@@ -1,0 +1,139 @@
+{
+  "name": "base_usdc",
+  "description": "Generic Base USDC developer quickstart request.",
+  "network_note": "Uses Base USDC identifiers for validation only. No mainnet funds are required for local request creation or status callbacks.",
+  "idempotency_key": "base-usdc-dev-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_base_usdc_dev_4200",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "developer_test",
+    "status": "awaiting_payment",
+    "title": "Developer test checkout",
+    "summary": "A local developer test context for a Base USDC Payment Request.",
+    "source": {
+      "agent_id": "agt_quickstart",
+      "agent_name": "Quickstart CLI",
+      "runtime": "cli",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Create a small local Base USDC request for wallet review."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "developer_fixture_selected",
+        "label": "Selected fixture",
+        "summary": "The developer selected the Base USDC quickstart fixture.",
+        "source_type": "user_provided"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "payment_requested",
+        "label": "Created Payment Request",
+        "summary": "Prepared a single Base USDC request for wallet review.",
+        "source_type": "payment_request_fact"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "dev_credit_bundle",
+        "name": "Developer credits",
+        "quantity": 1,
+        "unit_amount": "42.00",
+        "currency": "USDC"
+      }
+    ],
+    "costs": {
+      "total": "42.00",
+      "currency": "USDC"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_base_usdc_dev_fixture",
+        "type": "test_fixture",
+        "title": "Base USDC developer fixture",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:base-usdc-dev-fixture"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "42.00",
+        "currency": "USDC",
+        "source_type": "platform_verified",
+        "verification_status": "signature_verified",
+        "evidence_ref": "ev_base_usdc_dev_fixture",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.to",
+        "value": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+        "source_type": "platform_verified",
+        "verification_status": "address_verified",
+        "evidence_ref": "ev_base_usdc_dev_fixture",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_base_usdc_dev_4200",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_base_usdc_dev_4200",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "base-usdc-dev-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_quickstart",
+      "agent_name": "Quickstart CLI",
+      "runtime": "cli",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "VelarumPay Developer Test",
+      "domain": "fixtures.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "42.00",
+      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Developer test checkout",
+      "summary": "Quickstart CLI prepared a local Base USDC request.",
+      "primary_action": "Pay"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "developer_test"
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "pending",
+    "risk_level": "safe",
+    "signing_allowed": true
+  }
+}

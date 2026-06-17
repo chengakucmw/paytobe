@@ -12,3 +12,9 @@ For copyable JSON payloads and a no-private-key smoke check, use:
 ```bash
 node examples/payment-request-quickstart/smoke-check.mjs
 ```
+
+For command-by-command local quickstart, use:
+
+```bash
+node examples/payment-request-quickstart/cli.mjs help
+```

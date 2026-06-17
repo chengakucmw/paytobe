@@ -9,6 +9,7 @@ import {
 } from "../../packages/protocol/src/index.js";
 
 const FIXTURE_NAMES = [
+  "base_usdc",
   "normal",
   "stellar_xlm",
   "missing_context",

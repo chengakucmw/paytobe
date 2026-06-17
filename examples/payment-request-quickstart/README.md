@@ -6,6 +6,7 @@ These fixtures are for validation, local routing, and smoke checks. They do not 
 
 ## Fixtures
 
+- `fixtures/base_usdc.json`: generic Base USDC developer test request.
 - `fixtures/normal.json`: AgentFood normal pending request on Base USDC.
 - `fixtures/stellar_xlm.json`: valid Stellar XLM testnet request.
 - `fixtures/missing_context.json`: GearScout request with missing evidence warning.
@@ -48,6 +49,53 @@ The smoke check covers:
 - agent token rejection on wallet status update
 - `/v1/payment-requests/events` polling
 - `/v1/ws/agent` connection-token WebSocket status notification
+
+## CLI Quickstart
+
+Start the local Platform API first:
+
+```bash
+cd /Users/yang/code/VelarumPayCode/services/platform-api
+npm install
+OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
+```
+
+In another terminal, create and approve a local dev pairing. The dev approval uses wallet device credentials only; it does not grant signing permission and does not touch private keys:
+
+```bash
+cd /Users/yang/code/VelarumPayCode
+node examples/payment-request-quickstart/cli.mjs pair --approve-dev-wallet
+```
+
+Copy the exported `CONNECTION_TOKEN`, `WALLET_DEVICE_ID`, `WALLET_TOKEN`, and `QUICKSTART_RUN_ID` from the output. Then create a Transaction Context and Payment Request:
+
+```bash
+node examples/payment-request-quickstart/cli.mjs context:create --fixture stellar_xlm
+node examples/payment-request-quickstart/cli.mjs request:create --fixture stellar_xlm
+```
+
+For Base USDC, use the explicit developer fixture:
+
+```bash
+node examples/payment-request-quickstart/cli.mjs context:create --fixture base_usdc
+node examples/payment-request-quickstart/cli.mjs request:create --fixture base_usdc
+```
+
+Read status and poll events with the connection token:
+
+```bash
+node examples/payment-request-quickstart/cli.mjs request:get "$REQUEST_ID"
+node examples/payment-request-quickstart/cli.mjs events:poll --since 0
+```
+
+To simulate local wallet status callbacks, use the wallet credentials printed by `pair --approve-dev-wallet`:
+
+```bash
+node examples/payment-request-quickstart/cli.mjs request:reject "$REQUEST_ID"
+node examples/payment-request-quickstart/cli.mjs request:confirm "$REQUEST_ID" --tx-hash local-dev-confirmed
+```
+
+`request:confirm` is a local dev status callback only. It does not sign, broadcast, or require mainnet/testnet funds.
 
 ## Manual Curl Shape
 
