@@ -83,6 +83,7 @@ public class MainActivity extends FragmentActivity {
     private static final int RED_SOFT = Color.rgb(248, 230, 227);
     private static final int AMBER_SOFT = Color.rgb(244, 239, 216);
     private static final int DARK = Color.rgb(14, 20, 17);
+    private static final String ENCRYPTED_LOCAL_KEYRING = "Encrypted local keyring";
     private static final int CHAIN_ETH = Color.rgb(98, 126, 234);
     private static final int CHAIN_SOL = Color.rgb(20, 241, 149);
     private static final int CHAIN_STELLAR = Color.rgb(27, 31, 42);
@@ -2713,58 +2714,230 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void payIntent(PaymentIntent intent) {
+        paymentSigningReviewSheet(intent);
+    }
+
+    private boolean ensurePaymentReadyToSign(PaymentIntent intent) {
         String state = paymentDetailState(intent);
         RiskPolicy.Result risk = paymentDetailRisk(intent, state);
         if (!isPaymentDetailSignable(intent, state, risk)) {
             error("Payment blocked", new IllegalStateException(paymentDetailBlockedReason(intent, state, risk)));
-            return;
+            return false;
         }
-        if (!requireWallet()) return;
+        if (!requireWallet()) return false;
         try {
             if (PaymentInboxStore.hasCompletedIntent(this, intent)) {
                 error("Payment blocked", new IllegalStateException("Duplicate or completed payment request"));
-                return;
+                return false;
             }
         } catch (Exception e) {
             error("Payment blocked", e);
-            return;
+            return false;
         }
-        authenticate("Pay " + intent.asset, "Confirm local signing and broadcast.", () -> {
-            toast("Generating transaction");
-            paymentProgressSheet(
-                    "Generating transaction",
-                    "Preparing and signing the transaction locally.",
-                    null
-            );
-            new Thread(() -> {
+        return true;
+    }
+
+    private void paymentSigningReviewSheet(PaymentIntent intent) {
+        if (!ensurePaymentReadyToSign(intent)) return;
+        LinearLayout body = sheetBase("Review before signing");
+        body.addView(signingStepRow(0));
+        addGap(body, 12);
+        body.addView(text("Confirm the exact on-chain action before unlocking the encrypted local keyring.", 15, INK_SOFT, false));
+        addGap(body, 12);
+        body.addView(signingFactsCard(intent, false));
+        addGap(body, 12);
+        body.addView(warning(signingBoundaryCopy()));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Cancel", () -> paymentDetailsSheet(intent)), weight());
+        actions.addView(primaryButton("Continue", () -> paymentSigningAuthSheet(intent)), weightLeft());
+        body.addView(actions);
+        showSheet(body);
+    }
+
+    private void paymentSigningAuthSheet(PaymentIntent intent) {
+        if (!ensurePaymentReadyToSign(intent)) return;
+        LinearLayout body = sheetBase("Unlock encrypted keyring");
+        body.addView(signingStepRow(1));
+        addGap(body, 12);
+        body.addView(text("Use biometric unlock or device passcode. The keyring is unlocked only for this one local signature.", 15, INK_SOFT, false));
+        addGap(body, 12);
+        body.addView(signingFactsCard(intent, false));
+        addGap(body, 12);
+        body.addView(warning("No signature is created until local authentication succeeds. " + signingBoundaryCopy()));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Cancel", () -> paymentSigningCancelledSheet(
+                intent,
+                "Signing cancelled",
+                "No signature created",
+                "You cancelled before local authentication completed. The request is still unsigned."
+        )), weight());
+        actions.addView(primaryButton("Authenticate", () -> authenticate(
+                "Unlock encrypted keyring",
+                "Confirm local signing for " + signingAmountLine(intent) + ".",
+                () -> executePaymentAfterAuthentication(intent),
+                () -> paymentSigningCancelledSheet(
+                        intent,
+                        "Signing cancelled",
+                        "No signature created",
+                        "Local authentication did not complete. The request status was not changed."
+                )
+        )), weightLeft());
+        body.addView(actions);
+        showSheet(body);
+    }
+
+    private void paymentSigningCancelledSheet(PaymentIntent intent, String heading, String title, String message) {
+        LinearLayout body = sheetBase(heading);
+        body.addView(signingStepRow(1));
+        addGap(body, 12);
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(BLUE_SOFT, dp(20), Color.rgb(191, 214, 229), 1));
+        card.addView(text(title, 17, INK, true));
+        addGap(card, 8);
+        card.addView(text(message, 13, INK_SOFT, false));
+        body.addView(card);
+        addGap(body, 12);
+        body.addView(signingFactsCard(intent, false));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(primaryButton("Review signing again", () -> paymentSigningReviewSheet(intent)), weight());
+        actions.addView(outlineButton("Return to request", () -> paymentDetailsSheet(intent)), weightLeft());
+        body.addView(actions);
+        showSheet(body);
+    }
+
+    private void executePaymentAfterAuthentication(PaymentIntent intent) {
+        if (!ensurePaymentReadyToSign(intent)) return;
+        toast("Signing locally");
+        paymentProgressSheet(
+                "Unlock encrypted keyring",
+                "Local authentication completed. Preparing a one-time signature on this device.",
+                "Key source: " + ENCRYPTED_LOCAL_KEYRING
+        );
+        new Thread(() -> {
+            try {
+                String txHash = PaymentExecutor.execute(this, wallet, intent, detail -> {
+                    runOnUiThread(() -> paymentProgressSheet(
+                            "Signed locally",
+                            intent.network.length() > 0
+                                    ? "A local signature exists. Broadcasting to " + intent.network + "."
+                                    : "A local signature exists. Broadcasting to the network.",
+                            detail
+                    ));
+                    RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_SIGNED, null, null);
+                });
+                RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_BROADCASTED, txHash, null);
+                RiskPolicy.recordSuccessfulPayment(this, intent);
+                runOnUiThread(() -> {
+                    paymentSigningReceiptSheet(intent, txHash);
+                    renderPaymentInboxOnly();
+                    refreshBalancesAfterPayment();
+                });
+            } catch (Exception e) {
                 try {
-                    String txHash = PaymentExecutor.execute(this, wallet, intent, detail -> {
-                        runOnUiThread(() -> paymentProgressSheet(
-                                "The transaction has been generated",
-                                intent.network.length() > 0
-                                        ? "Broadcasting to " + intent.network + "."
-                                        : "Broadcasting to the network.",
-                                detail
-                        ));
-                        RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_SIGNED, null, null);
-                    });
-                    RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_BROADCASTED, txHash, null);
-                    RiskPolicy.recordSuccessfulPayment(this, intent);
-                    runOnUiThread(() -> {
-                        resultSheet("Payment broadcasted", txHash);
-                        renderPaymentInboxOnly();
-                        refreshBalancesAfterPayment();
-                    });
-                } catch (Exception e) {
-                    try {
-                        String status = intent.isExpired() ? PaymentIntent.STATUS_EXPIRED : PaymentIntent.STATUS_FAILED;
-                        RelayClient.updateStatus(this, intent, status, null, e.getMessage());
-                    } catch (Exception ignored) {
-                    }
-                    runOnUiThread(() -> error("Payment failed", e));
+                    String status = intent.isExpired() ? PaymentIntent.STATUS_EXPIRED : PaymentIntent.STATUS_FAILED;
+                    RelayClient.updateStatus(this, intent, status, null, e.getMessage());
+                } catch (Exception ignored) {
                 }
-            }).start();
-        });
+                runOnUiThread(() -> error("Payment failed", e));
+            }
+        }).start();
+    }
+
+    private void paymentSigningReceiptSheet(PaymentIntent intent, String txHash) {
+        LinearLayout body = sheetBase("Signed locally");
+        body.addView(signingStepRow(2));
+        addGap(body, 12);
+        body.addView(text("The transaction signature was created on this device. " + signingBoundaryCopy(), 15, INK_SOFT, false));
+        addGap(body, 12);
+        LinearLayout receipt = card();
+        receipt.setElevation(0);
+        receipt.setBackground(round(GREEN_SOFT, dp(20), Color.rgb(191, 216, 197), 1));
+        receipt.addView(text("Signature receipt", 18, INK, true));
+        receipt.addView(field("Request ID", signingRequestId(intent), true));
+        if (isUseful(txHash)) {
+            receipt.addView(field("Tx hash", txHash, true));
+        } else {
+            receipt.addView(field("Local signing status", "Signed locally", false));
+        }
+        receipt.addView(field("Amount", signingAmountLine(intent), false));
+        receipt.addView(field("Created by", ENCRYPTED_LOCAL_KEYRING, false));
+        body.addView(receipt);
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(primaryButton("View activity", this::openActivityFromSheet), weight());
+        actions.addView(outlineButton("Open request", () -> openUpdatedPaymentDetails(intent)), weightLeft());
+        body.addView(actions);
+        showSheet(body);
+    }
+
+    private void openUpdatedPaymentDetails(PaymentIntent intent) {
+        try {
+            PaymentIntent current = PaymentInboxStore.find(this, signingRequestId(intent));
+            paymentDetailsSheet(current == null ? intent : current);
+        } catch (Exception e) {
+            paymentDetailsSheet(intent);
+        }
+    }
+
+    private View signingStepRow(int active) {
+        LinearLayout steps = row();
+        String[] labels = {"Review", "Unlock", "Signed"};
+        for (int i = 0; i < labels.length; i++) {
+            int color = i == active ? (i == 1 ? BLUE : GREEN) : MUTED;
+            int bg = i == active ? (i == 1 ? BLUE_SOFT : GREEN_SOFT) : SOFT;
+            TextView step = pill((i + 1) + " " + labels[i], color, bg, Color.TRANSPARENT);
+            step.setGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(34), 1);
+            if (i > 0) lp.leftMargin = dp(8);
+            steps.addView(step, lp);
+        }
+        return steps;
+    }
+
+    private View signingFactsCard(PaymentIntent intent, boolean includeRequestId) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(20), LINE, 1));
+        card.addView(field("Payee", inboxPayeeLabel(intent), false));
+        card.addView(field("Recipient address", intent.to, true));
+        card.addView(field("Network", firstNonEmpty(intent.network, intent.request.network, "Unknown network"), false));
+        card.addView(field("Total", signingTotalLine(intent), false));
+        card.addView(field("Key source", ENCRYPTED_LOCAL_KEYRING, false));
+        if (includeRequestId) card.addView(field("Request ID", signingRequestId(intent), true));
+        return card;
+    }
+
+    private String signingAmountLine(PaymentIntent intent) {
+        return firstNonEmpty(intent.amount, intent.request.amount, "0") + " " + firstNonEmpty(intent.asset, intent.request.asset, "token");
+    }
+
+    private String signingTotalLine(PaymentIntent intent) {
+        String amount = firstNonEmpty(intent.amount, intent.request.amount, "0");
+        String asset = firstNonEmpty(intent.asset, intent.request.asset, "token");
+        String total = intent.request == null ? "" : intent.request.total;
+        if (isUseful(total) && !total.equals(amount)) {
+            return total.toUpperCase().contains(asset.toUpperCase()) ? total : total + " " + asset;
+        }
+        if (isUseful(intent.estimatedFee)) return amount + " " + asset + " + fee " + intent.estimatedFee;
+        return amount + " " + asset;
+    }
+
+    private String signingRequestId(PaymentIntent intent) {
+        return firstNonEmpty(
+                intent.velarumRequestId,
+                intent.request == null ? "" : intent.request.requestId,
+                intent.id,
+                intent.request == null ? "" : intent.request.legacyIntentId,
+                "local-request"
+        );
+    }
+
+    private String signingBoundaryCopy() {
+        return "Agent, connector, and VelarumPay server never receive seed material or signing authority.";
     }
 
     private String paymentDetailBlockedReason(PaymentIntent intent, String state, RiskPolicy.Result risk) {
@@ -2895,11 +3068,16 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void authenticate(String title, String subtitle, Runnable onSuccess) {
+        authenticate(title, subtitle, onSuccess, null);
+    }
+
+    private void authenticate(String title, String subtitle, Runnable onSuccess, Runnable onCancel) {
         int authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
         BiometricManager manager = BiometricManager.from(this);
         int can = manager.canAuthenticate(authenticators);
         if (can != BiometricManager.BIOMETRIC_SUCCESS) {
             toast("Biometric or device credential is not available");
+            if (onCancel != null) onCancel.run();
             return;
         }
         Executor executor = ContextCompat.getMainExecutor(this);
@@ -2911,7 +3089,11 @@ public class MainActivity extends FragmentActivity {
 
             @Override
             public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                toast("Authentication cancelled");
+                if (onCancel != null) {
+                    onCancel.run();
+                } else {
+                    toast("Authentication cancelled");
+                }
             }
         });
         BiometricPrompt.PromptInfo info = new BiometricPrompt.PromptInfo.Builder()
