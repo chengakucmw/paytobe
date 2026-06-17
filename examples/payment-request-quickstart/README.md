@@ -12,6 +12,7 @@ These fixtures are for validation, local routing, and smoke checks. They do not 
 - `fixtures/missing_context.json`: GearScout request with missing evidence warning.
 - `fixtures/mismatch.json`: TripPlanner payee and recipient mismatch blocker.
 - `fixtures/ai_only.json`: LearnScout AI-only critical claim warning.
+- `fixtures/expired.json`: AgentFood request materialized with a short TTL by the cross-component smoke harness.
 - `fixtures/asset_network_mismatch.json`: negative asset/network mismatch blocker.
 
 Every fixture includes:
@@ -49,6 +50,33 @@ The smoke check covers:
 - agent token rejection on wallet status update
 - `/v1/payment-requests/events` polling
 - `/v1/ws/agent` connection-token WebSocket status notification
+
+## Cross-Component Smoke Harness
+
+Run the developer preview harness from the repository root:
+
+```bash
+node scripts/cross-component-smoke.mjs
+```
+
+By default it starts a temporary local Platform API, runs the standard fixtures
+`normal`, `missing_context`, `mismatch`, `ai_only`, and `expired`, and verifies
+the SDK, CLI, OpenClaw payload builder, MCP tools, and Hermes adapter. It also
+covers Base USDC and Stellar XLM, list/detail reads, wallet status updates,
+events polling, and structured expected failures for API/schema/connector
+diagnostics.
+
+Use an existing API or write reports to a fixed directory:
+
+```bash
+BASE_URL=http://127.0.0.1:8787 node scripts/cross-component-smoke.mjs
+node scripts/cross-component-smoke.mjs --report-dir tests/smoke-results/manual
+node scripts/cross-component-smoke.mjs --json
+```
+
+The harness writes a machine-readable JSON result and a human-readable Markdown
+summary. It never reads private keys, seed phrases, signing keys, or mainnet
+funds.
 
 ## CLI Quickstart
 
