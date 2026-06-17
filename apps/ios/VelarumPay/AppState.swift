@@ -255,6 +255,9 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 guard intent.isPending else {
                     throw AppError.invalidResponse(intent.isExpired ? "Payment request expired." : "Payment request is already \(intent.status).")
                 }
+                guard isPaymentDetailSignable(intent) else {
+                    throw AppError.invalidResponse(paymentBlockedReason(intent))
+                }
                 guard intent.isStellarXLM else {
                     if intent.asset.uppercased() != "XLM", intent.network.lowercased().contains("stellar") {
                         try await stellar.canReceiveAsset(
