@@ -1,0 +1,125 @@
+{
+  "name": "hermes_stellar_xlm",
+  "description": "Hermes local agent Stellar XLM testnet Payment Request fixture.",
+  "network_note": "Uses Stellar testnet and does not require mainnet funds.",
+  "target_app_device_id": "wallet_dev_hermes",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_hermes_stellar_books_1001",
+    "connection_id": "conn_hermes_demo",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "online_purchase",
+    "status": "awaiting_payment",
+    "title": "Book order test payment",
+    "summary": "Hermes prepared a Stellar XLM testnet transfer for wallet review.",
+    "source": {
+      "agent_id": "agt_hermes_local",
+      "agent_name": "Hermes Local Agent",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Buy two books using a Stellar testnet payment."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "payment_requested",
+        "label": "Created testnet request",
+        "summary": "Prepared a Stellar XLM testnet Payment Request for wallet review.",
+        "source_type": "payment_request_fact"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "book_bundle",
+        "name": "Book bundle",
+        "quantity": 1,
+        "unit_amount": "32.50",
+        "currency": "XLM"
+      }
+    ],
+    "costs": {
+      "total": "32.50",
+      "currency": "XLM"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_hermes_books_checkout",
+        "type": "web_snapshot",
+        "title": "Hermes book checkout snapshot",
+        "source_url": "https://books.example/orders/1001",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:hermes-books-1001"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "32.50",
+        "currency": "XLM",
+        "source_type": "merchant_web_observed",
+        "verification_status": "observed_only",
+        "evidence_ref": "ev_hermes_books_checkout",
+        "confidence": "medium",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.to",
+        "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "source_type": "payment_request_fact",
+        "verification_status": "observed_only",
+        "confidence": "medium",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_hermes_stellar_books_1001",
+    "connection_id": "conn_hermes_demo",
+    "transaction_id": "txn_hermes_stellar_books_1001",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "hermes-stellar-books-1001-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_hermes_local",
+      "agent_name": "Hermes Local Agent",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "Hermes Books Test",
+      "domain": "books.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "XLM",
+      "amount": "32.50",
+      "to": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "memo": "hermes-books-1001",
+      "estimated_fee": "0.00001"
+    },
+    "display": {
+      "title": "Book order test payment",
+      "summary": "Hermes prepared a Stellar XLM testnet transfer.",
+      "primary_action": "Pay"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "online_purchase",
+      "connector": "hermes"
+    }
+  }
+}

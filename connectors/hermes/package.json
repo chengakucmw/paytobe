@@ -1,0 +1,14 @@
+{
+  "name": "@velarumpay/hermes-connector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --test test/*.test.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

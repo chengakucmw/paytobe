@@ -1,0 +1,134 @@
+{
+  "name": "hermes_base_usdc",
+  "description": "Hermes local agent Base USDC Payment Request fixture.",
+  "network_note": "Uses Base USDC identifiers for validation only. No mainnet funds are required for local request creation or status callbacks.",
+  "target_app_device_id": "wallet_dev_hermes",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_hermes_base_dev_4200",
+    "connection_id": "conn_hermes_demo",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "developer_test",
+    "status": "awaiting_payment",
+    "title": "Hermes developer test checkout",
+    "summary": "Hermes prepared a Base USDC Payment Request for local wallet review.",
+    "source": {
+      "agent_id": "agt_hermes_local",
+      "agent_name": "Hermes Local Agent",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Create a small Base USDC developer test request."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "developer_fixture_selected",
+        "label": "Selected Hermes fixture",
+        "summary": "The developer selected the Hermes Base USDC fixture.",
+        "source_type": "user_provided"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "payment_requested",
+        "label": "Created Payment Request",
+        "summary": "Prepared a Base USDC Payment Request for wallet review.",
+        "source_type": "payment_request_fact"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "dev_credit_bundle",
+        "name": "Developer credits",
+        "quantity": 1,
+        "unit_amount": "42.00",
+        "currency": "USDC"
+      }
+    ],
+    "costs": {
+      "total": "42.00",
+      "currency": "USDC"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_hermes_base_usdc_fixture",
+        "type": "test_fixture",
+        "title": "Hermes Base USDC developer fixture",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:hermes-base-usdc-dev-fixture"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "42.00",
+        "currency": "USDC",
+        "source_type": "platform_verified",
+        "verification_status": "signature_verified",
+        "evidence_ref": "ev_hermes_base_usdc_fixture",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.to",
+        "value": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+        "source_type": "platform_verified",
+        "verification_status": "address_verified",
+        "evidence_ref": "ev_hermes_base_usdc_fixture",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_hermes_base_dev_4200",
+    "connection_id": "conn_hermes_demo",
+    "transaction_id": "txn_hermes_base_dev_4200",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "hermes-base-dev-4200-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_hermes_local",
+      "agent_name": "Hermes Local Agent",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "VelarumPay Hermes Developer Test",
+      "domain": "fixtures.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "42.00",
+      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Hermes developer test checkout",
+      "summary": "Hermes prepared a Base USDC Payment Request.",
+      "primary_action": "Pay"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "developer_test",
+      "connector": "hermes"
+    }
+  }
+}
