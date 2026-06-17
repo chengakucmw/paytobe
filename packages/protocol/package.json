@@ -1,0 +1,15 @@
+{
+  "name": "@velarumpay/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./fixtures": "./src/fixtures.js"
+  },
+  "scripts": {
+    "check": "node --check src/index.js && node --check src/constants.js && node --check src/fixtures.js && node --check src/validators.js",
+    "test": "node --test ../../tests/protocol/*.test.mjs"
+  }
+}

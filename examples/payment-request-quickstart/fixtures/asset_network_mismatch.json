@@ -1,0 +1,127 @@
+{
+  "name": "asset_network_mismatch",
+  "description": "Negative fixture where context says Stellar XLM but the Payment Request asks for Base USDC.",
+  "network_note": "No funds are required. This fixture is expected to create a structured blocker risk.",
+  "idempotency_key": "asset-network-mismatch-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_asset_network_mismatch_55",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "developer_test",
+    "status": "awaiting_payment",
+    "title": "Asset and network mismatch sample",
+    "summary": "Context evidence says Stellar XLM, but the payment request hard facts ask for Base USDC.",
+    "source": {
+      "agent_id": "agt_quickstart",
+      "agent_name": "Quickstart Fixture",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Demonstrate a structured asset and network mismatch blocker."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "mismatch_seeded",
+        "label": "Seeded mismatch",
+        "summary": "The context intentionally conflicts with Payment Request hard facts.",
+        "source_type": "platform_verified"
+      }
+    ],
+    "items": [],
+    "costs": {
+      "total": "55.00",
+      "currency": "XLM"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_asset_network_mismatch",
+        "type": "test_fixture",
+        "title": "Asset and network mismatch evidence",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:asset-network-mismatch"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "payment.asset",
+        "value": "XLM",
+        "source_type": "platform_verified",
+        "verification_status": "signature_verified",
+        "evidence_ref": "ev_asset_network_mismatch",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.network",
+        "value": "stellar_testnet",
+        "source_type": "platform_verified",
+        "verification_status": "signature_verified",
+        "evidence_ref": "ev_asset_network_mismatch",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_asset_network_mismatch_55",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_asset_network_mismatch_55",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "asset-network-mismatch-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_quickstart",
+      "agent_name": "Quickstart Fixture",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "Mismatch Fixture",
+      "domain": "fixtures.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "55.00",
+      "to": "0x140dc8a3eb8f291d85fb5efbe1885924b5d20f11",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Asset and network mismatch sample",
+      "summary": "This request should be blocked by deterministic risk rules.",
+      "primary_action": "Review"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "developer_test"
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "blocked",
+    "risk_level": "danger",
+    "signing_allowed": false,
+    "error_codes": [
+      "context_asset_mismatch",
+      "context_network_mismatch"
+    ]
+  }
+}

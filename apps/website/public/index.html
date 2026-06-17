@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VelarumPay</title>
+    <meta
+      name="description"
+      content="VelarumPay is a self-custodial mobile wallet for AI-agent-initiated payments, local signing, and human confirmation."
+    />
+    <meta property="og:title" content="VelarumPay" />
+    <meta
+      property="og:description"
+      content="A self-custodial mobile wallet for reviewing and approving AI-agent payment requests."
+    />
+    <meta property="og:image" content="/assets/VelarumPay-hero.png" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="VelarumPay home">
+        <span class="brand-mark">VP</span>
+        <span>VelarumPay</span>
+      </a>
+      <nav class="nav" aria-label="Primary navigation">
+        <a href="#wallet">Wallet</a>
+        <a href="#security">Security</a>
+        <a href="#demo">Demo</a>
+        <a class="nav-action" href="/download/android">Android demo</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img class="hero-image" src="/assets/VelarumPay-hero.png" alt="VelarumPay mobile app payment confirmation preview" />
+        <div class="hero-shade"></div>
+        <div class="hero-copy">
+          <p class="eyebrow">Self-custodial AI payment wallet</p>
+          <h1>VelarumPay</h1>
+          <p class="hero-text">
+            Review AI-agent payment requests, confirm the details, and sign crypto transactions locally on your phone.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="/download/android">Download Android demo</a>
+            <a class="button secondary" href="https://agentfood.velarumai.com/demo">Open AgentFood demo</a>
+          </div>
+        </div>
+      </section>
+
+      <section id="wallet" class="section intro">
+        <div>
+          <p class="eyebrow">Built for human confirmation</p>
+          <h2>A wallet that stays between your AI agent and your assets.</h2>
+        </div>
+        <p>
+          VelarumPay receives structured payment requests from trusted agent workflows, shows the merchant, recipient,
+          amount, chain, asset, order details, and risk warnings, then waits for explicit user approval before signing.
+        </p>
+      </section>
+
+      <section class="feature-grid" aria-label="VelarumPay capabilities">
+        <article class="feature-card">
+          <span>01</span>
+          <h3>Payment request inbox</h3>
+          <p>AI-created intents arrive as reviewable requests with order context, chain data, and status history.</p>
+        </article>
+        <article class="feature-card">
+          <span>02</span>
+          <h3>Local wallet signing</h3>
+          <p>Private keys stay on the phone. Signing happens only after the user confirms and authenticates.</p>
+        </article>
+        <article class="feature-card">
+          <span>03</span>
+          <h3>XLM and USDC demos</h3>
+          <p>Current demo flows support Stellar XLM and Base USDC payment request handling.</p>
+        </article>
+        <article class="feature-card">
+          <span>04</span>
+          <h3>Relay connection</h3>
+          <p>A lightweight relay connects desktop agents, Telegram demos, and the mobile wallet without exposing keys.</p>
+        </article>
+      </section>
+
+      <section id="security" class="section split">
+        <div>
+          <p class="eyebrow">Security boundary</p>
+          <h2>The agent proposes. The wallet decides.</h2>
+        </div>
+        <div class="security-list">
+          <div>
+            <strong>No cloud private keys</strong>
+            <p>OpenClaw, Telegram integrations, and relay services never receive seed phrases or signing material.</p>
+          </div>
+          <div>
+            <strong>Human-in-the-loop approval</strong>
+            <p>Every payment request is shown before signing, including recipient, asset, amount, and irreversible-payment warnings.</p>
+          </div>
+          <div>
+            <strong>Payment proof trail</strong>
+            <p>Requests, status updates, and transaction hashes are tracked so demos can be inspected end to end.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="demo" class="demo-band">
+        <div>
+          <p class="eyebrow">Live demo</p>
+          <h2>Try the AgentFood payment flow.</h2>
+          <p>
+            The food delivery site is simulated, but the wallet confirmation flow is real: create an order, receive a payment
+            request, inspect it in VelarumPay, then decide whether to pay.
+          </p>
+        </div>
+        <a class="button primary" href="https://agentfood.velarumai.com/demo">Open demo setup</a>
+      </section>
+
+      <section class="section footer-cta">
+        <p class="eyebrow">VelarumPay</p>
+        <h2>Self-custody for agent-driven payments.</h2>
+        <p>Designed for demos today, shaped for a safer payment layer between autonomous agents and user-owned wallets.</p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>VelarumPay</span>
+      <span>Human approval before wallet signing.</span>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,325 @@
+package ai.agentwallet.hd;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
+
+final class PaymentIntent {
+    static final String STATUS_PENDING = "pending";
+    static final String STATUS_SIGNED = "signed";
+    static final String STATUS_BROADCASTED = "broadcasted";
+    static final String STATUS_CONFIRMED = "confirmed";
+    static final String STATUS_FAILED = "failed";
+    static final String STATUS_EXPIRED = "expired";
+    static final String STATUS_REJECTED = "rejected";
+
+    final String id;
+    final String status;
+    final long createdAt;
+    final long expiresAt;
+    final String sourceType;
+    final String sourceChannel;
+    final String sourceDeviceId;
+    final String velarumRequestId;
+    final String velarumPayloadHash;
+    final String rail;
+    final String network;
+    final long chainId;
+    final String asset;
+    final String assetIssuer;
+    final String tokenContract;
+    final int decimals;
+    final String amount;
+    final String to;
+    final String memo;
+    final String rpcUrl;
+    final String horizonUrl;
+    final boolean stellarTestnet;
+    final String estimatedFee;
+    final String idempotencyKey;
+    final String txHash;
+    final String error;
+    final String displayTitle;
+    final String displaySummary;
+    final String displayButton;
+    final PaymentRequest request;
+    final String merchantName;
+    final String merchantWebsite;
+    final String merchantCategory;
+    final String recipientName;
+    final String orderId;
+    final String orderType;
+    final String orderUrl;
+    final String shoppingSiteUrl;
+    final String restaurantName;
+    final String restaurantCuisine;
+    final String restaurantImageUrl;
+    final String restaurantUrl;
+    final String itemSummary;
+    final String orderSubtotalUsd;
+    final String orderDeliveryFeeUsd;
+    final String orderTotalUsd;
+    final String orderEtaMinutes;
+    final String agentPrompt;
+    final String agentNote;
+    final List<OrderItem> orderItems;
+    final List<String> warnings;
+    final JSONObject raw;
+
+    private PaymentIntent(JSONObject raw) {
+        request = PaymentRequest.parse(raw);
+        this.raw = request.toJson();
+        raw = this.raw;
+        JSONObject payment = raw.optJSONObject("payment");
+        if (payment == null) payment = new JSONObject();
+        JSONObject source = raw.optJSONObject("source");
+        if (source == null) source = new JSONObject();
+        JSONObject velarum = raw.optJSONObject("velarum");
+        if (velarum == null) velarum = new JSONObject();
+        JSONObject risk = raw.optJSONObject("risk");
+        if (risk == null) risk = new JSONObject();
+        JSONObject display = raw.optJSONObject("display");
+        if (display == null) display = new JSONObject();
+        JSONObject metadata = raw.optJSONObject("metadata");
+        if (metadata == null) metadata = new JSONObject();
+        JSONObject order = firstObject(
+                raw.optJSONObject("order"),
+                velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("order"),
+                metadata.optJSONObject("food_order")
+        );
+        if (order == null) order = new JSONObject();
+        JSONObject restaurant = order.optJSONObject("restaurant");
+        if (restaurant == null) restaurant = new JSONObject();
+        JSONObject pricing = order.optJSONObject("pricing");
+        if (pricing == null) pricing = new JSONObject();
+        JSONObject merchant = firstObject(raw.optJSONObject("merchant"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("merchant"));
+        if (merchant == null) merchant = new JSONObject();
+        JSONObject recipient = firstObject(raw.optJSONObject("recipient"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("recipient"));
+        if (recipient == null) recipient = new JSONObject();
+        JSONObject agentContext = order.optJSONObject("agent_context");
+        if (agentContext == null) agentContext = new JSONObject();
+
+        id = request.id;
+        status = request.status;
+        createdAt = request.createdAt;
+        expiresAt = request.expiresAt;
+        sourceType = request.sourceType;
+        sourceChannel = request.sourceChannel;
+        sourceDeviceId = firstNonEmpty(request.sourceDeviceLabel, request.sourceDeviceId);
+        velarumRequestId = request.requestId;
+        velarumPayloadHash = velarum.optString("payload_hash", "");
+        rail = request.rail;
+        network = request.network;
+        chainId = request.chainId;
+        asset = request.asset;
+        tokenContract = request.tokenContract;
+        assetIssuer = request.assetIssuer;
+        decimals = request.decimals;
+        amount = request.amount;
+        to = request.recipient;
+        memo = request.memo;
+        rpcUrl = request.rpcUrl;
+        stellarTestnet = request.stellarTestnet;
+        horizonUrl = request.horizonUrl;
+        estimatedFee = request.estimatedFee;
+        idempotencyKey = request.idempotencyKey;
+        txHash = request.txHash;
+        error = request.error;
+        displayTitle = request.displayTitle;
+        displaySummary = request.displaySummary;
+        displayButton = request.displayButton;
+        merchantName = firstNonEmpty(merchant.optString("name", ""), request.payeeName);
+        merchantWebsite = normalizePublicUrl(firstNonEmpty(merchant.optString("website", ""), request.payeeDomain));
+        merchantCategory = merchant.optString("category", "");
+        recipientName = firstNonEmpty(recipient.optString("name", ""), request.payeeName);
+        orderId = order.optString("id", order.optString("order_id", ""));
+        orderType = order.optString("type", "");
+        orderUrl = normalizePublicUrl(order.optString("url", ""));
+        shoppingSiteUrl = normalizePublicUrl(firstNonEmpty(order.optString("shopping_site_url", ""), order.optString("website_url", ""), orderUrl, merchantWebsite));
+        restaurantName = restaurant.optString("name", "");
+        restaurantCuisine = restaurant.optString("cuisine", "");
+        restaurantImageUrl = firstNonEmpty(restaurant.optString("image_url", ""), restaurant.optString("hero_image_url", ""));
+        restaurantUrl = normalizePublicUrl(restaurant.optString("url", ""));
+        itemSummary = order.optString("item_summary", "");
+        orderSubtotalUsd = pricing.optString("subtotal_usd", "");
+        orderDeliveryFeeUsd = pricing.optString("delivery_fee_usd", "");
+        orderTotalUsd = pricing.optString("total_usd", "");
+        orderEtaMinutes = String.valueOf(restaurant.opt("eta_minutes") == null ? "" : restaurant.opt("eta_minutes"));
+        agentPrompt = agentContext.optString("user_prompt", "");
+        agentNote = agentContext.optString("note", "");
+        orderItems = readOrderItems(order.optJSONArray("items"));
+        warnings = request.warnings;
+    }
+
+    static PaymentIntent parse(JSONObject raw) {
+        return new PaymentIntent(raw);
+    }
+
+    static PaymentIntent parse(String raw) throws Exception {
+        return parse(new JSONObject(raw));
+    }
+
+    JSONObject toJson() {
+        return raw;
+    }
+
+    boolean isExpired() {
+        return System.currentTimeMillis() > expiresAt;
+    }
+
+    boolean isBaseUsdc() {
+        return (rail.equals("evm_erc20") || rail.equals("base_usdc"))
+                && network.equals("base_mainnet")
+                && chainId == 8453L
+                && asset.equalsIgnoreCase("USDC");
+    }
+
+    boolean isStellarXlm() {
+        return rail.equals("stellar_xlm") && asset.equalsIgnoreCase("XLM");
+    }
+
+    boolean isStellarAsset() {
+        return (rail.equals("stellar_asset") || network.toLowerCase().contains("stellar"))
+                && !asset.equalsIgnoreCase("XLM");
+    }
+
+    String title() {
+        if (displayTitle.length() > 0) return displayTitle;
+        if (isBaseUsdc()) return "Send " + amount + " USDC";
+        if (isStellarXlm()) return "Send " + amount + " XLM";
+        if (isStellarAsset()) return "Send " + amount + " " + asset;
+        return "Payment Request";
+    }
+
+    String summary() {
+        if (displaySummary.length() > 0) return displaySummary;
+        if (itemSummary.length() > 0) return itemSummary;
+        if (request.summary().length() > 0) return request.summary();
+        return sourceLabel();
+    }
+
+    String payButtonLabel() {
+        if (displayButton.length() > 0) return displayButton;
+        return request.payButtonLabel();
+    }
+
+    boolean hasOrderDetails() {
+        return orderId.length() > 0 || restaurantName.length() > 0 || itemSummary.length() > 0 || !orderItems.isEmpty();
+    }
+
+    String primaryImageUrl() {
+        for (OrderItem item : orderItems) {
+            if (item.imageUrl.length() > 0) return item.imageUrl;
+        }
+        return restaurantImageUrl;
+    }
+
+    String sourceLabel() {
+        return request.sourceLabel();
+    }
+
+    private static JSONObject firstObject(JSONObject... values) {
+        if (values == null) return null;
+        for (JSONObject value : values) {
+            if (value != null) return value;
+        }
+        return null;
+    }
+
+    private static String firstNonEmpty(String... values) {
+        if (values == null) return "";
+        for (String value : values) {
+            if (value != null && value.trim().length() > 0 && !"null".equalsIgnoreCase(value.trim())) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    private static List<OrderItem> readOrderItems(JSONArray array) {
+        List<OrderItem> out = new ArrayList<>();
+        if (array == null) return out;
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject item = array.optJSONObject(i);
+            if (item == null) continue;
+            out.add(new OrderItem(
+                    item.optString("name", item.optString("item_id", "Item")),
+                    item.optInt("quantity", 1),
+                    item.optString("line_total_usd", ""),
+                    item.optString("description", ""),
+                    item.optString("image_url", ""),
+                    normalizePublicUrl(item.optString("url", "")),
+                    item.optString("note", "")
+            ));
+        }
+        return out;
+    }
+
+    private static List<String> readWarnings(JSONArray array) {
+        List<String> out = new ArrayList<>();
+        if (array == null) return out;
+        for (int i = 0; i < array.length(); i++) {
+            JSONObject item = array.optJSONObject(i);
+            if (item != null) {
+                out.add(firstNonEmpty(item.optString("message", ""), item.optString("code", ""), item.toString()));
+            } else {
+                out.add(array.optString(i));
+            }
+        }
+        return out;
+    }
+
+    private static long parseTime(String value, long fallback) {
+        if (value == null || value.length() == 0) return fallback;
+        try {
+            return java.time.Instant.parse(value).toEpochMilli();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private static String normalizeStatus(String value) {
+        if ("pending_user_approval".equals(value)) return STATUS_PENDING;
+        return value == null || value.length() == 0 ? STATUS_PENDING : value;
+    }
+
+    private static String normalizePublicUrl(String value) {
+        if (value == null) return "";
+        String clean = value.trim();
+        if (clean.startsWith("http://localhost:8090")) {
+            return "https://agentfood.velarumai.com" + clean.substring("http://localhost:8090".length());
+        }
+        if (clean.startsWith("http://127.0.0.1:8090")) {
+            return "https://agentfood.velarumai.com" + clean.substring("http://127.0.0.1:8090".length());
+        }
+        return clean;
+    }
+
+    private static String stellarHorizonUrl(String value, boolean testnet) {
+        String trimmed = value == null ? "" : value.trim();
+        if (trimmed.length() > 0) return trimmed;
+        return testnet ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org";
+    }
+
+    static final class OrderItem {
+        final String name;
+        final int quantity;
+        final String lineTotalUsd;
+        final String description;
+        final String imageUrl;
+        final String url;
+        final String note;
+
+        OrderItem(String name, int quantity, String lineTotalUsd, String description, String imageUrl, String url, String note) {
+            this.name = name;
+            this.quantity = quantity;
+            this.lineTotalUsd = lineTotalUsd;
+            this.description = description;
+            this.imageUrl = imageUrl;
+            this.url = url;
+            this.note = note;
+        }
+    }
+}

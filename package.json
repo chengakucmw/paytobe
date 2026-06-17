@@ -1,0 +1,17 @@
+{
+  "name": "velarumpay-code",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/protocol",
+    "services/platform-api",
+    "connectors/openclaw-telegram"
+  ],
+  "scripts": {
+    "check": "npm run check:protocol && npm run check:platform-api && npm run check:openclaw-telegram",
+    "check:protocol": "npm --prefix packages/protocol run check",
+    "check:platform-api": "npm --prefix services/platform-api run check",
+    "check:openclaw-telegram": "npm --prefix connectors/openclaw-telegram run check",
+    "test": "npm --prefix services/platform-api test"
+  }
+}

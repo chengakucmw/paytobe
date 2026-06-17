@@ -1,0 +1,158 @@
+{
+  "name": "ai_only",
+  "description": "LearnScout request with AI-only critical claims, aligned with the source-review prototype.",
+  "network_note": "Uses Base USDC identifiers for validation only. No funds are required.",
+  "idempotency_key": "learnscout-course-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_ai_only_course_99",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "online_purchase",
+    "status": "awaiting_payment",
+    "title": "Course checkout with AI-only refund claim",
+    "summary": "Refund and access terms are supported only by AI claims and page observation.",
+    "source": {
+      "agent_id": "agt_learnscout",
+      "agent_name": "LearnScout",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Find a practical API security course under 120 USDC with refund protection."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "options_compared",
+        "label": "Compared options",
+        "summary": "LearnScout compared three course pages and selected NovaCourse Lab.",
+        "source_type": "user_agent_inferred"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "weak_claims_captured",
+        "label": "Captured weak claims",
+        "summary": "Refund policy came from merchant AI and access terms came from page observation only.",
+        "source_type": "merchant_ai_claim"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "api_security_course",
+        "name": "API Security Course",
+        "quantity": 1,
+        "unit_amount": "99.00",
+        "currency": "USDC"
+      }
+    ],
+    "costs": {
+      "total": "99.00",
+      "currency": "USDC"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_course_page",
+        "type": "web_snapshot",
+        "title": "Course landing page",
+        "source_url": "https://novacourse.example/api-security",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:novacourse-page"
+      },
+      {
+        "evidence_id": "ev_merchant_ai_chat",
+        "type": "agent_summary",
+        "title": "Merchant AI refund chat",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:merchant-ai-chat"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "99.00",
+        "currency": "USDC",
+        "source_type": "merchant_web_observed",
+        "verification_status": "observed_only",
+        "evidence_ref": "ev_course_page",
+        "confidence": "medium",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "refund_policy",
+        "value": "7-day refund",
+        "source_type": "merchant_ai_claim",
+        "verification_status": "ai_claim_only",
+        "evidence_ref": "ev_merchant_ai_chat",
+        "confidence": "low",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "recommendation",
+        "value": "Best fit under budget",
+        "source_type": "user_agent_inferred",
+        "verification_status": "inferred_only",
+        "confidence": "medium",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_ai_only_course_99",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_ai_only_course_99",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "learnscout-course-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_learnscout",
+      "agent_name": "LearnScout",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "NovaCourse Lab",
+      "domain": "novacourse.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "99.00",
+      "to": "0x6e182544a17bc2206ad7095b61f884e7f2d1d40b",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Course checkout with AI-only refund claim",
+      "summary": "LearnScout found a course, but critical claims need source review.",
+      "primary_action": "Review"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "online_purchase"
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "source_review_required",
+    "risk_level": "caution",
+    "signing_allowed": true,
+    "warning_codes": [
+      "ai_only_critical_field"
+    ]
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "name": "normal",
+  "description": "AgentFood normal pending request aligned with the pending-ready-to-sign prototype.",
+  "network_note": "Uses Base USDC identifiers for validation only. The smoke check rejects the request and does not require funds or private keys.",
+  "idempotency_key": "agentfood-run-1842-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_agentfood_1842",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "food_order",
+    "status": "awaiting_payment",
+    "title": "Dinner order from Oaxaca Kitchen",
+    "summary": "AgentFood built your dinner order under the limit you set.",
+    "source": {
+      "agent_id": "agt_agentfood",
+      "agent_name": "AgentFood",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Order dinner from Oaxaca Kitchen, keep it under 30 USDC."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "intent_received",
+        "label": "Read your request",
+        "summary": "You asked AgentFood to order dinner and keep the total under 30 USDC.",
+        "source_type": "user_provided"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "cart_built",
+        "label": "Built a cart",
+        "summary": "Selected Mole Negro Plate, Horchata, tax and service.",
+        "source_type": "merchant_web_observed"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "payment_requested",
+        "label": "Created Payment Request",
+        "summary": "Prepared a single USDC transfer on Base for review.",
+        "source_type": "payment_request_fact"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "item_mole_negro",
+        "name": "Mole Negro Plate",
+        "quantity": 1,
+        "unit_amount": "16.00",
+        "currency": "USDC"
+      },
+      {
+        "item_id": "item_horchata",
+        "name": "Horchata",
+        "quantity": 1,
+        "unit_amount": "4.00",
+        "currency": "USDC"
+      }
+    ],
+    "costs": {
+      "subtotal": "20.00",
+      "tax": "2.40",
+      "service_fee": "1.60",
+      "total": "24.00",
+      "currency": "USDC"
+    },
+    "media": [
+      {
+        "media_id": "media_oaxaca_logo",
+        "type": "merchant_logo",
+        "title": "Oaxaca Kitchen",
+        "source_type": "platform_verified"
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "ev_agentfood_quote",
+        "type": "signed_quote",
+        "title": "AgentFood signed checkout quote",
+        "source_url": "https://agentfood.example/orders/1842",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:agentfood1842",
+        "signature": {
+          "algorithm": "ed25519",
+          "verified": true,
+          "key_id": "agentfood_demo_key_2026_01"
+        }
+      },
+      {
+        "evidence_id": "ev_oaxaca_address_binding",
+        "type": "address_binding",
+        "title": "Oaxaca Kitchen recipient binding",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:oaxaca-binding"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "24.00",
+        "currency": "USDC",
+        "source_type": "merchant_signed_quote",
+        "verification_status": "signature_verified",
+        "evidence_ref": "ev_agentfood_quote",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.to",
+        "value": "0x9b1c2f4e3a8d5c6b7e9f0a1b2c3d4e5f60718293",
+        "source_type": "platform_verified",
+        "verification_status": "address_verified",
+        "evidence_ref": "ev_oaxaca_address_binding",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": []
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_agentfood_1842",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_agentfood_1842",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "agentfood-run-1842-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_agentfood",
+      "agent_name": "AgentFood",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "Oaxaca Kitchen",
+      "domain": "oaxaca.example",
+      "verified": true
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "24.00",
+      "to": "0x9b1c2f4e3a8d5c6b7e9f0a1b2c3d4e5f60718293",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Dinner order from Oaxaca Kitchen",
+      "summary": "AgentFood prepared a one-time USDC payment.",
+      "primary_action": "Pay"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "food_order",
+      "food_order": {
+        "order_id": "ord_agentfood_1842",
+        "restaurant": {
+          "name": "Oaxaca Kitchen"
+        }
+      }
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "pending",
+    "risk_level": "safe",
+    "signing_allowed": true
+  }
+}

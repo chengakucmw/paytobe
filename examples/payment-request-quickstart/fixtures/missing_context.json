@@ -1,0 +1,133 @@
+{
+  "name": "missing_context",
+  "description": "GearScout request with incomplete Transaction Context evidence, aligned with the missing-context prototype.",
+  "network_note": "Uses Base USDC identifiers for validation only. No funds are required.",
+  "idempotency_key": "gearscout-reservation-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_missing_evidence_169",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "online_purchase",
+    "status": "awaiting_payment",
+    "title": "Hardware wallet reservation",
+    "summary": "The Payment Request arrived, but item evidence and source pages are missing.",
+    "source": {
+      "agent_id": "agt_gearscout",
+      "agent_name": "GearScout",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Reserve a hardware wallet."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "payment_facts_received",
+        "label": "Received payment facts",
+        "summary": "Amount, token, network and recipient are visible.",
+        "source_type": "payment_request_fact"
+      },
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "context_missing",
+        "label": "Context missing",
+        "summary": "Items, source page and agent reasoning are unavailable.",
+        "source_type": "unknown"
+      }
+    ],
+    "items": [],
+    "costs": {
+      "total": "169.00",
+      "currency": "USDC"
+    },
+    "media": [],
+    "evidence": [],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "payment.amount",
+        "value": "169.00",
+        "currency": "USDC",
+        "source_type": "payment_request_fact",
+        "verification_status": "observed_only",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [
+      {
+        "field": "items",
+        "reason": "Product evidence was not received from context.",
+        "severity": "warning"
+      },
+      {
+        "field": "evidence.checkout_page",
+        "reason": "Source checkout page is missing.",
+        "severity": "review_required"
+      }
+    ],
+    "risk_findings": [
+      {
+        "code": "critical_field_missing_evidence",
+        "severity": "warning",
+        "field": "items",
+        "message": "Item evidence is missing."
+      }
+    ]
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_missing_evidence_169",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_missing_evidence_169",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "gearscout-reservation-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_gearscout",
+      "agent_name": "GearScout",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "Northstar Devices",
+      "domain": "northstar.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "169.00",
+      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.02"
+    },
+    "display": {
+      "title": "Hardware wallet reservation",
+      "summary": "GearScout prepared a payment, but context evidence is incomplete.",
+      "primary_action": "Review"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "online_purchase"
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "missing_context",
+    "risk_level": "caution",
+    "signing_allowed": false,
+    "warning_codes": [
+      "context_missing"
+    ]
+  }
+}

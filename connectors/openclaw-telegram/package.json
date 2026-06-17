@@ -1,0 +1,11 @@
+{
+  "name": "openclaw-agentwallet-telegram-skill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dry-run": "node src/index.js --dry-run",
+    "check": "node --check src/index.js && node --check src/parser.js && node --check src/intent_builder.js && node --check src/velarum_adapter.js && node --check src/relay_client.js"
+  }
+}

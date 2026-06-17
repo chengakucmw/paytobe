@@ -1,0 +1,48 @@
+# macOS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and local machine configuration
+.env
+.env.*
+!.env.example
+local.properties
+
+# Dependency directories
+node_modules/
+Pods/
+
+# Build outputs and caches
+build/
+.gradle/
+out/
+dist/
+coverage/
+.turbo/
+.next/
+
+# Android artifacts
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# iOS/Xcode artifacts
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+
+# Logs and runtime state
+*.log
+logs/
+tmp/
+*.tmp
+*.pid
+*.seed
+runtime-store*.json
+*runtime-store.json
+payment-inbox-store*.json
+transaction-history-store*.json

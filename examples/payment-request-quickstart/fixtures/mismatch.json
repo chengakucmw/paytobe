@@ -1,0 +1,141 @@
+{
+  "name": "mismatch",
+  "description": "TripPlanner payee/recipient mismatch aligned with the risk-blocked prototype.",
+  "network_note": "Uses Base USDC identifiers for validation only. No funds are required.",
+  "idempotency_key": "tripplanner-hotel-deposit-payment-1",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_hotel_mismatch_240",
+    "connection_id": "conn_quickstart_placeholder",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "travel_booking",
+    "status": "awaiting_payment",
+    "title": "Hotel deposit with payee mismatch",
+    "summary": "The verified hotel profile does not match the payment recipient.",
+    "source": {
+      "agent_id": "agt_tripplanner",
+      "agent_name": "TripPlanner",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "user_intent": {
+      "prompt_summary": "Hold a refundable hotel deposit under 250 USDC."
+    },
+    "agent_activity": [
+      {
+        "at": "2026-06-17T10:00:00.000Z",
+        "action": "mismatch_detected",
+        "label": "Detected mismatch",
+        "summary": "The transfer recipient differs from the verified hotel address.",
+        "source_type": "platform_verified"
+      }
+    ],
+    "items": [
+      {
+        "item_id": "hotel_deposit",
+        "name": "Hotel deposit",
+        "quantity": 1,
+        "unit_amount": "240.00",
+        "currency": "USDC"
+      }
+    ],
+    "costs": {
+      "total": "240.00",
+      "currency": "USDC"
+    },
+    "media": [],
+    "evidence": [
+      {
+        "evidence_id": "ev_canal_house_profile",
+        "type": "address_binding",
+        "title": "Canal House Hotel verified profile",
+        "captured_at": "2026-06-17T10:00:00.000Z",
+        "hash": "sha256:canal-profile"
+      }
+    ],
+    "provenance": {
+      "model": "truth_layer_v1"
+    },
+    "truth_fields": [
+      {
+        "field": "payee.name",
+        "value": "Canal House Hotel",
+        "source_type": "platform_verified",
+        "verification_status": "domain_verified",
+        "evidence_ref": "ev_canal_house_profile",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      },
+      {
+        "field": "payment.to",
+        "value": "0xa40d9123e72c0445fd19aa00beef9981742c19dd",
+        "source_type": "payment_request_fact",
+        "verification_status": "conflicted",
+        "evidence_ref": "ev_canal_house_profile",
+        "confidence": "high",
+        "observed_at": "2026-06-17T10:00:00.000Z"
+      }
+    ],
+    "missing_context": [],
+    "risk_findings": [
+      {
+        "code": "payee_mismatch",
+        "severity": "blocker",
+        "field": "payment.to",
+        "message": "The payment recipient differs from the verified hotel address."
+      }
+    ]
+  },
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_hotel_mismatch_240",
+    "connection_id": "conn_quickstart_placeholder",
+    "transaction_id": "txn_hotel_mismatch_240",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "tripplanner-hotel-deposit-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_tripplanner",
+      "agent_name": "TripPlanner",
+      "runtime": "hermes",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "Canal House Hotel",
+      "domain": "canalhouse.example",
+      "verified": true
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "240.00",
+      "to": "0xa40d9123e72c0445fd19aa00beef9981742c19dd",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.03"
+    },
+    "display": {
+      "title": "Hotel deposit with payee mismatch",
+      "summary": "TripPlanner prepared a deposit, but recipient evidence conflicts.",
+      "primary_action": "Review"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "travel_booking"
+    }
+  },
+  "expected": {
+    "lifecycle_status": "pending",
+    "review_state": "blocked",
+    "risk_level": "danger",
+    "signing_allowed": false,
+    "error_codes": [
+      "context_payee_mismatch"
+    ]
+  }
+}
