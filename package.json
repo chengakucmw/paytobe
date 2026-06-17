@@ -4,12 +4,14 @@
   "private": true,
   "workspaces": [
     "packages/protocol",
+    "packages/sdk-js",
     "services/platform-api",
     "connectors/openclaw-telegram"
   ],
   "scripts": {
-    "check": "npm run check:protocol && npm run check:platform-api && npm run check:openclaw-telegram",
+    "check": "npm run check:protocol && npm run check:sdk-js && npm run check:platform-api && npm run check:openclaw-telegram",
     "check:protocol": "npm --prefix packages/protocol run check",
+    "check:sdk-js": "npm --prefix packages/sdk-js run check",
     "check:platform-api": "npm --prefix services/platform-api run check",
     "check:openclaw-telegram": "npm --prefix connectors/openclaw-telegram run check",
     "test": "npm --prefix services/platform-api test"
