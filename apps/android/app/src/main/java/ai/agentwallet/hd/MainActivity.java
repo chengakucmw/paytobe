@@ -2035,6 +2035,9 @@ public class MainActivity extends FragmentActivity {
         addGap(body, 12);
         body.addView(paymentDetailStateCard(intent, state, risk, canSign));
 
+        addGap(body, 12);
+        body.addView(truthPanelCard(intent.request));
+
         if (intent.hasOrderDetails()) {
             addGap(body, 12);
             body.addView(sectionEyebrow("Request context"));
@@ -2295,6 +2298,107 @@ public class MainActivity extends FragmentActivity {
     private void backToInboxFromSheet() {
         closeActiveSheet();
         switchTab(TAB_MESSAGES);
+    }
+
+    private View truthPanelCard(PaymentRequest request) {
+        LinearLayout panel = card();
+        panel.setElevation(0);
+        panel.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text("Truth Panel", 19, INK, true));
+        copy.addView(text("facts, claims, inference", 12, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        head.addView(pill("Sources", BLUE, BLUE_SOFT, Color.TRANSPARENT));
+        panel.addView(head);
+
+        List<TruthPanel.Section> sections = TruthPanel.sections(request);
+        if (sections.isEmpty()) {
+            addGap(panel, 12);
+            panel.addView(warning("Transaction context was not received. Payment Facts remain visible, but source evidence is unavailable."));
+            return panel;
+        }
+        for (TruthPanel.Section section : sections) {
+            addGap(panel, 12);
+            panel.addView(truthSectionView(section));
+        }
+        return panel;
+    }
+
+    private View truthSectionView(TruthPanel.Section section) {
+        LinearLayout box = vertical();
+        box.setPadding(dp(14), dp(14), dp(14), dp(14));
+        box.setBackground(round(truthToneBackground(section.tone), dp(18), truthToneBorder(section.tone), 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text(section.title, 15, INK, true));
+        copy.addView(text(section.note, 11, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        head.addView(pill(truthToneLabel(section.tone), truthToneColor(section.tone), SURFACE, Color.TRANSPARENT));
+        box.addView(head);
+        for (TruthPanel.Row truthRow : section.rows) {
+            addGap(box, 10);
+            box.addView(truthRowView(truthRow));
+        }
+        return box;
+    }
+
+    private View truthRowView(TruthPanel.Row truthRow) {
+        LinearLayout box = vertical();
+        box.setPadding(dp(12), dp(12), dp(12), dp(12));
+        box.setBackground(round(SURFACE, dp(14), Color.TRANSPARENT, 0));
+        box.addView(text(truthRow.field, 13, INK, true));
+        addGap(box, 4);
+        TextView value = text(truthRow.value, 13, INK_SOFT, false);
+        value.setTextIsSelectable(true);
+        box.addView(value);
+        addGap(box, 8);
+        LinearLayout badges = row();
+        badges.addView(pill(truthRow.source, truthToneColor(truthRow.tone), truthTonePillBackground(truthRow.tone), Color.TRANSPARENT));
+        LinearLayout.LayoutParams statusLp = new LinearLayout.LayoutParams(-2, -2);
+        statusLp.leftMargin = dp(8);
+        badges.addView(pill(truthRow.status, truthToneColor(truthRow.tone), truthTonePillBackground(truthRow.tone), Color.TRANSPARENT), statusLp);
+        box.addView(badges);
+        if (isUseful(truthRow.evidence)) {
+            addGap(box, 8);
+            box.addView(text(truthRow.evidence, 12, MUTED, false));
+        }
+        return box;
+    }
+
+    private int truthToneColor(String tone) {
+        if (TruthPanel.TONE_DANGER.equals(tone)) return RED;
+        if (TruthPanel.TONE_CAUTION.equals(tone)) return GOLD;
+        if (TruthPanel.TONE_SAFE.equals(tone)) return GREEN;
+        return BLUE;
+    }
+
+    private int truthToneBackground(String tone) {
+        if (TruthPanel.TONE_DANGER.equals(tone)) return RED_SOFT;
+        if (TruthPanel.TONE_CAUTION.equals(tone)) return AMBER_SOFT;
+        if (TruthPanel.TONE_SAFE.equals(tone)) return GREEN_SOFT;
+        return BLUE_SOFT;
+    }
+
+    private int truthTonePillBackground(String tone) {
+        if (TruthPanel.TONE_DANGER.equals(tone)) return RED_SOFT;
+        if (TruthPanel.TONE_CAUTION.equals(tone)) return AMBER_SOFT;
+        if (TruthPanel.TONE_SAFE.equals(tone)) return GREEN_SOFT;
+        return BLUE_SOFT;
+    }
+
+    private int truthToneBorder(String tone) {
+        if (TruthPanel.TONE_DANGER.equals(tone)) return Color.rgb(232, 187, 181);
+        if (TruthPanel.TONE_CAUTION.equals(tone)) return Color.rgb(231, 220, 170);
+        if (TruthPanel.TONE_SAFE.equals(tone)) return Color.rgb(191, 216, 197);
+        return Color.rgb(191, 214, 229);
+    }
+
+    private String truthToneLabel(String tone) {
+        if (TruthPanel.TONE_DANGER.equals(tone)) return "Blocked";
+        if (TruthPanel.TONE_CAUTION.equals(tone)) return "Review";
+        if (TruthPanel.TONE_SAFE.equals(tone)) return "Verified";
+        return "Info";
     }
 
     private View orderPurposeCard(PaymentIntent intent) {

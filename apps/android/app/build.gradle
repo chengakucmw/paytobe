@@ -53,5 +53,6 @@ dependencies {
     implementation "org.web3j:core:4.12.3"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
     testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20250517"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }
