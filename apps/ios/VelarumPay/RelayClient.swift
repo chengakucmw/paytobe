@@ -122,12 +122,34 @@ final class RelayClient {
     }
 
     func sync(config: Config) async throws -> [PaymentIntent] {
+        do {
+            let response = try await get(config: config, path: "/v1/payment-requests?device_id=\(urlEscape(config.deviceId))&token=\(urlEscape(config.token))")
+            let items = response["items"] as? [[String: Any]] ?? []
+            return try items.map { try PaymentIntent.parse($0) }.sorted { $0.createdAtMs > $1.createdAtMs }
+        } catch {
+            return try await syncLegacyIntents(config: config)
+        }
+    }
+
+    private func syncLegacyIntents(config: Config) async throws -> [PaymentIntent] {
         let response = try await get(config: config, path: "/v1/payment-intents?device_id=\(urlEscape(config.deviceId))&token=\(urlEscape(config.token))")
         let items = response["items"] as? [[String: Any]] ?? []
         return try items.map { try PaymentIntent.parse($0) }.sorted { $0.createdAtMs > $1.createdAtMs }
     }
 
     func fetchIntent(config: Config, id: String) async throws -> PaymentIntent {
+        do {
+            let response = try await get(config: config, path: "/v1/payment-requests/\(urlEscape(id))?device_id=\(urlEscape(config.deviceId))&token=\(urlEscape(config.token))")
+            guard let raw = response["payment_request"] as? [String: Any] else {
+                throw AppError.invalidResponse("Relay response did not include payment_request.")
+            }
+            return try PaymentIntent.parse(raw)
+        } catch {
+            return try await fetchLegacyIntent(config: config, id: id)
+        }
+    }
+
+    private func fetchLegacyIntent(config: Config, id: String) async throws -> PaymentIntent {
         let response = try await get(config: config, path: "/v1/payment-intents/\(urlEscape(id))?device_id=\(urlEscape(config.deviceId))&token=\(urlEscape(config.token))")
         guard let raw = response["intent"] as? [String: Any] else {
             throw AppError.invalidResponse("Relay response did not include intent.")
@@ -143,7 +165,11 @@ final class RelayClient {
         ]
         if let txHash { body["tx_hash"] = txHash }
         if let error { body["error"] = error }
-        _ = try await post(config: config, path: "/v1/payment-intents/\(urlEscape(intent.id))/status", body: body)
+        if intent.isStandardPaymentRequest {
+            _ = try await post(config: config, path: "/v1/payment-requests/\(urlEscape(intent.id))/status", body: body)
+        } else {
+            _ = try await post(config: config, path: "/v1/payment-intents/\(urlEscape(intent.id))/status", body: body)
+        }
     }
 
     func connect(config: Config, onIntentId: @escaping (String) async -> Void, onMessage: @escaping (String) async -> Void) {
@@ -176,8 +202,8 @@ final class RelayClient {
                         await onMessage(text)
                         continue
                     }
-                    if string(object, "type") == "payment_intent" {
-                        await onIntentId(string(object, "intent_id"))
+                    if let requestId = paymentRequestId(from: object) {
+                        await onIntentId(requestId)
                     } else {
                         await onMessage(text)
                     }
@@ -238,6 +264,28 @@ final class RelayClient {
 
     private func endpoint(config: Config, path: String) -> URL {
         URL(string: path, relativeTo: config.baseURL)!.absoluteURL
+    }
+
+    private func paymentRequestId(from object: [String: Any]) -> String? {
+        let type = string(object, "type")
+        let data = object["data"] as? [String: Any] ?? [:]
+        let id = firstNonEmpty(
+            string(object, "request_id"),
+            string(object, "intent_id"),
+            string(data, "request_id"),
+            string(data, "intent_id")
+        )
+        guard !id.isEmpty else { return nil }
+        if [
+            "payment_intent",
+            "payment_request",
+            "payment_request.created",
+            "payment_request.status",
+            "payment_request_status"
+        ].contains(type) {
+            return id
+        }
+        return nil
     }
 
     private func pairingLookup(from input: String) throws -> PairingLookup {
