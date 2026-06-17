@@ -1,0 +1,40 @@
+{
+  "connection_token": "conn_tok_dev_placeholder",
+  "transaction_context": {
+    "protocol": "velarum.transaction_context.v1",
+    "transaction_id": "txn_mcp_base_usdc_dev_4200",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "type": "developer_test",
+    "status": "awaiting_payment",
+    "title": "Developer test checkout",
+    "summary": "A local developer test context for a Base USDC Payment Request.",
+    "source": {
+      "agent_id": "agt_mcp_local",
+      "agent_name": "VelarumPay MCP Local Agent",
+      "runtime": "mcp",
+      "channel": "local_desktop"
+    },
+    "costs": {
+      "total": "42.00",
+      "currency": "USDC"
+    },
+    "truth_fields": [
+      {
+        "field": "pricing.total",
+        "value": "42.00",
+        "currency": "USDC",
+        "source_type": "platform_verified",
+        "verification_status": "signature_verified"
+      },
+      {
+        "field": "payment.to",
+        "value": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+        "source_type": "platform_verified",
+        "verification_status": "address_verified"
+      }
+    ],
+    "evidence": [],
+    "missing_context": [],
+    "risk_findings": []
+  }
+}

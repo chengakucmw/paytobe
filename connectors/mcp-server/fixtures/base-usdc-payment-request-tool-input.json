@@ -1,0 +1,46 @@
+{
+  "connection_token": "conn_tok_dev_placeholder",
+  "target_app_device_id": "wallet_dev_placeholder",
+  "payment_request": {
+    "protocol": "velarum.payment_request.v1",
+    "request_id": "prq_mcp_base_usdc_dev_4200",
+    "transaction_id": "txn_mcp_base_usdc_dev_4200",
+    "created_at": "2026-06-17T10:00:00.000Z",
+    "expires_at": "2027-12-31T23:59:00.000Z",
+    "idempotency_key": "mcp-base-usdc-dev-payment-1",
+    "status": "pending",
+    "source": {
+      "agent_id": "agt_mcp_local",
+      "agent_name": "VelarumPay MCP Local Agent",
+      "runtime": "mcp",
+      "channel": "local_desktop"
+    },
+    "payee": {
+      "name": "VelarumPay Developer Test",
+      "domain": "fixtures.example",
+      "verified": false
+    },
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "42.00",
+      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6,
+      "estimated_fee": "0.01"
+    },
+    "display": {
+      "title": "Developer test checkout",
+      "summary": "MCP local agent prepared a Base USDC request.",
+      "primary_action": "Pay"
+    },
+    "policy": {
+      "requires_user_approval": true
+    },
+    "metadata": {
+      "type": "developer_test"
+    }
+  }
+}

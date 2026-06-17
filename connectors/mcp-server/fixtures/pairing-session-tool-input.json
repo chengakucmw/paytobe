@@ -1,0 +1,15 @@
+{
+  "agent": {
+    "agent_id": "agt_mcp_local",
+    "agent_name": "VelarumPay MCP Local Agent",
+    "runtime": "mcp",
+    "device_label": "local developer machine"
+  },
+  "requested_scopes": [
+    "payment.requests.create",
+    "payment.requests.read",
+    "transaction_contexts.create",
+    "transaction_contexts.read"
+  ],
+  "expires_in_seconds": 300
+}
