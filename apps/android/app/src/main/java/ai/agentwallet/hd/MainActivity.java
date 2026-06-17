@@ -2782,6 +2782,10 @@ public class MainActivity extends FragmentActivity {
                         "Signing cancelled",
                         "No signature created",
                         "Local authentication did not complete. The request status was not changed."
+                ),
+                () -> paymentSigningFailedSheet(
+                        intent,
+                        "The keyring remains locked. No signature was created and the request status was not changed."
                 )
         )), weightLeft());
         body.addView(actions);
@@ -2805,6 +2809,27 @@ public class MainActivity extends FragmentActivity {
         LinearLayout actions = row();
         actions.addView(primaryButton("Review signing again", () -> paymentSigningReviewSheet(intent)), weight());
         actions.addView(outlineButton("Return to request", () -> paymentDetailsSheet(intent)), weightLeft());
+        body.addView(actions);
+        showSheet(body);
+    }
+
+    private void paymentSigningFailedSheet(PaymentIntent intent, String message) {
+        LinearLayout body = sheetBase("Authentication failed");
+        body.addView(signingStepRow(1));
+        addGap(body, 12);
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(RED_SOFT, dp(20), Color.rgb(232, 187, 181), 1));
+        card.addView(text("Keyring remains locked", 17, INK, true));
+        addGap(card, 8);
+        card.addView(text(message, 13, INK_SOFT, false));
+        body.addView(card);
+        addGap(body, 12);
+        body.addView(signingFactsCard(intent, false));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(primaryButton("Try again", () -> paymentSigningAuthSheet(intent)), weight());
+        actions.addView(outlineButton("Cancel signing", () -> paymentDetailsSheet(intent)), weightLeft());
         body.addView(actions);
         showSheet(body);
     }
@@ -3072,12 +3097,16 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void authenticate(String title, String subtitle, Runnable onSuccess, Runnable onCancel) {
+        authenticate(title, subtitle, onSuccess, onCancel, onCancel);
+    }
+
+    private void authenticate(String title, String subtitle, Runnable onSuccess, Runnable onCancel, Runnable onFailure) {
         int authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.DEVICE_CREDENTIAL;
         BiometricManager manager = BiometricManager.from(this);
         int can = manager.canAuthenticate(authenticators);
         if (can != BiometricManager.BIOMETRIC_SUCCESS) {
             toast("Biometric or device credential is not available");
-            if (onCancel != null) onCancel.run();
+            if (onFailure != null) onFailure.run();
             return;
         }
         Executor executor = ContextCompat.getMainExecutor(this);
@@ -3089,10 +3118,18 @@ public class MainActivity extends FragmentActivity {
 
             @Override
             public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
-                if (onCancel != null) {
+                if (isAuthenticationCancel(errorCode)) {
+                    if (onCancel != null) {
+                        onCancel.run();
+                    } else {
+                        toast("Authentication cancelled");
+                    }
+                } else if (onFailure != null) {
+                    onFailure.run();
+                } else if (onCancel != null) {
                     onCancel.run();
                 } else {
-                    toast("Authentication cancelled");
+                    toast("Authentication failed");
                 }
             }
         });
@@ -3102,6 +3139,12 @@ public class MainActivity extends FragmentActivity {
                 .setAllowedAuthenticators(authenticators)
                 .build();
         prompt.authenticate(info);
+    }
+
+    private boolean isAuthenticationCancel(int errorCode) {
+        return errorCode == BiometricPrompt.ERROR_CANCELED
+                || errorCode == BiometricPrompt.ERROR_USER_CANCELED
+                || errorCode == BiometricPrompt.ERROR_NEGATIVE_BUTTON;
     }
 
     private void requestNotificationPermissionIfNeeded() {
