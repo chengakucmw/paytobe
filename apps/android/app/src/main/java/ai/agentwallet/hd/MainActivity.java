@@ -2038,6 +2038,9 @@ public class MainActivity extends FragmentActivity {
         addGap(body, 12);
         body.addView(truthPanelCard(intent.request));
 
+        addGap(body, 12);
+        body.addView(transactionDossierEntryCard(intent));
+
         if (intent.hasOrderDetails()) {
             addGap(body, 12);
             body.addView(sectionEyebrow("Request context"));
@@ -2224,7 +2227,7 @@ public class MainActivity extends FragmentActivity {
         }
         if ("blocked".equals(value)) {
             addTwoPaymentActions(body,
-                    primaryButton("Open dossier", () -> openPaymentDossierPlaceholder(intent)),
+                    primaryButton("Open dossier", () -> paymentDossierSheet(intent)),
                     dangerButton("Reject request", () -> rejectIntent(intent)));
             return;
         }
@@ -2272,10 +2275,6 @@ public class MainActivity extends FragmentActivity {
         toast("Context requested from " + inboxAgentLabel(intent));
     }
 
-    private void openPaymentDossierPlaceholder(PaymentIntent intent) {
-        toast("Transaction dossier opens in the next review task");
-    }
-
     private void openNetworkSettings() {
         closeActiveSheet();
         switchTab(TAB_SETTINGS);
@@ -2298,6 +2297,236 @@ public class MainActivity extends FragmentActivity {
     private void backToInboxFromSheet() {
         closeActiveSheet();
         switchTab(TAB_MESSAGES);
+    }
+
+    private View transactionDossierEntryCard(PaymentIntent intent) {
+        TransactionDossier dossier = TransactionDossier.from(intent);
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text("Transaction dossier", 19, INK, true));
+        copy.addView(text("intent, evidence, AI trace, risk checks, payment mapping", 12, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        head.addView(pill(dossier.status, truthToneColor(dossier.tone), truthTonePillBackground(dossier.tone), Color.TRANSPARENT));
+        card.addView(head);
+        addGap(card, 10);
+        card.addView(text("Open the full dossier to see why this payment exists, what the AI did, what evidence arrived, and how it maps to the final chain action.", 13, INK_SOFT, false));
+        addGap(card, 12);
+        card.addView(outlineButton("Open transaction dossier", () -> paymentDossierSheet(intent)), new LinearLayout.LayoutParams(-1, dp(48)));
+        return card;
+    }
+
+    private void paymentDossierSheet(PaymentIntent intent) {
+        TransactionDossier dossier = TransactionDossier.from(intent);
+        LinearLayout body = sheetBase("Transaction Dossier");
+        LinearLayout top = row();
+        LinearLayout copy = vertical();
+        copy.addView(text(dossier.title, 25, INK, true));
+        copy.addView(text(dossier.agentName + " / " + dossier.source, 13, MUTED, false));
+        top.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(pill(dossier.status, truthToneColor(dossier.tone), truthTonePillBackground(dossier.tone), Color.TRANSPARENT));
+        body.addView(top);
+
+        addGap(body, 12);
+        body.addView(dossierRiskCard(dossier));
+
+        addGap(body, 12);
+        body.addView(dossierEvidenceCard(dossier.evidenceItems));
+
+        addGap(body, 12);
+        body.addView(dossierRowsCard("Decision snapshot", "why this payment exists", dossier.decisionRows));
+
+        addGap(body, 12);
+        body.addView(dossierRowsCard("Evidence and items", "what was purchased or requested", dossier.itemRows));
+
+        addGap(body, 12);
+        body.addView(dossierTruthCard(dossier.truthSections));
+
+        addGap(body, 12);
+        body.addView(dossierTraceCard(dossier.agentSteps));
+
+        addGap(body, 12);
+        body.addView(dossierRowsCard("Permission and risk checks", "request permission, local signing, blockers", dossier.permissionRiskRows));
+
+        addGap(body, 12);
+        body.addView(dossierRowsCard("Payment mapping", "final chain action", dossier.paymentMappingRows));
+
+        addGap(body, 12);
+        addDossierActions(body, intent);
+        showSheet(body);
+    }
+
+    private View dossierRiskCard(TransactionDossier dossier) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(truthToneBackground(dossier.tone), dp(20), truthToneBorder(dossier.tone), 1));
+        LinearLayout top = row();
+        top.addView(text(dossier.riskTitle, 17, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(pill(truthToneLabel(dossier.tone), truthToneColor(dossier.tone), SURFACE, Color.TRANSPARENT));
+        card.addView(top);
+        addGap(card, 8);
+        card.addView(text(dossier.riskBody, 13, INK_SOFT, false));
+        return card;
+    }
+
+    private View dossierEvidenceCard(List<TransactionDossier.EvidenceItem> items) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        head.addView(text("Evidence", 19, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        head.addView(text("source material", 12, MUTED, false));
+        card.addView(head);
+        if (items == null || items.isEmpty()) {
+            addGap(card, 12);
+            card.addView(dossierEvidenceItemView(new TransactionDossier.EvidenceItem("Evidence not received", "Missing", TransactionDossier.TONE_DANGER)));
+            return card;
+        }
+        LinearLayout currentRow = null;
+        for (int i = 0; i < items.size(); i++) {
+            if (i % 2 == 0) {
+                addGap(card, 10);
+                currentRow = row();
+                card.addView(currentRow);
+            }
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+            if (i % 2 == 1) lp.leftMargin = dp(10);
+            currentRow.addView(dossierEvidenceItemView(items.get(i)), lp);
+        }
+        return card;
+    }
+
+    private View dossierEvidenceItemView(TransactionDossier.EvidenceItem item) {
+        LinearLayout box = vertical();
+        box.setPadding(dp(14), dp(14), dp(14), dp(14));
+        box.setBackground(round(truthTonePillBackground(item.tone), dp(18), Color.TRANSPARENT, 0));
+        box.addView(text(item.title, 14, INK, true));
+        addGap(box, 6);
+        box.addView(text(item.meta, 12, INK_SOFT, false));
+        return box;
+    }
+
+    private View dossierRowsCard(String title, String note, List<TransactionDossier.Row> rows) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text(title, 19, INK, true));
+        if (isUseful(note)) copy.addView(text(note, 12, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        card.addView(head);
+        if (rows == null || rows.isEmpty()) {
+            addGap(card, 12);
+            card.addView(warning("Evidence not received."));
+            return card;
+        }
+        for (TransactionDossier.Row item : rows) {
+            addGap(card, 10);
+            card.addView(dossierRowView(item));
+        }
+        return card;
+    }
+
+    private View dossierRowView(TransactionDossier.Row item) {
+        LinearLayout box = vertical();
+        box.setPadding(dp(12), dp(12), dp(12), dp(12));
+        box.setBackground(round(truthTonePillBackground(item.tone), dp(16), truthToneBorder(item.tone), 1));
+        LinearLayout top = row();
+        top.addView(text(item.label, 13, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(pill(truthToneLabel(item.tone), truthToneColor(item.tone), SURFACE, Color.TRANSPARENT));
+        box.addView(top);
+        addGap(box, 5);
+        TextView value = text(item.value, 13, INK_SOFT, false);
+        value.setTextIsSelectable(true);
+        box.addView(value);
+        if (isUseful(item.detail)) {
+            addGap(box, 6);
+            box.addView(text(item.detail, 12, MUTED, false));
+        }
+        return box;
+    }
+
+    private View dossierTruthCard(List<TruthPanel.Section> sections) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text("Truth Panel", 19, INK, true));
+        copy.addView(text("facts, claims, inference", 12, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        card.addView(head);
+        if (sections == null || sections.isEmpty()) {
+            addGap(card, 12);
+            card.addView(warning("Evidence not received. Payment Facts remain visible, but source evidence is unavailable."));
+            return card;
+        }
+        for (TruthPanel.Section section : sections) {
+            addGap(card, 12);
+            card.addView(truthSectionView(section));
+        }
+        return card;
+    }
+
+    private View dossierTraceCard(List<TransactionDossier.TraceStep> steps) {
+        LinearLayout card = card();
+        card.setElevation(0);
+        card.setBackground(round(SURFACE, dp(24), LINE, 1));
+        LinearLayout head = row();
+        LinearLayout copy = vertical();
+        copy.addView(text("AI task trace", 19, INK, true));
+        copy.addView(text("decision path", 12, MUTED, false));
+        head.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        card.addView(head);
+        if (steps == null || steps.isEmpty()) {
+            addGap(card, 12);
+            card.addView(warning("Evidence not received. Agent trace is missing."));
+            return card;
+        }
+        for (TransactionDossier.TraceStep step : steps) {
+            addGap(card, 10);
+            card.addView(dossierTraceStepView(step));
+        }
+        return card;
+    }
+
+    private View dossierTraceStepView(TransactionDossier.TraceStep step) {
+        LinearLayout box = row();
+        box.setGravity(Gravity.TOP);
+        box.setPadding(dp(12), dp(12), dp(12), dp(12));
+        box.setBackground(round(truthTonePillBackground(step.tone), dp(16), truthToneBorder(step.tone), 1));
+        TextView marker = pill("", truthToneColor(step.tone), truthToneColor(step.tone), Color.TRANSPARENT);
+        LinearLayout.LayoutParams markerLp = new LinearLayout.LayoutParams(dp(12), dp(12));
+        markerLp.topMargin = dp(3);
+        box.addView(marker, markerLp);
+        LinearLayout copy = vertical();
+        LinearLayout.LayoutParams copyLp = new LinearLayout.LayoutParams(0, -2, 1);
+        copyLp.leftMargin = dp(10);
+        copy.addView(text(step.title, 13, INK, true));
+        addGap(copy, 4);
+        copy.addView(text(step.body, 12, MUTED, false));
+        box.addView(copy, copyLp);
+        return box;
+    }
+
+    private void addDossierActions(LinearLayout body, PaymentIntent intent) {
+        String value = PaymentInboxFilter.normalizeState(paymentDetailState(intent));
+        if ("missing_context".equals(value) || "needs_review".equals(value) || "source_review_required".equals(value)) {
+            addTwoPaymentActions(body,
+                    primaryButton("Request context", () -> requestPaymentContext(intent)),
+                    outlineButton("Back to Payment Detail", () -> paymentDetailsSheet(intent)));
+            return;
+        }
+        if ("blocked".equals(value)) {
+            addTwoPaymentActions(body,
+                    dangerButton("Reject request", () -> rejectIntent(intent)),
+                    outlineButton("Back to Payment Detail", () -> paymentDetailsSheet(intent)));
+            return;
+        }
+        body.addView(primaryButton("Back to Payment Detail", () -> paymentDetailsSheet(intent)), new LinearLayout.LayoutParams(-1, dp(48)));
     }
 
     private View truthPanelCard(PaymentRequest request) {
