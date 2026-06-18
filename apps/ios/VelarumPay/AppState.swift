@@ -328,6 +328,13 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                     throw AppError.unsupportedPayment("iOS v1 supports Stellar XLM payment requests. \(intent.asset) / \(intent.network) is review-only for now.")
                 }
                 selectedIntent = nil
+                // L4: dismiss the detail sheet, then present the progress sheet on the
+                // NEXT runloop tick. Both are .sheet(item:) on the same view (see
+                // ContentView), and flipping selectedIntent → nil and progress → value
+                // in a single runloop is a known SwiftUI race that can silently drop the
+                // second presentation, so the progress sheet sometimes never appears.
+                // Yielding one main-runloop tick lets the dismissal commit first.
+                await Task.yield()
                 progress = PaymentProgress(
                     title: "Generating transaction",
                     message: "Preparing and signing the transaction locally.",
