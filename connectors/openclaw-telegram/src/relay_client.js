@@ -1,7 +1,7 @@
 import crypto from "crypto";
 
 export async function submitPaymentIntent(intent) {
-  const relayUrl = (process.env.AGENTWALLET_RELAY_URL || "http://localhost:8787").replace(/\/+$/, "");
+  const relayUrl = (process.env.VELARUMPAY_API_BASE_URL || process.env.AGENTWALLET_RELAY_URL || process.env.BASE_URL || "http://localhost:8787").replace(/\/+$/, "");
   const body = JSON.stringify(intent);
   const secret = process.env.OPENCLAW_DEVICE_SECRET || "";
   const signature = secret
