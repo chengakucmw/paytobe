@@ -36,6 +36,12 @@ export function buildPaymentRequestPayload(payment, source = {}, options = {}) {
   if (Object.keys(metadata).length) request.metadata = metadata;
   if (source.transaction_context_snapshot) {
     request.transaction_context_snapshot = source.transaction_context_snapshot;
+  } else {
+    // L5: real-time Telegram payments otherwise carry no transaction context, so the
+    // wallet always shows "missing context". Attach a minimal, truthful context
+    // derived from the payment itself. payee.verified is left exactly as buildPayee
+    // resolved it — this fills the context gap, it never fabricates verification.
+    request.transaction_context_snapshot = buildMinimalContextSnapshot(request, normalizedPayment);
   }
 
   return request;
@@ -202,6 +208,39 @@ function stableId(prefix, seed) {
 
 function hash(value) {
   return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+// L5: build a minimal Transaction Context snapshot for OpenClaw payments that would
+// otherwise arrive with no context. Mirrors the shape (and snapshot_hash scheme) of
+// the protocol's createTransactionContextSnapshot so the wallet renders it normally,
+// while keeping this connector self-contained (no protocol-package dependency). The
+// truth fields are the literal transfer parameters, tagged as unverified facts of the
+// payment request — context for the user to review, never a verification claim.
+function buildMinimalContextSnapshot(request, payment) {
+  const snapshot = {
+    transaction_id: request.transaction_id,
+    snapshot_created_at: request.created_at,
+    truth_fields: [
+      { field: "payment.amount", value: payment.amount, currency: payment.asset, source_type: "payment_request_fact", verification_status: "unverified" },
+      { field: "payment.to", value: payment.to, source_type: "payment_request_fact", verification_status: "unverified" },
+      { field: "payment.asset", value: `${payment.asset} on ${payment.network}`, source_type: "payment_request_fact", verification_status: "unverified" }
+    ],
+    evidence: [],
+    missing_context: [],
+    risk_findings: []
+  };
+  snapshot.snapshot_hash = `sha256:${hash(stableContextString(snapshot))}`;
+  return snapshot;
+}
+
+// Deterministic (sorted-key) serialization used only for the snapshot hash above,
+// matching the protocol package's stableStringify so hashes stay consistent.
+function stableContextString(value) {
+  if (Array.isArray(value)) return `[${value.map(stableContextString).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableContextString(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function assertPresent(value, field) {
