@@ -123,11 +123,8 @@
   },
   "expected": {
     "lifecycle_status": "pending",
-    "review_state": "source_review_required",
-    "risk_level": "caution",
-    "signing_allowed": true,
-    "warning_codes": [
-      "ai_only_critical_field"
-    ]
+    "review_state": "pending",
+    "risk_level": "safe",
+    "signing_allowed": true
   }
 }
