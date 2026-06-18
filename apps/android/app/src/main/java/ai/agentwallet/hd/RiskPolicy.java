@@ -80,6 +80,8 @@ final class RiskPolicy {
 
         result.warnings.addAll(intent.warnings);
         if (intent.velarumRequestId.length() == 0) result.warnings.add("No Velarum request id is attached");
+        // M12: surface (but do not block on) a request the server left without an expiry.
+        if (!intent.hasExpiry()) result.warnings.add("This request has no expiry; it stays valid until cancelled");
         if (result.errors.isEmpty()) result.allowed = true;
         return result;
     }

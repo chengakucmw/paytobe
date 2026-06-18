@@ -2626,6 +2626,9 @@ public class MainActivity extends FragmentActivity {
     private String inboxTimeWindow(PaymentIntent intent, String state) {
         if ("expired".equals(state)) return "Approval window expired " + timeAgo(intent.expiresAt) + " ago";
         if (PaymentInboxFilter.isFinalState(state)) return "Final request created " + timeAgo(intent.createdAt) + " ago";
+        // M12: a request the server left without an expiry never auto-expires, so don't
+        // render it as "expired some time ago".
+        if (!intent.hasExpiry()) return "No expiry set - stays valid until cancelled";
         if (intent.expiresAt > System.currentTimeMillis()) return "Approval window: " + timeUntil(intent.expiresAt) + " left";
         return "Approval window expired " + timeAgo(intent.expiresAt) + " ago";
     }

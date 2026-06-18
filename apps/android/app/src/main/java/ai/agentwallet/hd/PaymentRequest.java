@@ -121,7 +121,7 @@ final class PaymentRequest {
                 STATUS_PENDING
         ));
         createdAt = parseTime(raw.optString("created_at", ""), raw.optLong("created_at_ms", System.currentTimeMillis()));
-        expiresAt = parseTime(raw.optString("expires_at", ""), raw.optLong("expires_at_ms", System.currentTimeMillis() + 300_000L));
+        expiresAt = resolveExpiry(raw);
 
         sourceType = firstNonEmpty(source.optString("type", ""), source.optString("runtime", ""), standard ? "agent" : "openclaw");
         sourceAgentId = source.optString("agent_id", "");
@@ -241,7 +241,12 @@ final class PaymentRequest {
     }
 
     boolean isExpired() {
-        return System.currentTimeMillis() > expiresAt;
+        // NO_EXPIRY means the server gave no expiry, so the request never auto-expires.
+        return expiresAt > 0L && System.currentTimeMillis() > expiresAt;
+    }
+
+    boolean hasExpiry() {
+        return expiresAt > 0L;
     }
 
     boolean isBaseUsdc() {
@@ -328,6 +333,29 @@ final class PaymentRequest {
             }
         }
         return "";
+    }
+
+    /** Sentinel for "the server provided no expiry" - the request never auto-expires. */
+    static final long NO_EXPIRY = 0L;
+
+    /**
+     * Resolves the request expiry. M12: when the server provides no {@code expires_at}
+     * (or a field-name drift / unparseable value leaves it missing), DO NOT invent a
+     * "5 minutes from now" clock. That silently turned legitimate pending requests into
+     * "expired" five minutes after they arrived - unsignable and gone from the default
+     * inbox filter. A missing or unparseable expiry now means {@link #NO_EXPIRY} ("does
+     * not expire"); an explicit server expiry (ISO-8601 or epoch ms) is still honoured.
+     */
+    private static long resolveExpiry(JSONObject raw) {
+        String iso = raw.optString("expires_at", "");
+        if (iso != null && iso.trim().length() > 0) {
+            return parseTime(iso, NO_EXPIRY);
+        }
+        if (raw.has("expires_at_ms")) {
+            long ms = raw.optLong("expires_at_ms", NO_EXPIRY);
+            return ms > 0L ? ms : NO_EXPIRY;
+        }
+        return NO_EXPIRY;
     }
 
     private static long parseTime(String value, long fallback) {

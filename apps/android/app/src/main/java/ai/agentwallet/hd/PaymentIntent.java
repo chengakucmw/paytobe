@@ -188,7 +188,12 @@ final class PaymentIntent {
     }
 
     boolean isExpired() {
-        return System.currentTimeMillis() > expiresAt;
+        // expiresAt == NO_EXPIRY (0) means the server gave no expiry -> never expires (M12).
+        return expiresAt > 0L && System.currentTimeMillis() > expiresAt;
+    }
+
+    boolean hasExpiry() {
+        return expiresAt > 0L;
     }
 
     boolean isBaseUsdc() {
