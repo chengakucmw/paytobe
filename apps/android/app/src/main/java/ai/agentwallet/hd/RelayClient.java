@@ -145,7 +145,10 @@ final class RelayClient {
         Exception standardFailure;
         try {
             JSONObject json = get(context, "/v1/payment-requests/" + urlEncode(id) + deviceQuery(context));
-            return PaymentRequest.parse(json.getJSONObject("payment_request"));
+            // H7: do not hard-assume an outer "payment_request" wrapper. getJSONObject() throws the
+            // moment the shape drifts (bare object, "intent" wrapper, renamed key), which crashed the
+            // single fetch. PaymentRequest.parse() already unwraps all of those shapes gracefully.
+            return PaymentRequest.parse(json);
         } catch (Exception e) {
             standardFailure = e;
             if (!shouldFallbackFromStandard(e)) throw e;
@@ -179,9 +182,17 @@ final class RelayClient {
         String requestId = firstNonEmpty(request == null ? "" : request.requestId, request == null ? "" : request.id);
         if (requestId.length() == 0) throw new IllegalArgumentException("Missing payment request id");
         JSONObject response = post(context, "/v1/payment-requests/" + urlEncode(requestId) + "/status", statusBody(context, status, txHash, error));
-        PaymentRequest updated = PaymentRequest.parse(response.getJSONObject("payment_request"));
-        PaymentInboxStore.upsert(context, updated);
-        return updated;
+        // H7: once this POST returns, the relay has already accepted the status report. The body is
+        // only used to refresh the local projection, so tolerate any wrapper/shape drift instead of
+        // letting a parse failure bubble up and make a successful report look like it never happened
+        // ("signed but not reported"). parse() unwraps the wrapper-or-bare body; only sync locally
+        // when the echoed request actually carries an id so an empty/odd body never clobbers state.
+        PaymentRequest updated = PaymentRequest.parse(response);
+        if (hasRequestIdentity(updated)) {
+            PaymentInboxStore.upsert(context, updated);
+            return updated;
+        }
+        return request;
     }
 
     private static void updateLegacyStatus(Context context, PaymentIntent intent, String status, String txHash, String error) throws Exception {
@@ -344,6 +355,11 @@ final class RelayClient {
             cursor = cursor.getCause();
         }
         return false;
+    }
+
+    private static boolean hasRequestIdentity(PaymentRequest request) {
+        if (request == null) return false;
+        return firstNonEmpty(request.requestId, request.id, request.legacyIntentId).length() > 0;
     }
 
     private static String firstNonEmpty(String... values) {
