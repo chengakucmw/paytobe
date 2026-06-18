@@ -28,10 +28,9 @@ public class WalletWebActivity extends FragmentActivity {
     private static final String START_URL = "file:///android_asset/web/index.html";
     private static final int REQUEST_SCAN = 7201;
 
-    // Mainnet endpoints + Base USDC contract (mirror BalanceFetcher).
-    private static final String ETHEREUM_RPC = "https://ethereum-rpc.publicnode.com";
-    private static final String BASE_RPC = "https://mainnet.base.org";
-    private static final String POLYGON_RPC = "https://polygon-bor-rpc.publicnode.com";
+    // Endpoints + Base USDC contract used to describe a local "Send" request. EVM
+    // sends are signed against the shared, verified WalletNetworkStore RPCs by
+    // PaymentExecutor, so only the non-EVM endpoints are pinned here.
     private static final String SOLANA_RPC = "https://api.mainnet-beta.solana.com";
     private static final String STELLAR_HORIZON = "https://horizon.stellar.org";
     private static final String BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -247,35 +246,79 @@ public class WalletWebActivity extends FragmentActivity {
                 .build());
     }
 
-    private String broadcast(String symbol, String network, String to, String amount) throws Exception {
+    /**
+     * Describes a manual "Send" as a {@link PaymentIntent} so it can flow through the
+     * same RiskPolicy + PaymentExecutor pipeline as an inbox payment request (bug M9).
+     *
+     * <p>The strict (symbol, network) allow-list is preserved: every branch requires
+     * BOTH the asset and the exact network to match, and anything unrecognized throws.
+     * This guarantees a transfer can never silently go out on the wrong chain (e.g. ETH
+     * on an L2) or as the wrong asset (e.g. USDC -> native ETH). EVM chain ids let
+     * PaymentExecutor resolve the verified RPC from WalletNetworkStore.
+     */
+    private PaymentIntent buildLocalSendIntent(String symbol, String network, String to, String amount) throws Exception {
         String sym = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.US);
         String net = network == null ? "" : network.trim().toLowerCase(java.util.Locale.US);
-        // Strict (symbol, network) allow-list. Every branch requires BOTH the asset
-        // and the exact network to match, and anything unrecognized throws. This
-        // guarantees a transfer can never silently broadcast on the wrong chain
-        // (e.g. ETH on an L2) or as the wrong asset (e.g. USDC -> native ETH).
+
+        JSONObject payment = new JSONObject();
+        payment.put("amount", amount);
+        payment.put("to", to);
+
         if (sym.equals("XLM") && net.contains("stellar")) {
-            return StellarTransfer.sendXlm(STELLAR_HORIZON, false, wallet.stellar.privateSeed, wallet.stellar.publicKey, to, amount);
+            payment.put("rail", "stellar_xlm");
+            payment.put("network", "stellar");
+            payment.put("asset", "XLM");
+            payment.put("horizon_url", STELLAR_HORIZON);
+        } else if (sym.equals("SOL") && net.contains("solana")) {
+            // Use the registry's canonical network id + decimals so the Solana branch of
+            // RiskPolicy (which runs TransferAssetRegistry.validateIntent) accepts it.
+            payment.put("rail", "solana_sol");
+            payment.put("network", "solana_mainnet");
+            payment.put("asset", "SOL");
+            payment.put("decimals", 9);
+            payment.put("rpc_url", SOLANA_RPC);
+        } else if (sym.equals("USDC") && net.equals("base")) {
+            payment.put("rail", "base_usdc");
+            payment.put("network", "base_mainnet");
+            payment.put("asset", "USDC");
+            payment.put("chain_id", 8453L);
+            payment.put("token_contract", BASE_USDC);
+            payment.put("decimals", 6);
+        } else if (sym.equals("ETH") && net.equals("base")) {
+            evmNativePayment(payment, "base_mainnet", "ETH", 8453L);
+        } else if (sym.equals("ETH") && net.equals("ethereum")) {
+            evmNativePayment(payment, "ethereum", "ETH", 1L);
+        } else if ((sym.equals("POL") || sym.equals("MATIC")) && (net.equals("polygon") || net.contains("polygon pos"))) {
+            evmNativePayment(payment, "polygon", sym, 137L);
+        } else {
+            throw new IllegalStateException(
+                    (symbol == null ? "" : symbol) + " on " + (network == null ? "" : network)
+                            + " is not supported for sending in this build. Supported: XLM on Stellar, "
+                            + "SOL on Solana, ETH on Ethereum or Base, USDC on Base, POL on Polygon.");
         }
-        if (sym.equals("SOL") && net.contains("solana")) {
-            return SolanaTransfer.sendSol(SOLANA_RPC, wallet.solana.privateSeed, wallet.solana.publicKey, to, amount);
+
+        JSONObject root = new JSONObject();
+        root.put("request_id", "local-send-" + System.currentTimeMillis());
+        root.put("status", PaymentIntent.STATUS_PENDING);
+        root.put("payment", payment);
+        return PaymentIntent.parse(root);
+    }
+
+    private static void evmNativePayment(JSONObject payment, String network, String asset, long chainId) throws Exception {
+        payment.put("rail", "evm_native");
+        payment.put("network", network);
+        payment.put("asset", asset);
+        payment.put("chain_id", chainId);
+    }
+
+    private static String joinMessages(java.util.List<String> messages) {
+        StringBuilder out = new StringBuilder();
+        for (String message : messages) {
+            if (message == null || message.length() == 0) continue;
+            if (out.length() > 0) out.append("; ");
+            out.append(message);
         }
-        if (sym.equals("USDC") && net.equals("base")) {
-            return EvmTransfer.sendErc20(BASE_RPC, 8453L, wallet.evm.privateKey, BASE_USDC, to, amount, 6);
-        }
-        if (sym.equals("ETH") && net.equals("base")) {
-            return EvmTransfer.sendNative(BASE_RPC, 8453L, wallet.evm.privateKey, to, amount);
-        }
-        if (sym.equals("ETH") && net.equals("ethereum")) {
-            return EvmTransfer.sendNative(ETHEREUM_RPC, 1L, wallet.evm.privateKey, to, amount);
-        }
-        if ((sym.equals("POL") || sym.equals("MATIC")) && (net.equals("polygon") || net.contains("polygon pos"))) {
-            return EvmTransfer.sendNative(POLYGON_RPC, 137L, wallet.evm.privateKey, to, amount);
-        }
-        throw new IllegalStateException(
-                (symbol == null ? "" : symbol) + " on " + (network == null ? "" : network)
-                        + " is not supported for sending in this build. Supported: XLM on Stellar, "
-                        + "SOL on Solana, ETH on Ethereum or Base, USDC on Base, POL on Polygon.");
+        return out.length() == 0 ? "This payment can't be sent right now." : out.toString();
     }
 
     private void emitSendResult(boolean ok, String txHash, String error, boolean backupRequired) {
@@ -408,11 +451,33 @@ public class WalletWebActivity extends FragmentActivity {
                 emitSendResult(false, null, "Enter a recipient and amount.", false);
                 return;
             }
+
+            // M9: the WebView "Send" used to sign + broadcast on its own, skipping the
+            // daily limit, recipient whitelist, expiry and address checks - and never
+            // recording the spend against the daily ledger. Route it through the SAME
+            // pipeline as the native inbox flow so both entry points share one
+            // "validate -> authenticate -> sign -> record" path.
+            final PaymentIntent intent;
+            try {
+                intent = buildLocalSendIntent(symbol, network, to, amount);
+            } catch (Exception e) {
+                emitSendResult(false, null, message(e), false);
+                return;
+            }
+            RiskPolicy.Result risk = RiskPolicy.evaluate(WalletWebActivity.this, intent);
+            if (!risk.allowed) {
+                emitSendResult(false, null, joinMessages(risk.errors), false);
+                return;
+            }
+
             runOnUiThread(() -> authenticate(
                     "Send " + symbol,
                     () -> new Thread(() -> {
                         try {
-                            String tx = broadcast(symbol, network, to, amount);
+                            // PaymentExecutor re-runs RiskPolicy before signing (defence in
+                            // depth) and broadcasts via the verified per-chain transfer.
+                            String tx = PaymentExecutor.execute(WalletWebActivity.this, wallet, intent);
+                            RiskPolicy.recordSuccessfulPayment(WalletWebActivity.this, intent);
                             try {
                                 TransactionHistoryStore.record(WalletWebActivity.this,
                                         tx != null && tx.length() > 0 ? "tx:" + tx : "local:" + System.currentTimeMillis(),
