@@ -51,8 +51,26 @@ final class PaymentNotifications {
     static void notifyPaymentIntent(Context context, PaymentIntent intent) {
         if (intent == null || intent.id.length() == 0) return;
         ensureChannels(context);
+
+        // M8: de-duplicate by (id, status), not by id alone. The old code stored a
+        // single boolean per request id, so the FIRST event won and every later
+        // payment_request.status event (expired / cancelled / rejected / paid) was
+        // silently dropped - the user kept staring at a stale "New payment request".
+        // Now each distinct lifecycle status for a request is handled exactly once.
+        String status = paymentStatus(intent);
+
+        // A request that is no longer pending is not actionable, so its earlier
+        // "New payment request" card is misleading and must be removed. Cancelling
+        // needs no POST_NOTIFICATIONS permission, so do it before the permission gate.
+        if (!isActionablePaymentStatus(status)) {
+            if (markNotified(context, intent.id, status)) {
+                cancelPaymentNotification(context, intent.id);
+            }
+            return;
+        }
+
         if (!hasNotificationPermission(context)) return;
-        if (!markNotified(context, intent.id)) return;
+        if (!markNotified(context, intent.id, status)) return;
 
         Intent launch = new Intent(context, MainActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -105,12 +123,36 @@ final class PaymentNotifications {
                 .build();
     }
 
-    private static boolean markNotified(Context context, String intentId) {
+    /**
+     * Records the last status we notified for {@code intentId} and returns true only
+     * when this {@code status} differs from it. Keying on (id, status) - instead of a
+     * bare per-id boolean - is what lets a later expired/cancelled/rejected event get
+     * through to update or cancel the notification (bug M8). One String per id keeps
+     * the stored state bounded.
+     */
+    private static boolean markNotified(Context context, String intentId, String status) {
         SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String key = "payment:" + intentId;
-        if (prefs.getBoolean(key, false)) return false;
-        prefs.edit().putBoolean(key, true).apply();
+        String key = "payment_status:" + intentId;
+        String current = status == null ? "" : status;
+        if (current.equals(prefs.getString(key, ""))) return false;
+        prefs.edit().putString(key, current).apply();
         return true;
+    }
+
+    private static void cancelPaymentNotification(Context context, String intentId) {
+        manager(context).cancel(notificationId(intentId));
+    }
+
+    private static String paymentStatus(PaymentIntent intent) {
+        String status = intent == null ? "" : intent.status;
+        return status == null || status.trim().length() == 0
+                ? PaymentIntent.STATUS_PENDING
+                : status.trim();
+    }
+
+    /** Only a still-pending request is actionable enough to show a payment card. */
+    static boolean isActionablePaymentStatus(String status) {
+        return PaymentIntent.STATUS_PENDING.equals(status);
     }
 
     private static int notificationId(String value) {
