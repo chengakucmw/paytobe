@@ -55,6 +55,13 @@ public class WalletWebActivity extends FragmentActivity {
             pendingScanPayload = savedInstanceState.getString(STATE_PENDING_SCAN);
         }
         webView = new WebView(this);
+        // Without a WebChromeClient and explicit touch focus, HTML <input> fields in this
+        // WebView never acquire focus and the soft keyboard never opens, so the Send form
+        // could not be typed into. A plain WebChromeClient plus touch focusability is the
+        // standard configuration required for HTML form input + IME to work.
+        webView.setWebChromeClient(new android.webkit.WebChromeClient());
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -256,13 +263,14 @@ public class WalletWebActivity extends FragmentActivity {
      * on an L2) or as the wrong asset (e.g. USDC -> native ETH). EVM chain ids let
      * PaymentExecutor resolve the verified RPC from WalletNetworkStore.
      */
-    private PaymentIntent buildLocalSendIntent(String symbol, String network, String to, String amount) throws Exception {
+    private PaymentIntent buildLocalSendIntent(String symbol, String network, String to, String amount, String memo) throws Exception {
         String sym = symbol == null ? "" : symbol.trim().toUpperCase(java.util.Locale.US);
         String net = network == null ? "" : network.trim().toLowerCase(java.util.Locale.US);
 
         JSONObject payment = new JSONObject();
         payment.put("amount", amount);
         payment.put("to", to);
+        if (memo != null && memo.trim().length() > 0) payment.put("memo", memo.trim());
 
         if (sym.equals("XLM") && net.contains("stellar")) {
             payment.put("rail", "stellar_xlm");
@@ -428,12 +436,14 @@ public class WalletWebActivity extends FragmentActivity {
             final String network;
             final String to;
             final String amount;
+            final String memo;
             try {
                 JSONObject d = new JSONObject(json == null ? "{}" : json);
                 symbol = d.optString("symbol", "");
                 network = d.optString("network", "");
                 to = d.optString("to", "").trim();
                 amount = d.optString("amount", "").trim();
+                memo = d.optString("memo", "").trim();
             } catch (Exception e) {
                 emitSendResult(false, null, "Invalid transfer request.", false);
                 return;
@@ -459,7 +469,7 @@ public class WalletWebActivity extends FragmentActivity {
             // "validate -> authenticate -> sign -> record" path.
             final PaymentIntent intent;
             try {
-                intent = buildLocalSendIntent(symbol, network, to, amount);
+                intent = buildLocalSendIntent(symbol, network, to, amount, memo);
             } catch (Exception e) {
                 emitSendResult(false, null, message(e), false);
                 return;

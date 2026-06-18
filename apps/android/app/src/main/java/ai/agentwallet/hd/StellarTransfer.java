@@ -50,6 +50,19 @@ final class StellarTransfer {
             String amountXlm,
             TransactionProgress progress
     ) throws Exception {
+        return sendXlm(horizonUrl, testnet, sourceSeed, sourcePublic, destinationAddress, amountXlm, progress, "");
+    }
+
+    static String sendXlm(
+            String horizonUrl,
+            boolean testnet,
+            byte[] sourceSeed,
+            byte[] sourcePublic,
+            String destinationAddress,
+            String amountXlm,
+            TransactionProgress progress,
+            String memo
+    ) throws Exception {
         horizonUrl = normalizeHorizonUrl(horizonUrl, testnet);
         String sourceAddress = StellarStrKey.encodePublicKey(sourcePublic);
         long sequence = fetchSequence(horizonUrl, sourceAddress) + 1;
@@ -66,7 +79,7 @@ final class StellarTransfer {
                 );
             }
         }
-        byte[] tx = transactionXdr(sourcePublic, destinationPublic, sequence, amount, createAccount);
+        byte[] tx = transactionXdr(sourcePublic, destinationPublic, sequence, amount, createAccount, memo);
         byte[] networkHash = sha256((testnet ? TESTNET_PASSPHRASE : PUBLIC_PASSPHRASE).getBytes(StandardCharsets.UTF_8));
         ByteArrayOutputStream signatureBase = new ByteArrayOutputStream();
         signatureBase.write(networkHash);
@@ -156,13 +169,13 @@ final class StellarTransfer {
         return false;
     }
 
-    private static byte[] transactionXdr(byte[] source, byte[] destination, long sequence, long amount, boolean createAccount) throws Exception {
+    private static byte[] transactionXdr(byte[] source, byte[] destination, long sequence, long amount, boolean createAccount, String memo) throws Exception {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         writeAccountId(out, source);
         writeInt(out, 100);
         writeLong(out, sequence);
         writeInt(out, 0);
-        writeInt(out, 0);
+        writeMemo(out, memo);
         writeInt(out, 1);
         writeBool(out, false);
         if (createAccount) {
@@ -297,6 +310,25 @@ final class StellarTransfer {
 
     private static void writeBool(ByteArrayOutputStream out, boolean value) {
         writeInt(out, value ? 1 : 0);
+    }
+
+    // Stellar Memo union. An empty memo encodes MEMO_NONE, byte-identical to the
+    // previous no-memo behaviour, so existing transactions/fixtures are unaffected.
+    // A non-empty memo is sent as MEMO_TEXT (string<28>).
+    private static void writeMemo(ByteArrayOutputStream out, String memo) throws Exception {
+        String text = memo == null ? "" : memo.trim();
+        if (text.isEmpty()) {
+            writeInt(out, 0); // MEMO_NONE
+            return;
+        }
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length > 28) {
+            throw new IllegalStateException(
+                    "Stellar text memo must be 28 bytes or fewer (this one is " + bytes.length
+                            + "). Shorten it, or confirm the exchange wants a numeric ID memo instead.");
+        }
+        writeInt(out, 1); // MEMO_TEXT
+        writeOpaque(out, bytes); // XDR string<28>: 4-byte length prefix + bytes + padding
     }
 
     private static void writeInt(ByteArrayOutputStream out, int value) {

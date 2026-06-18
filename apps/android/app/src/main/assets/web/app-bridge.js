@@ -125,8 +125,9 @@
     var network = (d.network || d.chain || '').toString();
     var to = (d.recipient || d.to || '').toString();
     var amount = (d.amount || '').toString();
+    var memo = (d.memo || '').toString();
     if (!to || !amount) return null;
-    return { symbol: token, network: network, to: to, amount: amount };
+    return { symbol: token, network: network, to: to, amount: amount, memo: memo };
   }
 
   function doRealSend(kind) {

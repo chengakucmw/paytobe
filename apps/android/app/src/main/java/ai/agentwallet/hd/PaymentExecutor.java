@@ -32,7 +32,8 @@ final class PaymentExecutor {
                     wallet.stellar.publicKey,
                     intent.to,
                     intent.amount,
-                    progress
+                    progress,
+                    intent.memo
             );
         }
         if (intent.isStellarAsset()) {
