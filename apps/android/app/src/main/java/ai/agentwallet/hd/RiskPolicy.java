@@ -17,6 +17,13 @@ final class RiskPolicy {
     private static final String KEY_STELLAR_WHITELIST = "stellar_whitelist";
     private static final BigDecimal DAILY_USDC_LIMIT = new BigDecimal("1000");
     private static final BigDecimal DAILY_XLM_LIMIT = new BigDecimal("1000");
+    // M10: when no recipient whitelist is configured, a payment above these per-asset
+    // caps to an unverified recipient is blocked (fail closed) instead of merely
+    // warned about, so the advertised whitelist control actually protects users.
+    // Exact BigDecimal, never floating point.
+    private static final BigDecimal UNVERIFIED_USDC_CAP = new BigDecimal("100");
+    private static final BigDecimal UNVERIFIED_XLM_CAP = new BigDecimal("100");
+    private static final BigDecimal UNVERIFIED_STELLAR_ASSET_CAP = new BigDecimal("100");
 
     private RiskPolicy() {}
 
@@ -35,18 +42,18 @@ final class RiskPolicy {
             if (baseNetwork == null || baseNetwork.rpcUrl.length() == 0) {
                 result.errors.add("Verified Base RPC URL is required");
             }
-            checkWhitelist(context, KEY_EVM_WHITELIST, intent.to, "recipient EVM address", result);
+            checkWhitelist(context, KEY_EVM_WHITELIST, intent.to, "recipient EVM address", intent.amount, UNVERIFIED_USDC_CAP, result);
             checkDailyLimit(context, "USDC", intent.amount, DAILY_USDC_LIMIT, result);
         } else if (intent.isStellarXlm()) {
             if (!intent.to.startsWith("G")) result.errors.add("Stellar recipient must be a G... public key");
             if (intent.horizonUrl.length() == 0) result.errors.add("Stellar Horizon URL is required");
-            checkWhitelist(context, KEY_STELLAR_WHITELIST, intent.to, "recipient Stellar address", result);
+            checkWhitelist(context, KEY_STELLAR_WHITELIST, intent.to, "recipient Stellar address", intent.amount, UNVERIFIED_XLM_CAP, result);
             checkDailyLimit(context, "XLM", intent.amount, DAILY_XLM_LIMIT, result);
         } else if (intent.isStellarAsset()) {
             if (!intent.to.startsWith("G")) result.errors.add("Stellar recipient must be a G... public key");
             if (intent.horizonUrl.length() == 0) result.errors.add("Stellar Horizon URL is required");
             if (intent.assetIssuer.length() == 0) result.errors.add("Stellar asset issuer is required");
-            checkWhitelist(context, KEY_STELLAR_WHITELIST, intent.to, "recipient Stellar address", result);
+            checkWhitelist(context, KEY_STELLAR_WHITELIST, intent.to, "recipient Stellar address", intent.amount, UNVERIFIED_STELLAR_ASSET_CAP, result);
             result.warnings.add("Stellar non-XLM assets require an active recipient account and a matching trustline before sending");
         } else if (intent.requiresPreparedPayloadSigner()) {
             // SECURITY (blind-signing fix): a prepared payload is an opaque, server-supplied
@@ -149,17 +156,40 @@ final class RiskPolicy {
         }
     }
 
-    private static void checkWhitelist(Context context, String key, String address, String label, Result result) {
+    private static void checkWhitelist(Context context, String key, String address, String label,
+                                       String amount, BigDecimal unverifiedCap, Result result) {
         Set<String> list = prefs(context).getStringSet(key, new HashSet<>());
-        if (list == null || list.isEmpty()) {
-            result.warnings.add("No local whitelist is configured for " + label);
+        if (list != null && !list.isEmpty()) {
+            boolean found = false;
+            for (String item : list) {
+                if (item.equalsIgnoreCase(address)) found = true;
+            }
+            if (!found) result.errors.add("The " + label + " is not in your local whitelist");
             return;
         }
-        boolean found = false;
-        for (String item : list) {
-            if (item.equalsIgnoreCase(address)) found = true;
+        // M10: with no whitelist to match against, this control previously only warned
+        // and never blocked - the advertised "recipient whitelist" was effectively dead.
+        // Fail closed instead: everyday small payments still go through (with a warning),
+        // but anything above the per-asset cap to an unverified recipient is blocked.
+        if (exceedsCap(amount, unverifiedCap)) {
+            result.errors.add("No recipient whitelist is set, so a payment of " + amount
+                    + " to an unverified " + label + " is blocked (limit "
+                    + unverifiedCap.toPlainString() + "). Send a smaller amount, or to a recipient you trust.");
+        } else {
+            result.warnings.add("No recipient whitelist is set for " + label
+                    + "; this recipient has not been verified.");
         }
-        if (!found) result.errors.add("The " + label + " is not in the local whitelist");
+    }
+
+    private static boolean exceedsCap(String amount, BigDecimal cap) {
+        if (cap == null) return false;
+        try {
+            return new BigDecimal(amount).compareTo(cap) > 0;
+        } catch (Exception e) {
+            // An unparseable/blank amount is treated as over the cap (fail closed); the
+            // per-rail amount validation surfaces a clearer "amount is invalid" error too.
+            return true;
+        }
     }
 
     private static boolean isEvmRecipient(String value) {
