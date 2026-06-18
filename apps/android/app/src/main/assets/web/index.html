@@ -3140,6 +3140,24 @@
     return asset.fullAddress || asset.address;
   }
 
+  // P1-1: actually write the address to the clipboard. Prefer the native bridge
+  // (file:// WebViews often block the async clipboard API), then the web APIs.
+  function copyToClipboard(text) {
+    if (!text) return false;
+    try { if (window.VelarumCopyBridge) { window.VelarumCopyBridge(text); return true; } } catch (e) {}
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text); return true; } } catch (e) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute'; ta.style.left = '-9999px';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
+    } catch (e) {}
+    return false;
+  }
+
   function getAsset(id) {
     return assetCatalog.find(asset => assetKey(asset) === id) || assetCatalog[0];
   }
@@ -3550,11 +3568,34 @@
   function renderReceive() {
     const asset = selectedTransferAsset();
     const receiveAddress = assetAddress(asset);
+    // P1-2: let the user pick which asset/network they are receiving, so the
+    // screen never silently shows the wrong chain's address (it used to default
+    // to whatever state.asset happened to be, e.g. Ethereum).
+    const chipBase = 'padding:8px 16px;border-radius:999px;font-weight:600;cursor:pointer;';
+    const chips = visibleAssets().map(a => {
+      const active = assetKey(a) === assetKey(asset);
+      const style = chipBase + (active
+        ? 'border:1px solid #2f7d4f;background:#2f7d4f;color:#fff;'
+        : 'border:1px solid #dbe6de;background:#fff;color:#16201a;');
+      return '<button data-receive-asset="' + assetKey(a) + '" style="' + style + '">' + escapeHtml(a.symbol) + '</button>';
+    }).join('');
+    // P1-3: warn when the asset needs a memo / destination tag on deposit.
+    const memoWarning = asset.memoRequired
+      ? '<div class="risk caution">' + icon('alert', 21) + '<div><strong>' + escapeHtml(asset.memoLabel || 'Memo') + ' required when receiving ' + escapeHtml(asset.symbol)
+        + '</strong><div style="font-size:var(--text-sm);margin-top:2px">Whoever sends you ' + escapeHtml(asset.symbol)
+        + ' must include the ' + escapeHtml((asset.memoLabel || 'memo').toLowerCase())
+        + ', or the deposit can be lost or delayed. ' + escapeHtml(asset.memoHelp || '') + '</div></div></div>'
+      : '';
+    const addressBlock = receiveAddress
+      ? '<span class="address">' + escapeHtml(receiveAddress) + '</span><button class="round-btn" data-action="copy-address" aria-label="Copy receive address">' + icon('copy', 18) + '</button>'
+      : '<span class="subtle">Wallet address is not ready yet. Create or unlock your wallet first.</span>';
     return [
       renderSubheader('Receive assets', 'Your wallet address', 'home'),
       '<section class="stack">',
-      '<div class="qr-card"><div class="qr receive-qr" id="receiveQr"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-5)"><span style="font-weight:var(--weight-semibold)">Network</span><span class="code-box">' + asset.chain + '</span></div></div>',
-      '<div class="address-card"><div class="eyebrow">Receive ' + asset.symbol + '</div><div class="copy-line" style="margin-top:var(--space-3)"><span class="address">' + escapeHtml(receiveAddress) + '</span><button class="round-btn" data-action="copy-address" aria-label="Copy receive address">' + icon('copy', 18) + '</button></div><p class="subtle" style="margin:var(--space-3) 0 0">Use this address only for ' + asset.symbol + ' on ' + asset.chain + '. Other networks show separate receive details.</p></div>',
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:var(--space-2)">' + chips + '</div>',
+      '<div class="qr-card"><div class="qr receive-qr" id="receiveQr"></div><div style="display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-5)"><span style="font-weight:var(--weight-semibold)">Network</span><span class="code-box">' + escapeHtml(asset.chain) + '</span></div></div>',
+      '<div class="address-card"><div class="eyebrow">Receive ' + escapeHtml(asset.symbol) + '</div><div class="copy-line" style="margin-top:var(--space-3)">' + addressBlock + '</div><p class="subtle" style="margin:var(--space-3) 0 0">Use this address only for ' + escapeHtml(asset.symbol) + ' on ' + escapeHtml(asset.chain) + '. Sending a different network or asset here can lose your funds.</p></div>',
+      memoWarning,
       '</section>'
     ].join('');
   }
@@ -5103,6 +5144,13 @@
       return;
     }
 
+    const receiveAssetTarget = event.target.closest('[data-receive-asset]');
+    if (receiveAssetTarget) {
+      state.asset = receiveAssetTarget.getAttribute('data-receive-asset');
+      render();
+      return;
+    }
+
     const assetTarget = event.target.closest('[data-asset]');
     if (assetTarget) {
       state.asset = assetTarget.getAttribute('data-asset');
@@ -5315,7 +5363,14 @@
     }
     if (action === 'copy-address') {
       const asset = selectedTransferAsset();
-      showToast('Address copied', asset.chain + ' receive address copied for this wallet.');
+      const addr = assetAddress(asset);
+      if (!addr) {
+        showToast('No address yet', 'Your wallet address is not ready to copy.', true);
+      } else if (copyToClipboard(addr)) {
+        showToast('Address copied', asset.chain + ' receive address copied to clipboard.');
+      } else {
+        showToast('Copy failed', 'Could not access the clipboard. Long-press the address to copy it.', true);
+      }
     }
     if (action === 'export-recovery') {
       showToast('Recovery checked', 'No recovery export was created in this prototype.');

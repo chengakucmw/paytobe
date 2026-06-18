@@ -237,6 +237,11 @@
   window.__vpOnWalletImported = function () { hideOnboarding(); loadWalletData(); safe(function () { N.refreshBalances(); }); };
   window.__vpOnError = function (msg) { safe(function () { showToast('Something went wrong', msg || 'Please try again.', true); }); };
 
+  // expose a native clipboard writer for the prototype's copy buttons (P1-1)
+  if (N.copyToClipboard) {
+    window.VelarumCopyBridge = function (text) { safe(function () { N.copyToClipboard(String(text == null ? '' : text)); }); };
+  }
+
   // ---------------- boot ----------------
   neutralizeDemo();
   rerender();

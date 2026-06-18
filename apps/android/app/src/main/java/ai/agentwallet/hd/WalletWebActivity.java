@@ -359,6 +359,22 @@ public class WalletWebActivity extends FragmentActivity {
             return SecureWalletStore.hasWallet(WalletWebActivity.this);
         }
 
+        // P1-1: the web copy button used to only show a toast; give it a real
+        // clipboard writer, because file:// pages often cannot use the async
+        // clipboard API.
+        @JavascriptInterface
+        public void copyToClipboard(String text) {
+            final String value = text == null ? "" : text;
+            runOnUiThread(() -> {
+                try {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager)
+                            getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+                    if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("VelarumPay address", value));
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
         @JavascriptInterface
         public String walletData() {
             return walletStateJson().toString();
