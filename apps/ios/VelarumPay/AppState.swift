@@ -163,10 +163,28 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 }
             }
         )
-        statusText = "Relay connected"
     }
 
-    func syncInbox() {
+    /// Connect/refresh in response to the app lifecycle so the inbox never
+    /// silently freezes. On foreground we (re)open the relay socket — which is
+    /// idempotent — and do a one-shot inbox sync as a fallback while the socket
+    /// catches up. On background we tear the socket down for a clean reconnect.
+    func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            guard !relayURL.isEmpty else { return }
+            connectRelay()
+            syncInbox(silent: true)
+        case .background:
+            relay.disconnect()
+        case .inactive:
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    func syncInbox(silent: Bool = false) {
         Task {
             do {
                 statusText = "Syncing inbox"
@@ -175,7 +193,11 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 inbox = localStore.loadInbox()
                 statusText = "Inbox synced"
             } catch {
-                showError(error)
+                if silent {
+                    statusText = "Inbox sync failed"
+                } else {
+                    showError(error)
+                }
             }
         }
     }

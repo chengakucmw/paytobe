@@ -38,6 +38,9 @@ final class RelayClient {
     }
 
     private var webSocket: URLSessionWebSocketTask?
+    private var connectionTask: Task<Void, Never>?
+    private var shouldReconnect = false
+    private var currentConfig: Config?
     private let session = URLSession(configuration: .default)
 
     func register(config: Config) async throws {
@@ -161,33 +164,104 @@ final class RelayClient {
         }
     }
 
-    func connect(config: Config, onIntentId: @escaping (String) async -> Void, onMessage: @escaping (String) async -> Void) {
-        disconnect()
-        guard let url = config.websocketURL else {
+    /// Opens the relay WebSocket and keeps it open. If the socket drops — which
+    /// happens routinely when the app is backgrounded or the network changes —
+    /// it reconnects automatically with exponential backoff until `disconnect()`
+    /// is called. Calling `connect` again with the same config while already
+    /// connected is a no-op, so it is safe to call on every foreground.
+    @MainActor
+    func connect(
+        config: Config,
+        onIntentId: @escaping (String) async -> Void,
+        onMessage: @escaping (String) async -> Void
+    ) {
+        if let task = connectionTask, !task.isCancelled, shouldReconnect, currentConfig == config {
+            return
+        }
+        let previous = connectionTask
+        teardown()
+        guard config.websocketURL != nil else {
             Task { await onMessage("Set Relay URL first.") }
             return
         }
-        let task = session.webSocketTask(with: url)
-        webSocket = task
-        task.resume()
-        Task {
-            await receiveLoop(task: task, onIntentId: onIntentId, onMessage: onMessage)
+        shouldReconnect = true
+        currentConfig = config
+        connectionTask = Task { [weak self] in
+            // Let any prior supervisor fully unwind (teardown cancelled it) so a
+            // superseded loop can never publish a stale socket alongside this one.
+            await previous?.value
+            await self?.maintainConnection(config: config, onIntentId: onIntentId, onMessage: onMessage)
         }
     }
 
+    @MainActor
     func disconnect() {
+        teardown()
+        currentConfig = nil
+    }
+
+    @MainActor
+    private func teardown() {
+        shouldReconnect = false
+        connectionTask?.cancel()
+        connectionTask = nil
         webSocket?.cancel(with: .normalClosure, reason: nil)
         webSocket = nil
     }
 
+    /// Supervises one logical connection: (re)open the socket, pump the receive
+    /// loop, and on any drop wait with backoff before reopening — repeating
+    /// until `disconnect()` flips `shouldReconnect` off or the task is cancelled.
+    @MainActor
+    private func maintainConnection(
+        config: Config,
+        onIntentId: @escaping (String) async -> Void,
+        onMessage: @escaping (String) async -> Void
+    ) async {
+        var attempt = 0
+        while shouldReconnect && !Task.isCancelled {
+            guard let url = config.websocketURL else {
+                await onMessage("Set Relay URL first.")
+                return
+            }
+            let task = session.webSocketTask(with: url)
+            webSocket = task
+            task.resume()
+            await onMessage(attempt == 0 ? "Relay connected" : "Relay reconnected")
+
+            let result = await receiveLoop(task: task, onIntentId: onIntentId, onMessage: onMessage)
+
+            if !shouldReconnect || Task.isCancelled { break }
+
+            // A connection that delivered at least one message counts as healthy,
+            // so the next drop restarts backoff from the shortest delay.
+            attempt = result.receivedAny ? 1 : attempt + 1
+            let delay = reconnectDelaySeconds(forAttempt: attempt)
+            await onMessage("Relay disconnected. Reconnecting in \(Int(delay.rounded()))s…")
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        }
+    }
+
+    /// Exponential backoff with light jitter, capped at 30 seconds.
+    private func reconnectDelaySeconds(forAttempt attempt: Int) -> Double {
+        let base = 1.0
+        let maxDelay = 30.0
+        let capped = min(maxDelay, base * pow(2.0, Double(max(0, attempt - 1))))
+        let jitter = Double.random(in: 0...0.3) * capped
+        return min(maxDelay, capped + jitter)
+    }
+
+    @MainActor
     private func receiveLoop(
         task: URLSessionWebSocketTask,
         onIntentId: @escaping (String) async -> Void,
         onMessage: @escaping (String) async -> Void
-    ) async {
-        while true {
+    ) async -> (receivedAny: Bool, reason: String) {
+        var receivedAny = false
+        while !Task.isCancelled {
             do {
                 let message = try await task.receive()
+                receivedAny = true
                 switch message {
                 case .string(let text):
                     guard let data = text.data(using: .utf8),
@@ -206,10 +280,12 @@ final class RelayClient {
                     await onMessage("Unknown relay message")
                 }
             } catch {
-                await onMessage("Relay disconnected: \(error.localizedDescription)")
-                return
+                // Surface the drop to the supervisor, which handles backoff +
+                // reconnect. Returning here (instead of looping) was the H10 bug.
+                return (receivedAny, error.localizedDescription)
             }
         }
+        return (receivedAny, "cancelled")
     }
 
     private func get(config: Config, path: String) async throws -> [String: Any] {
