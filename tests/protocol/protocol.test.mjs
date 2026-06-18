@@ -1,16 +1,20 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
   BASE_USDC_CONTRACT,
+  IMPLEMENTED_TRANSFER_RAILS,
   PAYMENT_RAILS,
   PAYMENT_STATUSES,
   PAIRING_SCOPES,
   RISK_SEVERITIES,
   SOURCE_TYPES,
+  SUPPORTED_TRANSFER_ASSETS,
   VERIFICATION_STATUSES,
+  detectUnsupportedTransferTarget,
+  findSupportedTransferAsset,
   normalizePaymentRequestV1,
   normalizeTransactionContextV1,
   paymentRequestFixtures,
@@ -27,6 +31,7 @@ import { Store } from "../../services/platform-api/src/store.js";
 
 test("protocol enums cover v0.1 shared contracts", () => {
   for (const rail of ["stellar_xlm", "base_usdc", "evm_erc20"]) assert.ok(PAYMENT_RAILS.includes(rail));
+  for (const rail of ["solana_sol", "ethereum_eth", "dogecoin_doge"]) assert.ok(PAYMENT_RAILS.includes(rail));
   for (const status of ["pending", "signed", "broadcasted", "confirmed", "failed", "expired", "rejected"]) {
     assert.ok(PAYMENT_STATUSES.includes(status));
   }
@@ -40,6 +45,31 @@ test("protocol enums cover v0.1 shared contracts", () => {
   for (const scope of ["request_payments", "create_transaction_contexts", "view_balances"]) {
     assert.ok(PAIRING_SCOPES.includes(scope));
   }
+});
+
+test("30-asset transfer registry includes XLM and excludes NEAR/TRON", () => {
+  assert.equal(SUPPORTED_TRANSFER_ASSETS.length, 30);
+  assert.ok(SUPPORTED_TRANSFER_ASSETS.some((asset) => asset.rail === "stellar_xlm" && asset.symbol === "XLM"));
+  assert.equal(SUPPORTED_TRANSFER_ASSETS.some((asset) => /near|tron|trx|trc/i.test(`${asset.rail} ${asset.network} ${asset.symbol}`)), false);
+  assert.ok(IMPLEMENTED_TRANSFER_RAILS.includes("base_usdc"));
+  assert.ok(IMPLEMENTED_TRANSFER_RAILS.includes("stellar_xlm"));
+  assert.ok(IMPLEMENTED_TRANSFER_RAILS.includes("solana_sol"));
+  assert.equal(IMPLEMENTED_TRANSFER_RAILS.length, 30);
+});
+
+test("transfer registry blocks TRON and NEAR before rail fallback", () => {
+  const tron = detectUnsupportedTransferTarget({
+    rail: "tron_trx",
+    network: "tron",
+    asset: "TRX",
+    to: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
+  });
+  assert.equal(tron.blocked, true);
+  assert.equal(tron.code, "unsupported_tron");
+
+  const near = detectUnsupportedTransferTarget({ rail: "near_native", network: "near", asset: "NEAR" });
+  assert.equal(near.blocked, true);
+  assert.equal(near.code, "unsupported_near");
 });
 
 test("valid Base USDC Payment Request normalizes stable payment facts", () => {
@@ -68,6 +98,97 @@ test("valid Stellar XLM Payment Request is accepted", () => {
   assert.equal(result.value.payment.rail, "stellar_xlm");
   assert.equal(result.value.payment.asset, "XLM");
   assert.equal(result.value.payment.network, "stellar_testnet");
+});
+
+test("registered implemented transfer assets normalize through shared registry", () => {
+  const result = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    request_id: "prq_solana_sol_registry",
+    payment: {
+      rail: "solana_sol",
+      network: "solana_mainnet",
+      asset: "SOL",
+      amount: "0.25",
+      to: "11111111111111111111111111111111",
+      decimals: 9
+    }
+  }, { now: protocolFixtureClock.now });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.value.payment.rail, "solana_sol");
+  assert.equal(result.value.payment.chain_family, "solana");
+  assert.equal(result.value.payment.signer_status, "implemented");
+});
+
+test("prepared-payload transfer assets require payload and broadcast URL before signing", () => {
+  const doge = findSupportedTransferAsset({ rail: "dogecoin_doge" });
+  assert.equal(doge.signer_status, "implemented");
+  assert.equal(doge.execution_mode, "prepared_payload");
+
+  const missingPayload = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    request_id: "prq_doge_registry",
+    payment: {
+      rail: "dogecoin_doge",
+      network: "dogecoin_mainnet",
+      asset: "DOGE",
+      amount: "10.5",
+      to: "D8BfE7n6R5m4K3j2H1g9F8e7D6c5B4a3Z",
+      decimals: 8
+    }
+  }, { now: protocolFixtureClock.now });
+  assert.equal(missingPayload.ok, false);
+  assert.equal(missingPayload.error.code, "prepared_payload_required");
+
+  const result = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    request_id: "prq_doge_registry_payload",
+    payment: {
+      rail: "dogecoin_doge",
+      network: "dogecoin_mainnet",
+      asset: "DOGE",
+      amount: "10.5",
+      to: "D8BfE7n6R5m4K3j2H1g9F8e7D6c5B4a3Z",
+      decimals: 8,
+      signing_payload: "01020304",
+      signing_payload_encoding: "hex",
+      broadcast_url: "https://relay.example/dogecoin/submit"
+    }
+  }, { now: protocolFixtureClock.now });
+  assert.equal(result.ok, true);
+  assert.equal(result.value.payment.signer_status, "implemented");
+  assert.equal(result.value.payment.execution_mode, "prepared_payload");
+  assert.equal(result.value.payment.key_curve, "secp256k1");
+  assert.equal(result.value.payment.coin_type, 3);
+  assert.equal(result.value.payment.signing_payload, "01020304");
+});
+
+test("Payment Request blocks TRON and NEAR rails with structured errors", () => {
+  const tron = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    payment: {
+      rail: "tron_trx",
+      network: "tron",
+      asset: "TRX",
+      amount: "1",
+      to: "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb"
+    }
+  }, { now: protocolFixtureClock.now });
+  assert.equal(tron.ok, false);
+  assert.equal(tron.error.code, "unsupported_tron");
+
+  const near = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    payment: {
+      rail: "near_native",
+      network: "near",
+      asset: "NEAR",
+      amount: "1",
+      to: "alice.near"
+    }
+  }, { now: protocolFixtureClock.now });
+  assert.equal(near.ok, false);
+  assert.equal(near.error.code, "unsupported_near");
 });
 
 test("Payment Request negative fixtures return structured errors", () => {
@@ -236,6 +357,85 @@ test("Platform API Store persists and reads Transaction Context by transaction_i
     assert.equal(fetched.costs.total, "169.00");
     assert.equal(fetched.agent_activity.length, 2);
     assert.equal(fetched.provenance.model, "truth_layer_v1");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Platform API Store persists relay state in SQLite across instances", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-sqlite-store-"));
+  try {
+    const sqlitePath = path.join(dir, "relay-store.sqlite");
+    const first = new Store(sqlitePath);
+    assert.equal(first.info().driver, "sqlite");
+
+    first.registerDevice("device_sqlite", "token_sqlite");
+    const normalized = normalizeApiPaymentRequestV1({
+      ...paymentRequestFixtures.valid_base_usdc,
+      request_id: "prq_sqlite_persist",
+      idempotency_key: "idem_sqlite_persist",
+      connection_id: "conn_sqlite"
+    }, { now: protocolFixtureClock.now });
+    assert.equal(normalized.ok, true);
+
+    first.putPaymentRequest({
+      ...normalized.value,
+      target_app_device_id: "device_sqlite"
+    });
+    first.updatePaymentRequestStatus("prq_sqlite_persist", "confirmed", { tx_hash: "0xabc123" });
+    const backupPath = path.join(dir, "relay-store-backup.sqlite");
+    first.backup(backupPath);
+    first.close();
+
+    const reopened = new Store(sqlitePath);
+    assert.equal(reopened.verifyDeviceToken("device_sqlite", "token_sqlite"), true);
+    assert.equal(reopened.device("device_sqlite").token, undefined);
+    assert.match(reopened.device("device_sqlite").token_hash, /^sha256:/);
+    assert.equal(reopened.paymentRequest("prq_sqlite_persist").status, "confirmed");
+    assert.equal(reopened.paymentRequest("prq_sqlite_persist").tx_hash, "0xabc123");
+    assert.equal(reopened.findPaymentRequestByIdempotency("idem_sqlite_persist", "conn_sqlite").request_id, "prq_sqlite_persist");
+    assert.equal(reopened.eventsSince(0).some((event) => event.type === "payment_request.status"), true);
+    reopened.close();
+
+    const backup = new Store(backupPath);
+    assert.equal(backup.verifyDeviceToken("device_sqlite", "token_sqlite"), true);
+    assert.equal(backup.paymentRequest("prq_sqlite_persist").status, "confirmed");
+    backup.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Platform API Store imports legacy JSON state into SQLite once", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-sqlite-migration-"));
+  try {
+    const legacyJson = path.join(dir, "relay-store.json");
+    const sqlitePath = path.join(dir, "relay-store.sqlite");
+    writeFileSync(legacyJson, JSON.stringify({
+      devices: {
+        migrated_device: {
+          device_id: "migrated_device",
+          token: "migrated_token",
+          registered_at: protocolFixtureClock.now,
+          last_seen_at: protocolFixtureClock.now
+        }
+      },
+      events: []
+    }, null, 2));
+
+    const migrated = new Store(sqlitePath, { legacyJsonFile: legacyJson });
+    assert.equal(migrated.info().driver, "sqlite");
+    assert.equal(migrated.verifyDeviceToken("migrated_device", "migrated_token"), true);
+    assert.equal(migrated.device("migrated_device").token, undefined);
+    assert.match(migrated.device("migrated_device").token_hash, /^sha256:/);
+    assert.equal(existsSync(`${legacyJson}.migrated-to-sqlite`), true);
+    migrated.close();
+
+    writeFileSync(legacyJson, JSON.stringify({ devices: {}, events: [] }, null, 2));
+    const reopened = new Store(sqlitePath, { legacyJsonFile: legacyJson });
+    assert.equal(reopened.verifyDeviceToken("migrated_device", "migrated_token"), true);
+    assert.equal(reopened.device("migrated_device").token, undefined);
+    reopened.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

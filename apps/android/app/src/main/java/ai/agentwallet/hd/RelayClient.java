@@ -25,12 +25,19 @@ final class RelayClient {
         void onFailure(String message);
     }
 
-    private static final OkHttpClient HTTP = new OkHttpClient();
+    private static final OkHttpClient HTTP = WalletHttp.oneShot();
+    private static final OkHttpClient WS_HTTP = WalletHttp.webSocket();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private WebSocket socket;
 
     void connect(Context context, Listener listener) {
-        String base = PaymentInboxStore.relayUrl(context);
+        String base;
+        try {
+            base = relayBase(context);
+        } catch (Exception e) {
+            listener.onFailure(e.getMessage());
+            return;
+        }
         String deviceId = PaymentInboxStore.deviceId(context);
         String token = PaymentInboxStore.deviceToken(context);
         String wsBase = base.startsWith("https://")
@@ -39,7 +46,7 @@ final class RelayClient {
         Request request = new Request.Builder()
                 .url(wsBase + "/v1/ws/app?device_id=" + urlEncode(deviceId) + "&token=" + urlEncode(token))
                 .build();
-        socket = HTTP.newWebSocket(request, new WebSocketListener() {
+        socket = WS_HTTP.newWebSocket(request, new WebSocketListener() {
             @Override
             public void onOpen(WebSocket webSocket, Response response) {
                 listener.onConnected();
@@ -87,21 +94,6 @@ final class RelayClient {
                 .put("device_id", PaymentInboxStore.deviceId(context))
                 .put("token", PaymentInboxStore.deviceToken(context));
         post(context, "/v1/devices/app", body);
-    }
-
-    static JSONObject createDemoSession(Context context, String label, String telegramBot, String stellarAddress, String evmAddress) throws Exception {
-        JSONObject body = new JSONObject()
-                .put("device_id", PaymentInboxStore.deviceId(context))
-                .put("token", PaymentInboxStore.deviceToken(context))
-                .put("label", label)
-                .put("telegram_bot", telegramBot)
-                .put("stellar_address", stellarAddress)
-                .put("evm_address", evmAddress);
-        JSONObject response = post(context, "/v1/demo/sessions", body);
-        JSONObject session = response.getJSONObject("session");
-        PaymentInboxStore.setDemoSessionId(context, session.optString("session_id", ""));
-        PaymentInboxStore.setTelegramBot(context, telegramBot);
-        return session;
     }
 
     static List<PaymentIntent> sync(Context context) throws Exception {
@@ -292,7 +284,7 @@ final class RelayClient {
 
     private static JSONObject get(Context context, String path) throws Exception {
         Request request = new Request.Builder()
-                .url(PaymentInboxStore.relayUrl(context) + path)
+                .url(relayBase(context) + path)
                 .get()
                 .build();
         try (Response response = HTTP.newCall(request).execute()) {
@@ -316,7 +308,7 @@ final class RelayClient {
 
     private static JSONObject sendWithBody(Context context, String method, String path, JSONObject body) throws Exception {
         RequestBody requestBody = RequestBody.create(body.toString(), JSON);
-        Request.Builder builder = new Request.Builder().url(PaymentInboxStore.relayUrl(context) + path);
+        Request.Builder builder = new Request.Builder().url(relayBase(context) + path);
         if ("PATCH".equals(method)) {
             builder.patch(requestBody);
         } else if ("DELETE".equals(method)) {
@@ -335,6 +327,18 @@ final class RelayClient {
     private static String deviceQuery(Context context) {
         return "?device_id=" + urlEncode(PaymentInboxStore.deviceId(context))
                 + "&token=" + urlEncode(PaymentInboxStore.deviceToken(context));
+    }
+
+    private static String relayBase(Context context) {
+        String base = PaymentInboxStore.relayUrl(context);
+        if (base == null || base.trim().length() == 0) {
+            throw new IllegalStateException("Set Relay URL first.");
+        }
+        base = base.trim().replaceAll("/+$", "");
+        if (!base.startsWith("https://") && !base.startsWith("http://")) {
+            throw new IllegalStateException("Relay URL must start with http:// or https://");
+        }
+        return base;
     }
 
     private static boolean isPaymentRequestEvent(String type) {

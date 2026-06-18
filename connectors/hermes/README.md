@@ -7,6 +7,12 @@ Request, and read request status through polling or the agent WebSocket URL.
 It does not hold wallet private keys, seed phrases, signing keys, automatic
 payment authority, webhook callbacks, or wallet status-update permission.
 
+Package name: `@velarumpay/hermes-connector`  
+Version: `0.1.0`  
+Entry point: `./src/index.js`  
+Types: `./src/index.d.ts`  
+Runtime dependency: `@velarumpay/sdk-js@0.1.0`
+
 ## Scopes
 
 Hermes requests only these v0.1 scopes:
@@ -22,7 +28,7 @@ are not exposed by this connector. The wallet still reviews and signs locally.
 ## Usage
 
 ```js
-import { createHermesPaymentRequestAdapter } from "./src/index.js";
+import { createHermesPaymentRequestAdapter } from "@velarumpay/hermes-connector";
 import fixture from "./fixtures/stellar-xlm-payment-request.json" with { type: "json" };
 
 const hermes = createHermesPaymentRequestAdapter({
@@ -59,6 +65,7 @@ require mainnet funds.
 ```bash
 cd /Users/yang/code/VelarumPayCode/connectors/hermes
 npm run check
+npm run pack:dry
 ```
 
 Formal protocol and API references live in the document workspace:

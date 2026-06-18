@@ -14,7 +14,7 @@ final class PaymentExecutor {
         if (!risk.allowed) throw new IllegalStateException(join(risk.errors));
         if (intent.isBaseUsdc()) {
             return EvmTransfer.sendErc20(
-                    intent.rpcUrl,
+                    RiskPolicy.verifiedEvmRpcUrl(context, intent),
                     8453L,
                     wallet.evm.privateKey,
                     intent.tokenContract,
@@ -46,7 +46,58 @@ final class PaymentExecutor {
             throw new IllegalStateException(
                     "Stellar " + intent.asset
                             + " recipient is ready, but this app version only broadcasts Stellar XLM. "
-                            + "Enable the Stellar asset signer before sending non-XLM assets."
+                    + "Enable the Stellar asset signer before sending non-XLM assets."
+            );
+        }
+        if (intent.requiresSignerAdapter()) {
+            TransferAssetRegistry.Asset asset = TransferAssetRegistry.find(intent);
+            throw new IllegalStateException(
+                    (asset == null ? intent.asset : asset.symbol + " on " + asset.chain)
+                            + " requires a chain-family signer adapter before broadcast"
+            );
+        }
+        if (intent.requiresPreparedPayloadSigner()) {
+            // SECURITY (blind-signing fix): never sign a server-supplied prepared payload. Its bytes
+            // are opaque and cannot be proven to match the amount/recipient shown to the user, so
+            // signing here would be a blind signature. This rail is review-only until the wallet can
+            // build or verify the transaction locally per chain. RiskPolicy already blocks it; this
+            // is a hard defense-in-depth guard so the blind-sign path can never be reached.
+            TransferAssetRegistry.Asset asset = TransferAssetRegistry.find(intent);
+            throw new IllegalStateException(
+                    (asset == null ? intent.asset : asset.symbol + " on " + asset.chain)
+                            + " can't be signed in this wallet yet: its prepared transaction can't be"
+                            + " verified against the amount and recipient shown here.");
+        }
+        if (intent.isSolanaSol()) {
+            return SolanaTransfer.sendSol(
+                    intent.rpcUrl,
+                    wallet.solana.privateSeed,
+                    wallet.solana.publicKey,
+                    intent.to,
+                    intent.amount
+            );
+        }
+        WalletNetworkConfig evmNetwork = RiskPolicy.enabledEvmNetwork(context, intent);
+        if (evmNetwork != null) {
+            if (RiskPolicy.isErc20Payment(intent)) {
+                return EvmTransfer.sendErc20(
+                        evmNetwork.rpcUrl,
+                        evmNetwork.chainId,
+                        wallet.evm.privateKey,
+                        intent.tokenContract,
+                        intent.to,
+                        intent.amount,
+                        intent.decimals,
+                        progress
+                );
+            }
+            return EvmTransfer.sendNative(
+                    evmNetwork.rpcUrl,
+                    evmNetwork.chainId,
+                    wallet.evm.privateKey,
+                    intent.to,
+                    intent.amount,
+                    progress
             );
         }
         throw new IllegalArgumentException("Unsupported payment request");

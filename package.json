@@ -6,14 +6,27 @@
     "packages/protocol",
     "packages/sdk-js",
     "services/platform-api",
-    "connectors/openclaw-telegram"
+    "connectors/openclaw-telegram",
+    "connectors/mcp-server",
+    "connectors/hermes"
   ],
   "scripts": {
-    "check": "npm run check:protocol && npm run check:sdk-js && npm run check:platform-api && npm run check:openclaw-telegram",
+    "check": "npm run check:protocol && npm run check:sdk-js && npm run check:platform-api && npm run check:openclaw-telegram && npm run check:mcp-server && npm run check:hermes",
     "check:protocol": "npm --prefix packages/protocol run check",
     "check:sdk-js": "npm --prefix packages/sdk-js run check",
     "check:platform-api": "npm --prefix services/platform-api run check",
     "check:openclaw-telegram": "npm --prefix connectors/openclaw-telegram run check",
-    "test": "npm --prefix services/platform-api test"
+    "check:mcp-server": "npm --prefix connectors/mcp-server run check",
+    "check:hermes": "npm --prefix connectors/hermes run check",
+    "test": "npm --prefix services/platform-api test && npm run test:sdk-js && npm run test:mcp-server && npm run test:hermes",
+    "test:sdk-js": "npm --prefix packages/sdk-js test",
+    "test:mcp-server": "npm --prefix connectors/mcp-server test",
+    "test:hermes": "npm --prefix connectors/hermes test",
+    "smoke:quickstart": "node examples/payment-request-quickstart/smoke-check.mjs",
+    "smoke:cross-component": "node scripts/cross-component-smoke.mjs",
+    "package:integrations": "npm --prefix packages/protocol run pack:dry && npm --prefix packages/sdk-js run pack:dry && npm --prefix connectors/mcp-server run pack:dry && npm --prefix connectors/hermes run pack:dry",
+    "android:build": "cd apps/android && ./gradlew testDebugUnitTest assembleDebug",
+    "ios:build": "xcodebuild -project apps/ios/VelarumPay.xcodeproj -scheme VelarumPay -configuration Debug -sdk iphonesimulator build",
+    "release:gate": "node scripts/release-gate.mjs"
   }
 }

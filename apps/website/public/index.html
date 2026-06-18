@@ -1,129 +1,214 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>VelarumPay</title>
-    <meta
-      name="description"
-      content="VelarumPay is a self-custodial mobile wallet for AI-agent-initiated payments, local signing, and human confirmation."
-    />
-    <meta property="og:title" content="VelarumPay" />
-    <meta
-      property="og:description"
-      content="A self-custodial mobile wallet for reviewing and approving AI-agent payment requests."
-    />
-    <meta property="og:image" content="/assets/VelarumPay-hero.png" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <header class="site-header">
-      <a class="brand" href="/" aria-label="VelarumPay home">
-        <span class="brand-mark">VP</span>
-        <span>VelarumPay</span>
-      </a>
-      <nav class="nav" aria-label="Primary navigation">
-        <a href="#wallet">Wallet</a>
-        <a href="#security">Security</a>
-        <a href="#demo">Demo</a>
-        <a class="nav-action" href="/download/android">Android demo</a>
-      </nav>
-    </header>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VelarumPay</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #e8f0e9;
+      --surface: #ffffff;
+      --soft: #f2f7f3;
+      --line: #dfe8e1;
+      --ink: #16201a;
+      --muted: #5b6a60;
+      --green: #3e7b4f;
+      --green-soft: #e0ede3;
+      --shadow: 0 24px 60px rgba(22, 32, 26, 0.12);
+    }
 
-    <main>
-      <section class="hero">
-        <img class="hero-image" src="/assets/VelarumPay-hero.png" alt="VelarumPay mobile app payment confirmation preview" />
-        <div class="hero-shade"></div>
-        <div class="hero-copy">
-          <p class="eyebrow">Self-custodial AI payment wallet</p>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px 18px;
+    }
+
+    .shell {
+      width: min(420px, 100%);
+      background: var(--surface);
+      border: 1px solid rgba(22, 32, 26, 0.1);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .mark {
+      width: 48px;
+      height: 48px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: var(--green);
+      color: white;
+      font-weight: 800;
+      font-size: 20px;
+      flex: 0 0 auto;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .subtitle {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .content {
+      padding: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .status {
+      padding: 18px;
+      border-radius: 20px;
+      background: var(--green-soft);
+      border: 1px solid rgba(62, 123, 79, 0.18);
+    }
+
+    .status span {
+      display: inline-flex;
+      margin-bottom: 10px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h2 {
+      font-size: 26px;
+      line-height: 1.08;
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .row {
+      min-height: 64px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      background: var(--soft);
+      border: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .row strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .row small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .pill {
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--muted);
+      border: 1px solid var(--line);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .footer {
+      padding: 0 24px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="shell" aria-label="VelarumPay initial state">
+      <header class="header">
+        <div class="mark" aria-hidden="true">V</div>
+        <div>
           <h1>VelarumPay</h1>
-          <p class="hero-text">
-            Review AI-agent payment requests, confirm the details, and sign crypto transactions locally on your phone.
-          </p>
-          <div class="hero-actions">
-            <a class="button primary" href="/download/android">Download Android demo</a>
-            <a class="button secondary" href="https://agentfood.velarumai.com/demo">Open AgentFood demo</a>
+          <p class="subtitle">Local signing wallet</p>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="status">
+          <span>Initial state</span>
+          <h2>No wallet loaded</h2>
+          <p class="subtitle">Create or recover a wallet in the mobile app to show real addresses, balances, requests, and history.</p>
+        </section>
+
+        <div class="grid" aria-label="Empty product surfaces">
+          <div class="row">
+            <div>
+              <strong>Inbox</strong>
+              <small>Payment requests will appear after a trusted agent is connected.</small>
+            </div>
+            <div class="pill">Empty</div>
+          </div>
+          <div class="row">
+            <div>
+              <strong>Connections</strong>
+              <small>Pairing starts from a relay URL, short code, or QR scan.</small>
+            </div>
+            <div class="pill">None</div>
+          </div>
+          <div class="row">
+            <div>
+              <strong>History</strong>
+              <small>Only signed or broadcasted real requests are recorded here.</small>
+            </div>
+            <div class="pill">Empty</div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <section id="wallet" class="section intro">
-        <div>
-          <p class="eyebrow">Built for human confirmation</p>
-          <h2>A wallet that stays between your AI agent and your assets.</h2>
-        </div>
-        <p>
-          VelarumPay receives structured payment requests from trusted agent workflows, shows the merchant, recipient,
-          amount, chain, asset, order details, and risk warnings, then waits for explicit user approval before signing.
-        </p>
-      </section>
-
-      <section class="feature-grid" aria-label="VelarumPay capabilities">
-        <article class="feature-card">
-          <span>01</span>
-          <h3>Payment request inbox</h3>
-          <p>AI-created intents arrive as reviewable requests with order context, chain data, and status history.</p>
-        </article>
-        <article class="feature-card">
-          <span>02</span>
-          <h3>Local wallet signing</h3>
-          <p>Private keys stay on the phone. Signing happens only after the user confirms and authenticates.</p>
-        </article>
-        <article class="feature-card">
-          <span>03</span>
-          <h3>XLM and USDC demos</h3>
-          <p>Current demo flows support Stellar XLM and Base USDC payment request handling.</p>
-        </article>
-        <article class="feature-card">
-          <span>04</span>
-          <h3>Relay connection</h3>
-          <p>A lightweight relay connects desktop agents, Telegram demos, and the mobile wallet without exposing keys.</p>
-        </article>
-      </section>
-
-      <section id="security" class="section split">
-        <div>
-          <p class="eyebrow">Security boundary</p>
-          <h2>The agent proposes. The wallet decides.</h2>
-        </div>
-        <div class="security-list">
-          <div>
-            <strong>No cloud private keys</strong>
-            <p>OpenClaw, Telegram integrations, and relay services never receive seed phrases or signing material.</p>
-          </div>
-          <div>
-            <strong>Human-in-the-loop approval</strong>
-            <p>Every payment request is shown before signing, including recipient, asset, amount, and irreversible-payment warnings.</p>
-          </div>
-          <div>
-            <strong>Payment proof trail</strong>
-            <p>Requests, status updates, and transaction hashes are tracked so demos can be inspected end to end.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="demo" class="demo-band">
-        <div>
-          <p class="eyebrow">Live demo</p>
-          <h2>Try the AgentFood payment flow.</h2>
-          <p>
-            The food delivery site is simulated, but the wallet confirmation flow is real: create an order, receive a payment
-            request, inspect it in VelarumPay, then decide whether to pay.
-          </p>
-        </div>
-        <a class="button primary" href="https://agentfood.velarumai.com/demo">Open demo setup</a>
-      </section>
-
-      <section class="section footer-cta">
-        <p class="eyebrow">VelarumPay</p>
-        <h2>Self-custody for agent-driven payments.</h2>
-        <p>Designed for demos today, shaped for a safer payment layer between autonomous agents and user-owned wallets.</p>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <span>VelarumPay</span>
-      <span>Human approval before wallet signing.</span>
-    </footer>
-  </body>
+      <p class="footer">This page intentionally contains no sample balances, merchants, agents, requests, or transaction data.</p>
+    </section>
+  </main>
+</body>
 </html>

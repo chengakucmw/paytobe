@@ -11,49 +11,61 @@ import AVFoundation
 #endif
 
 struct ContentView: View {
+    var body: some View {
+        VelarumRootView()
+    }
+}
+
+struct VelarumRootView: View {
     @EnvironmentObject private var app: AppState
 
     var body: some View {
-        TabView {
+        TabView(selection: $app.selectedTab) {
             WalletView()
-                .tabItem { Label("Wallet", systemImage: "wallet.pass") }
+                .tabItem { Label("Home", systemImage: "wallet.pass") }
+                .tag(AppTab.home)
             InboxView()
                 .tabItem { Label("Inbox", systemImage: "tray.full") }
+                .tag(AppTab.inbox)
             HistoryView()
-                .tabItem { Label("History", systemImage: "clock.arrow.circlepath") }
+                .tabItem { Label("History", systemImage: "clock") }
+                .tag(AppTab.history)
             SettingsView()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
+                .tag(AppTab.settings)
         }
-        .tint(.green)
         .sheet(item: $app.selectedIntent) { intent in
             PaymentDetailView(intent: intent)
-                .presentationDetents([.medium, .large])
+                .environmentObject(app)
         }
         .sheet(item: $app.pairingSession) { session in
             PairingReviewView(session: session)
-                .presentationDetents([.large])
-        }
-        .sheet(isPresented: $app.showingPairingScanner) {
-            PairingScannerSheet { value in
-                app.pairingInput = value
-                app.showingPairingScanner = false
-                app.reviewPairing()
-            }
+                .environmentObject(app)
         }
         .sheet(item: $app.selectedConnection) { connection in
             ConnectionDetailView(connection: connection)
-                .presentationDetents([.medium, .large])
+                .environmentObject(app)
         }
         .sheet(item: $app.progress) { progress in
             PaymentProgressView(progress: progress)
-                .presentationDetents([.height(progress.canDismiss ? 300 : 240)])
-                .interactiveDismissDisabled(!progress.canDismiss)
+                .environmentObject(app)
+                .presentationDetents([.medium, .large])
         }
-        .alert("VelarumPay", isPresented: Binding(
-            get: { app.errorMessage != nil },
-            set: { if !$0 { app.errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) {}
+        .sheet(isPresented: $app.showingPairingScanner) {
+            PairingScannerSheet { code in
+                app.showingPairingScanner = false
+                app.pairingInput = code
+                app.reviewPairing()
+            }
+        }
+        .alert(
+            "VelarumPay",
+            isPresented: Binding(
+                get: { app.errorMessage != nil },
+                set: { if !$0 { app.errorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { app.errorMessage = nil }
         } message: {
             Text(app.errorMessage ?? "")
         }
@@ -72,15 +84,15 @@ struct WalletView: View {
                         AddressCard(
                             title: "Stellar",
                             address: wallet.address,
-                            note: "Use this address for XLM. Stellar accounts must be funded before they are active."
+                            note: "Use this address only for Stellar XLM. Other networks show separate receive details when their signer is enabled."
                         )
-                        DemoCard()
+                        WalletRelayCard()
                     } else {
                         EmptyWalletCard()
                     }
                     InfoCard(
-                        title: "Receive Addresses",
-                        bodyText: "iOS v1 focuses on Stellar XLM for the AgentFood demo. EVM and Solana signing are reserved for the next wallet-core integration pass."
+                        title: "Payment support",
+                        bodyText: "iOS v1 signs Stellar XLM Payment Requests locally. Other rails remain review-only until their signer is enabled."
                     )
                 }
                 .padding()
@@ -98,12 +110,12 @@ struct EmptyWalletCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("No wallet yet")
                     .font(.title2.bold())
-                Text("Generate a local Stellar wallet for the iOS demo. The private seed is stored in this device Keychain.")
+                Text("Set up or recover a wallet from Settings > Security. Home will show balances and receive addresses after a wallet is loaded.")
                     .foregroundStyle(.secondary)
                 Button {
-                    app.generateWallet()
+                    app.openSecuritySettings()
                 } label: {
-                    Label("Generate Wallet", systemImage: "plus.circle.fill")
+                    Label("Open Settings", systemImage: "gearshape")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
@@ -113,21 +125,21 @@ struct EmptyWalletCard: View {
     }
 }
 
-struct DemoCard: View {
+struct WalletRelayCard: View {
     @EnvironmentObject private var app: AppState
 
     var body: some View {
         Card {
             VStack(alignment: .leading, spacing: 12) {
-                Text("AgentFood Demo")
+                Text("Payment Request relay")
                     .font(.title2.bold())
-                Text("Register this phone with the relay, then ask the Telegram bot to order food and pay with XLM.")
+                Text("Register this device with a VelarumPay relay, connect trusted agents, then review incoming requests before signing.")
                     .foregroundStyle(.secondary)
                 HStack {
                     Button {
-                        app.startDemoSession()
+                        app.registerRelay()
                     } label: {
-                        Label("Start Demo", systemImage: "paperplane")
+                        Label("Register", systemImage: "antenna.radiowaves.left.and.right")
                     }
                     .buttonStyle(.borderedProminent)
                     Button {
@@ -137,16 +149,248 @@ struct DemoCard: View {
                     }
                     .buttonStyle(.bordered)
                 }
-                if let session = app.demoSessionId, !session.isEmpty {
-                    FieldRow(title: "Session", value: session, copyAction: { app.copy(session) })
+                if app.relayURL.isEmpty {
+                    Text("Set a relay URL in Settings before registering or syncing.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    FieldRow(title: "Relay URL", value: app.relayURL)
+                }
+            }
+        }
+    }
+}
+
+struct MnemonicBackupCard: View {
+    let wallet: StellarWallet
+    let onBackup: () -> Void
+
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Recovery phrase")
+                            .font(.title2.bold())
+                        Text(wallet.displayMnemonicType)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    TonePill(text: wallet.isBackupVerified ? "Verified" : "Required", tone: wallet.isBackupVerified ? "success" : "warning")
+                }
+                if let path = wallet.derivationPath, !path.isEmpty {
+                    FieldRow(title: "Stellar path", value: path)
+                }
+                Text(wallet.isBackupVerified ? "This wallet is ready for local signing." : "Back up and verify the recovery phrase before signing Payment Requests.")
+                    .foregroundStyle(.secondary)
+                Button {
+                    onBackup()
+                } label: {
+                    Label(wallet.isBackupVerified ? "Review Backup" : "Back Up Now", systemImage: "lock.shield")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        }
+    }
+}
+
+struct RecoveryPhraseBackupSheet: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    let wallet: StellarWallet
+    @State private var showingWords = false
+    @State private var answers: [Int: String] = [:]
+    @State private var verificationMessage = ""
+
+    private var words: [String] {
+        wallet.recoveryPhrase?.split(whereSeparator: { $0.isWhitespace }).map(String.init) ?? []
+    }
+
+    private var positions: [Int] {
+        challengePositions(for: words.count)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    InfoCard(
+                        title: "Offline backup only",
+                        bodyText: "Write the recovery phrase in the exact order. Do not save it to screenshots, cloud notes, chat, or email."
+                    )
+                    if words.isEmpty {
+                        ContentUnavailableView("Recovery phrase unavailable", systemImage: "key.slash", description: Text("This looks like a legacy local Stellar key and cannot be backed up as a BIP-39 phrase."))
+                    } else if showingWords {
+                        MnemonicGrid(words: words)
+                            .textSelection(.disabled)
+                        Text("Verification")
+                            .font(.headline)
+                        ForEach(positions, id: \.self) { position in
+                            TextField("Word #\(position + 1)", text: Binding(
+                                get: { answers[position, default: ""] },
+                                set: { answers[position] = $0 }
+                            ))
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .textFieldStyle(.roundedBorder)
+                        }
+                        if !verificationMessage.isEmpty {
+                            Text(verificationMessage)
+                                .font(.footnote.bold())
+                                .foregroundStyle(.red)
+                        }
+                        Button {
+                            verify()
+                        } label: {
+                            Label("Verify Backup", systemImage: "checkmark.shield")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    } else {
+                        Button {
+                            showingWords = true
+                        } label: {
+                            Label("Show Recovery Phrase", systemImage: "eye")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Back Up Wallet")
+            .appInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func verify() {
+        for position in positions {
+            let expected = words[position]
+            let actual = answers[position, default: ""].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            guard actual == expected else {
+                verificationMessage = "Word #\(position + 1) does not match."
+                return
+            }
+        }
+        app.markWalletBackupVerified()
+        dismiss()
+    }
+}
+
+struct RecoveryPhraseImportSheet: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var phraseText = ""
+    @State private var backupConfirmed = false
+    @State private var preview: StellarWallet?
+    @State private var errorMessage = ""
+    private let stellar = StellarService()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    InfoCard(
+                        title: "Import recovery phrase",
+                        bodyText: "Supported BIP-39 English lengths are 12, 15, 18, 21, and 24 words. Cloud backup and MPC recovery are not enabled in this build."
+                    )
+                    TextEditor(text: $phraseText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.system(.body, design: .monospaced))
+                        .frame(minHeight: 150)
+                        .padding(8)
+                        .background(Color.appSecondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 14))
+                    Toggle("I already have this phrase backed up offline", isOn: $backupConfirmed)
                     Button {
-                        app.openTelegramDemo()
+                        previewImport()
                     } label: {
-                        Label("Open Telegram", systemImage: "message")
+                        Label("Preview Address", systemImage: "doc.text.magnifyingglass")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    if let preview {
+                        Card {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Address preview")
+                                    .font(.headline)
+                                FieldRow(title: "Mnemonic type", value: preview.displayMnemonicType)
+                                FieldRow(title: "Stellar path", value: preview.derivationPath ?? "m/44'/148'/0'")
+                                FieldRow(title: "Stellar address", value: preview.address)
+                                Text(backupConfirmed ? "This wallet will be marked as backed up." : "Backup verification will be required before signing.")
+                                    .foregroundStyle(.secondary)
+                                Button {
+                                    app.restoreWallet(mnemonic: phraseText, backupVerified: backupConfirmed)
+                                    dismiss()
+                                } label: {
+                                    Label("Import to this Device", systemImage: "square.and.arrow.down")
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                            }
+                        }
+                    }
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.footnote.bold())
+                            .foregroundStyle(.red)
+                    }
                 }
+                .padding()
+            }
+            .navigationTitle("Import Wallet")
+            .appInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func previewImport() {
+        errorMessage = ""
+        preview = nil
+        Task {
+            do {
+                let wallet = try await stellar.restoreWallet(mnemonic: phraseText, backupVerified: backupConfirmed)
+                await MainActor.run { preview = wallet }
+            } catch {
+                await MainActor.run { errorMessage = error.localizedDescription }
+            }
+        }
+    }
+}
+
+struct MnemonicGrid: View {
+    let words: [String]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            ForEach(Array(words.enumerated()), id: \.offset) { index, word in
+                HStack(spacing: 8) {
+                    Text(String(format: "%02d", index + 1))
+                        .foregroundStyle(.secondary)
+                    Text(word)
+                        .fontWeight(.semibold)
+                    Spacer(minLength: 0)
+                }
+                .font(.system(.subheadline, design: .monospaced))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 10)
+                .background(Color.appSecondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 12))
             }
         }
     }
@@ -183,7 +427,7 @@ struct InboxView: View {
                     .pickerStyle(.segmented)
                 }
                 if visibleItems.isEmpty {
-                    ContentUnavailableView("No payment requests", systemImage: "tray", description: Text("Connect the relay or sync after creating an AgentFood order."))
+                    ContentUnavailableView("No payment requests", systemImage: "tray", description: Text("Connect a trusted agent and sync the relay to receive reviewable requests."))
                 } else {
                     ForEach(sections) { section in
                         Section(section.title) {
@@ -240,10 +484,52 @@ struct HistoryView: View {
 struct SettingsView: View {
     @EnvironmentObject private var app: AppState
     @State private var relayDraft = ""
+    @State private var showingBackup = false
+    @State private var showingImport = false
+    @State private var showingAddNetwork = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Security") {
+                    Text("Settings > Security is the only place for wallet creation, recovery phrase backup, import, and recovery flows. Signing stays locked until the offline backup is verified.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    if let wallet = app.wallet {
+                        FieldRow(title: "Mnemonic type", value: wallet.displayMnemonicType)
+                        FieldRow(title: "Backup status", value: wallet.isBackupVerified ? "Verified" : "Required before signing")
+                        if let path = wallet.derivationPath, !path.isEmpty {
+                            FieldRow(title: "Stellar path", value: path)
+                        }
+                        FieldRow(title: "Stellar Address", value: wallet.address, copyAction: { app.copy(wallet.address) })
+                    } else {
+                        ContentUnavailableView("No wallet loaded", systemImage: "wallet.pass", description: Text("Create a new wallet or recover an existing one here."))
+                    }
+                    Button {
+                        app.generateWallet()
+                    } label: {
+                        Label("Create 24-word wallet", systemImage: "plus.circle.fill")
+                    }
+                    Button {
+                        showingBackup = true
+                    } label: {
+                        Label(app.wallet?.isBackupVerified == true ? "Review recovery phrase backup" : "Recovery phrase backup", systemImage: "lock.shield")
+                    }
+                    .disabled(app.wallet == nil)
+                    Button {
+                        showingImport = true
+                    } label: {
+                        Label("Import or recover wallet", systemImage: "square.and.arrow.down")
+                    }
+                    Label("Device risk controls: local Keychain storage, no cloud backup in v1, and local user approval before signing.", systemImage: "iphone")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    if app.wallet != nil {
+                        Button("Clear Local Wallet", role: .destructive) {
+                            app.clearWallet()
+                        }
+                    }
+                }
                 Section("Relay") {
                     TextField("Relay URL", text: $relayDraft)
                         .relayURLInputStyle()
@@ -293,22 +579,266 @@ struct SettingsView: View {
                         }
                     }
                 }
+                Section("Networks") {
+                    Text("Add EVM-compatible networks after verifying that the RPC endpoint reports the exact Chain ID. Personal RPC settings stay on this device.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    ForEach(app.networks) { network in
+                        NetworkConfigRow(network: network)
+                    }
+                    Button {
+                        showingAddNetwork = true
+                    } label: {
+                        Label("Add Network", systemImage: "plus.circle")
+                    }
+                }
                 Section("Device") {
                     FieldRow(title: "Device ID", value: app.deviceId, copyAction: { app.copy(app.deviceId) })
                     FieldRow(title: "Device Token", value: app.deviceToken, copyAction: { app.copy(app.deviceToken) })
-                }
-                Section("Wallet") {
-                    if let wallet = app.wallet {
-                        FieldRow(title: "Stellar Address", value: wallet.address, copyAction: { app.copy(wallet.address) })
-                    }
-                    Button("Clear Local Wallet", role: .destructive) {
-                        app.clearWallet()
-                    }
                 }
             }
             .navigationTitle("Settings")
             .onAppear { relayDraft = app.relayURL }
         }
+        .sheet(isPresented: $showingBackup) {
+            if let wallet = app.wallet {
+                RecoveryPhraseBackupSheet(wallet: wallet)
+                    .environmentObject(app)
+                    .presentationDetents([.large])
+                    .privacySensitive()
+            }
+        }
+        .sheet(isPresented: $showingImport) {
+            RecoveryPhraseImportSheet()
+                .environmentObject(app)
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showingAddNetwork) {
+            AddNetworkSheet(sourceIntent: nil)
+                .environmentObject(app)
+                .presentationDetents([.large])
+        }
+    }
+}
+
+struct NetworkConfigRow: View {
+    let network: WalletNetworkConfig
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: network.source == WalletNetworkConfig.sourceBuiltIn ? "checkmark.seal.fill" : "network")
+                .foregroundStyle(.green)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(network.name)
+                    .font(.headline)
+                Text(network.displayLine)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if !network.defaultRPCURL.isEmpty {
+                    Text(network.defaultRPCURL)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct AddNetworkSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var app: AppState
+    let sourceIntent: PaymentIntent?
+
+    @State private var networkName = ""
+    @State private var rpcURL = ""
+    @State private var chainId = ""
+    @State private var currencySymbol = ""
+    @State private var blockExplorerURL = ""
+    @State private var verificationText = "Test RPC before adding the network."
+    @State private var verifiedFingerprint = ""
+    @State private var isTesting = false
+    @State private var didPrefill = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let sourceIntent {
+                    Section("Requested Network") {
+                        FieldRow(title: "Network", value: "\(valueOr(sourceIntent.network, "Unknown network"))\(requestChainSuffix(sourceIntent))")
+                        Text("Adding this network only enables local review. You still approve or reject the request separately.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section {
+                    TextField("Enter network name", text: $networkName)
+                    TextField("Add a URL", text: $rpcURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    TextField("Enter Chain ID", text: $chainId)
+                        .keyboardType(.numbersAndPunctuation)
+                    TextField("Enter symbol", text: $currencySymbol)
+                        .textInputAutocapitalization(.characters)
+                    TextField("Add a URL", text: $blockExplorerURL)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("Network")
+                } footer: {
+                    Text("Default RPC URL and optional block explorer URL must use HTTPS in release builds.")
+                }
+                Section("Verification") {
+                    Text(verificationText)
+                        .foregroundColor(verifiedFingerprint.isEmpty ? Color.secondary : Color.green)
+                    Button {
+                        Task { await testRPC() }
+                    } label: {
+                        Label(isTesting ? "Testing RPC" : "Test RPC", systemImage: "checkmark.shield")
+                    }
+                    .disabled(isTesting)
+                    Button {
+                        addNetwork()
+                    } label: {
+                        Label("Add Network", systemImage: "plus.circle.fill")
+                    }
+                    .disabled(!canAdd)
+                }
+            }
+            .navigationTitle("Add Network")
+            .appInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { dismiss() }
+                }
+            }
+            .onAppear(perform: prefillIfNeeded)
+        }
+    }
+
+    private var canAdd: Bool {
+        (try? currentFingerprint()) == verifiedFingerprint && !verifiedFingerprint.isEmpty
+    }
+
+    private var allowLocalURLs: Bool {
+        #if DEBUG
+        true
+        #else
+        false
+        #endif
+    }
+
+    private func testRPC() async {
+        do {
+            let config = try buildDraft(source: sourceIntent == nil ? WalletNetworkConfig.sourceUser : WalletNetworkConfig.sourcePaymentRequest)
+            let fingerprint = try currentFingerprint()
+            isTesting = true
+            verificationText = "Testing RPC chain ID..."
+            let rpcChainId = try await WalletNetworkRPCVerifier.verifyEVMRPC(rpcURL: config.defaultRPCURL, expectedChainId: config.chainId)
+            verifiedFingerprint = fingerprint
+            verificationText = "RPC verified: \(rpcChainId) / Chain ID \(config.chainId)"
+            isTesting = false
+        } catch {
+            verifiedFingerprint = ""
+            verificationText = error.localizedDescription
+            isTesting = false
+        }
+    }
+
+    private func addNetwork() {
+        do {
+            guard try currentFingerprint() == verifiedFingerprint else {
+                verificationText = "Test RPC again before adding."
+                return
+            }
+            let source = sourceIntent == nil ? WalletNetworkConfig.sourceUser : WalletNetworkConfig.sourcePaymentRequest
+            let config = try buildDraft(source: source)
+            app.addNetwork(config)
+            dismiss()
+        } catch {
+            verificationText = error.localizedDescription
+        }
+    }
+
+    private func buildDraft(source: String) throws -> WalletNetworkConfig {
+        try WalletNetworkValidator.buildVerifiedEVMConfig(
+            name: networkName,
+            rpcURL: rpcURL,
+            chainId: chainId,
+            currencySymbol: currencySymbol,
+            blockExplorerURL: blockExplorerURL,
+            source: source,
+            allowLocalURLs: allowLocalURLs
+        )
+    }
+
+    private func currentFingerprint() throws -> String {
+        try WalletNetworkValidator.fingerprint(
+            name: networkName,
+            rpcURL: rpcURL,
+            chainId: chainId,
+            currencySymbol: currencySymbol,
+            blockExplorerURL: blockExplorerURL
+        )
+    }
+
+    private func prefillIfNeeded() {
+        guard !didPrefill else { return }
+        didPrefill = true
+        guard let intent = sourceIntent else { return }
+        networkName = defaultNetworkName(intent)
+        rpcURL = firstNonEmpty(intent.rpcUrl, defaultRPCURL(intent))
+        let id = intent.chainId > 0 ? intent.chainId : defaultChainId(intent)
+        chainId = id > 0 ? "\(id)" : ""
+        currencySymbol = defaultCurrencySymbol(intent)
+        blockExplorerURL = defaultBlockExplorerURL(intent)
+    }
+
+    private func defaultNetworkName(_ intent: PaymentIntent) -> String {
+        let lower = intent.network.lowercased()
+        if lower.contains("base"), lower.contains("sepolia") { return "Base Sepolia" }
+        if lower.contains("base") { return "Base" }
+        if lower.contains("polygon") { return "Polygon" }
+        if lower.contains("ethereum") || lower.contains("sepolia") { return "Ethereum Sepolia" }
+        return titleize(intent.network.replacingOccurrences(of: "_", with: " "), fallback: "Custom EVM Network")
+    }
+
+    private func defaultChainId(_ intent: PaymentIntent) -> Int64 {
+        let lower = intent.network.lowercased()
+        if lower.contains("base"), lower.contains("sepolia") { return 84532 }
+        if lower.contains("base") { return 8453 }
+        if lower.contains("polygon") { return 137 }
+        if lower.contains("sepolia") { return 11155111 }
+        return 0
+    }
+
+    private func defaultRPCURL(_ intent: PaymentIntent) -> String {
+        let lower = intent.network.lowercased()
+        if lower.contains("base"), lower.contains("sepolia") { return "https://sepolia.base.org" }
+        if lower.contains("base") { return "https://mainnet.base.org" }
+        if lower.contains("polygon") { return "https://polygon-rpc.com" }
+        return ""
+    }
+
+    private func defaultBlockExplorerURL(_ intent: PaymentIntent) -> String {
+        let lower = intent.network.lowercased()
+        if lower.contains("base"), lower.contains("sepolia") { return "https://sepolia.basescan.org" }
+        if lower.contains("base") { return "https://basescan.org" }
+        if lower.contains("polygon") { return "https://polygonscan.com" }
+        if lower.contains("sepolia") { return "https://sepolia.etherscan.io" }
+        return ""
+    }
+
+    private func defaultCurrencySymbol(_ intent: PaymentIntent) -> String {
+        intent.network.lowercased().contains("polygon") ? "MATIC" : "ETH"
+    }
+
+    private func requestChainSuffix(_ intent: PaymentIntent) -> String {
+        let id = intent.chainId > 0 ? intent.chainId : defaultChainId(intent)
+        return id > 0 ? " / Chain ID \(id)" : ""
     }
 }
 
@@ -424,7 +954,7 @@ final class QRScannerViewController: UIViewController, AVCaptureMetadataOutputOb
 
     private func showPermissionMessage() {
         let label = UILabel()
-        label.text = "Camera is required to scan pairing QR codes."
+        label.text = "Camera is required to scan QR codes."
         label.textColor = .white
         label.textAlignment = .center
         label.numberOfLines = 0
@@ -496,22 +1026,7 @@ struct PairingReviewView: View {
                         title: "No signing permission",
                         bodyText: "Pairing is not payment approval. Agents can prepare requests or read their own status only; every payment still needs review and local signing on this device."
                     )
-                    if session.isPending {
-                        HStack {
-                            Button(role: .destructive) {
-                                app.rejectPairing(session)
-                            } label: {
-                                Text("Reject").frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            Button {
-                                app.approvePairing(session, scopes: approvedScopes)
-                            } label: {
-                                Text("Approve Selected").frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                        }
-                    } else {
+                    if !session.isPending {
                         InfoCard(title: "Session closed", bodyText: "This pairing session is \(session.status) and cannot be approved.")
                     }
                 }
@@ -527,6 +1042,26 @@ struct PairingReviewView: View {
             .onAppear {
                 if approvedScopes.isEmpty {
                     approvedScopes = Set(session.requestedScopes)
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                if session.isPending {
+                    FloatingActionBar {
+                        HStack {
+                            Button(role: .destructive) {
+                                app.rejectPairing(session)
+                            } label: {
+                                Text("Reject").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            Button {
+                                app.approvePairing(session, scopes: approvedScopes)
+                            } label: {
+                                Text("Approve Selected").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
                 }
             }
         }
@@ -561,7 +1096,25 @@ struct ConnectionDetailView: View {
                         title: "User-controlled payments",
                         bodyText: "Signing permission is not available for agent connections. Paused or revoked connections cannot create standard requests."
                     )
-                    if !connection.isRevoked {
+                }
+                .padding()
+            }
+            .navigationTitle("Agent")
+            .appInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") { app.selectedConnection = nil }
+                }
+            }
+            .alert("Revoke connection?", isPresented: $confirmingRevoke) {
+                Button("Cancel", role: .cancel) {}
+                Button("Revoke", role: .destructive) { app.revokeConnection(connection) }
+            } message: {
+                Text("The agent will no longer be authorized to create standard requests with this token.")
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !connection.isRevoked {
+                    FloatingActionBar {
                         HStack {
                             Button {
                                 app.updateConnection(connection, status: connection.status == "paused" ? "active" : "paused")
@@ -579,20 +1132,6 @@ struct ConnectionDetailView: View {
                         }
                     }
                 }
-                .padding()
-            }
-            .navigationTitle("Agent")
-            .appInlineNavigationTitle()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { app.selectedConnection = nil }
-                }
-            }
-            .alert("Revoke connection?", isPresented: $confirmingRevoke) {
-                Button("Cancel", role: .cancel) {}
-                Button("Revoke", role: .destructive) { app.revokeConnection(connection) }
-            } message: {
-                Text("The agent will no longer be authorized to create standard requests with this token.")
             }
         }
     }
@@ -602,13 +1141,38 @@ struct PaymentDetailView: View {
     @EnvironmentObject private var app: AppState
     let intent: PaymentIntent
     @State private var showingWarningReview = false
+    @State private var showingAddNetwork = false
 
     private var reviewState: String {
-        paymentReviewState(intent)
+        let state = paymentReviewState(intent)
+        if state == "network_disabled", app.isNetworkEnabled(for: intent) {
+            return "pending"
+        }
+        return state
+    }
+
+    private var paymentReady: Bool {
+        isPaymentDetailSignable(intent, state: reviewState)
+    }
+
+    private var backupGateRequired: Bool {
+        WalletSecurityNavigationPolicy.requiresBackupGate(
+            walletLoaded: app.wallet != nil,
+            backupVerified: app.wallet?.isBackupVerified == true,
+            paymentReady: paymentReady
+        )
+    }
+
+    private var displayState: String {
+        backupGateRequired ? WalletSecurityNavigationPolicy.backupRequiredReviewState : reviewState
     }
 
     private var canSign: Bool {
-        isPaymentDetailSignable(intent)
+        WalletSecurityNavigationPolicy.canCreateSignature(
+            walletLoaded: app.wallet != nil,
+            backupVerified: app.wallet?.isBackupVerified == true,
+            paymentReady: paymentReady
+        )
     }
 
     private var requiresWarningStepUp: Bool {
@@ -622,37 +1186,48 @@ struct PaymentDetailView: View {
                     Text(intent.title)
                         .font(.largeTitle.bold())
                     HStack {
-                        TonePill(text: paymentStatusLabel(reviewState), tone: paymentTone(reviewState, canSign: canSign))
+                        TonePill(text: paymentStatusLabel(displayState), tone: paymentTone(displayState, canSign: canSign))
                         TonePill(text: paymentRiskLabel(intent), tone: paymentRiskTone(intent))
                     }
                     Text(intent.summary)
                         .foregroundStyle(.secondary)
                     PaymentFactsCard(intent: intent)
-                    PaymentStateCard(intent: intent, state: reviewState, canSign: canSign)
+                    PaymentStateCard(intent: intent, state: displayState, canSign: canSign)
                     TruthPanelCard(intent: intent)
                     PaymentContextCard(intent: intent)
+                }
+                .padding()
+            }
+            .navigationTitle("Payment")
+            .appInlineNavigationTitle()
+            .safeAreaInset(edge: .bottom) {
+                FloatingActionBar {
                     PaymentDetailActions(
                         intent: intent,
-                        state: reviewState,
+                        state: displayState,
                         canSign: canSign,
                         requiresWarningStepUp: requiresWarningStepUp,
                         onReject: { app.reject(intent) },
                         onSign: { app.pay(intent) },
                         onReviewWarnings: { showingWarningReview = true },
                         onCopyTransaction: { app.copy(intent.txHash) },
-                        onRequestContext: { app.statusText = "Context requested" }
+                        onRequestContext: { app.statusText = "Context requested" },
+                        onEnableNetwork: { showingAddNetwork = true },
+                        onOpenSecurity: { app.openSecuritySettings() }
                     )
                 }
-                .padding()
             }
-            .navigationTitle("Payment")
-            .appInlineNavigationTitle()
             .sheet(isPresented: $showingWarningReview) {
                 WarningReviewSheet(intent: intent) {
                     showingWarningReview = false
                     app.pay(intent)
                 }
                 .presentationDetents([.medium, .large])
+            }
+            .sheet(isPresented: $showingAddNetwork) {
+                AddNetworkSheet(sourceIntent: intent)
+                    .environmentObject(app)
+                    .presentationDetents([.large])
             }
         }
     }
@@ -848,6 +1423,8 @@ struct PaymentDetailActions: View {
     let onReviewWarnings: () -> Void
     let onCopyTransaction: () -> Void
     let onRequestContext: () -> Void
+    let onEnableNetwork: () -> Void
+    let onOpenSecurity: () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
@@ -872,7 +1449,18 @@ struct PaymentDetailActions: View {
     @ViewBuilder
     private var nonSigningActions: some View {
         let normalized = normalizeReviewState(state)
-        if ["missing_context", "needs_review", "source_review_required"].contains(normalized) && intent.status == PaymentStatus.pending.rawValue {
+        if normalized == WalletSecurityNavigationPolicy.backupRequiredReviewState && intent.status == PaymentStatus.pending.rawValue {
+            HStack {
+                Button(action: onOpenSecurity) {
+                    Text("Open Settings").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                Button(role: .destructive, action: onReject) {
+                    Text("Reject request").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
+        } else if ["missing_context", "needs_review", "source_review_required"].contains(normalized) && intent.status == PaymentStatus.pending.rawValue {
             HStack {
                 Button(action: onRequestContext) {
                     Text("Request context").frame(maxWidth: .infinity)
@@ -888,6 +1476,17 @@ struct PaymentDetailActions: View {
                 Text("Reject request").frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
+        } else if normalized == "network_disabled" && intent.status == PaymentStatus.pending.rawValue {
+            HStack {
+                Button(action: onEnableNetwork) {
+                    Text("Enable network").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                Button(role: .destructive, action: onReject) {
+                    Text("Reject request").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+            }
         } else if normalized == "failed" {
             InfoCard(title: "Retry requires review", bodyText: "Retry only after re-checking fee, recipient, and the prior transaction state.")
         } else if normalized == "broadcasting" || normalized == "signed_locally" || normalized == "confirmed" {
@@ -938,14 +1537,6 @@ struct WarningReviewSheet: View {
                             }
                         }
                     }
-                    Button {
-                        onAccept()
-                    } label: {
-                        Text("Accept unverified context and Sign")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
                 }
                 .padding()
             }
@@ -954,6 +1545,18 @@ struct WarningReviewSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                FloatingActionBar {
+                    Button {
+                        onAccept()
+                    } label: {
+                        Text("Accept unverified context and Sign")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
                 }
             }
         }
@@ -1263,6 +1866,22 @@ struct Card<Content: View>: View {
     }
 }
 
+struct FloatingActionBar<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        content
+            .padding(.horizontal)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity)
+            .background(Color.appSystemBackground)
+            .overlay(alignment: .top) {
+                Divider()
+            }
+    }
+}
+
 extension Array where Element == HistoryEntry {
     func uniquedById() -> [HistoryEntry] {
         var seen = Set<String>()
@@ -1453,8 +2072,8 @@ func isFinalReviewState(_ state: String) -> Bool {
     ["confirmed", "rejected", "expired", "cancelled"].contains(normalizeReviewState(state))
 }
 
-func isPaymentDetailSignable(_ intent: PaymentIntent) -> Bool {
-    let state = paymentReviewState(intent)
+func isPaymentDetailSignable(_ intent: PaymentIntent, state overrideState: String? = nil) -> Bool {
+    let state = overrideState ?? paymentReviewState(intent)
     return intent.canSign && ["pending", "awaiting_signature", "needs_review", "source_review_required"].contains(state)
 }
 
@@ -1492,12 +2111,14 @@ func paymentTone(_ state: String, canSign: Bool) -> String {
     if canSign { return "caution" }
     if value == "confirmed" { return "safe" }
     if ["broadcasting", "signed_locally", "expired", "cancelled"].contains(value) { return "info" }
+    if value == WalletSecurityNavigationPolicy.backupRequiredReviewState { return "caution" }
     if ["missing_context", "needs_review", "source_review_required", "network_disabled"].contains(value) { return "caution" }
     return "danger"
 }
 
 func paymentStatusLabel(_ state: String) -> String {
     switch normalizeReviewState(state) {
+    case WalletSecurityNavigationPolicy.backupRequiredReviewState: return "Backup required"
     case "missing_context": return "Missing context"
     case "blocked": return "Risk blocked"
     case "network_disabled": return "Network disabled"
@@ -1518,6 +2139,7 @@ func paymentStateTitle(_ state: String, canSign: Bool) -> String {
     let value = normalizeReviewState(state)
     if canSign && value == "pending" { return "Ready to sign" }
     if canSign { return "Source review required" }
+    if value == WalletSecurityNavigationPolicy.backupRequiredReviewState { return "Backup required before signing" }
     if ["missing_context", "needs_review", "source_review_required"].contains(value) { return "Context needs review" }
     if value == "blocked" { return "Blocked by risk policy" }
     if value == "network_disabled" { return "Network disabled" }
@@ -1537,6 +2159,9 @@ func paymentStateCopy(_ intent: PaymentIntent, state: String, canSign: Bool) -> 
     }
     if canSign {
         return "Warnings remain. Review the source groups and accept the unverified context before signing."
+    }
+    if value == WalletSecurityNavigationPolicy.backupRequiredReviewState {
+        return WalletSecurityNavigationPolicy.backupGateCopy
     }
     if value == "missing_context" {
         return "Required transaction context or evidence is missing. Payment facts remain visible, but signing is unavailable until the agent repairs the context."
@@ -1905,8 +2530,8 @@ func truthToneLabel(_ tone: String) -> String {
 
 func toneColor(_ tone: String) -> Color {
     switch tone {
-    case "safe": return .green
-    case "caution": return .orange
+    case "safe", "success": return .green
+    case "caution", "warning": return .orange
     case "danger": return .red
     default: return .blue
     }
@@ -1931,6 +2556,13 @@ func dateText(_ timestampMs: Int64) -> String {
     guard timestampMs > 0 else { return "Not available" }
     let date = Date(timeIntervalSince1970: Double(timestampMs) / 1000)
     return date.formatted(date: .abbreviated, time: .shortened)
+}
+
+func challengePositions(for wordCount: Int) -> [Int] {
+    let preferred = [2, 6, 10, 14, 18, 22]
+    let filtered = preferred.filter { $0 < wordCount }
+    if !filtered.isEmpty { return filtered }
+    return Array(0..<min(3, wordCount))
 }
 
 extension Color {

@@ -96,12 +96,13 @@ final class LocalStore {
     private let inboxKey = "VelarumPay.ios.inbox"
     private let historyKey = "VelarumPay.ios.history"
     private let connectionsKey = "VelarumPay.ios.agent-connections"
+    private let networksKey = "VelarumPay.ios.wallet-networks"
     private let relayURLKey = "VelarumPay.ios.relay-url"
     private let deviceIdKey = "VelarumPay.ios.device-id"
     private let deviceTokenKey = "VelarumPay.ios.device-token"
 
     var relayURL: String {
-        get { defaults.string(forKey: relayURLKey) ?? "https://relay-agentfood.velarumai.com" }
+        get { defaults.string(forKey: relayURLKey) ?? "" }
         set { defaults.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: relayURLKey) }
     }
 
@@ -184,5 +185,31 @@ final class LocalStore {
 
     func updateConnection(id: String, status: String) {
         saveConnections(loadConnections().map { $0.connectionId == id ? $0.updating(status: status) : $0 })
+    }
+
+    func loadUserNetworks() -> [WalletNetworkConfig] {
+        guard let data = defaults.data(forKey: networksKey) else { return [] }
+        return (try? JSONDecoder().decode([WalletNetworkConfig].self, from: data)) ?? []
+    }
+
+    func loadAllNetworks() -> [WalletNetworkConfig] {
+        let builtIns = WalletNetworkConfig.builtInEVMNetworks
+        let builtInIds = Set(builtIns.map(\.id))
+        return builtIns + loadUserNetworks().filter { !builtInIds.contains($0.id) }
+    }
+
+    func saveUserNetworks(_ items: [WalletNetworkConfig]) {
+        guard let data = try? JSONEncoder().encode(items.sorted { $0.chainId < $1.chainId }) else { return }
+        defaults.set(data, forKey: networksKey)
+    }
+
+    func upsertNetwork(_ network: WalletNetworkConfig) {
+        var items = loadUserNetworks()
+        if let index = items.firstIndex(where: { $0.id == network.id }) {
+            items[index] = network
+        } else {
+            items.append(network)
+        }
+        saveUserNetworks(items)
     }
 }

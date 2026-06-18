@@ -1,0 +1,32 @@
+[Unit]
+Description=VelarumPay Platform API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=velarumpay
+Group=velarumpay
+WorkingDirectory=/opt/velarumpay/VelarumPayCode/services/platform-api
+Environment=NODE_ENV=production
+Environment=RUNTIME_ENV=production
+EnvironmentFile=/etc/velarumpay/platform-api.env
+ExecStartPre=/usr/bin/env npm run check:runtime-config
+ExecStart=/usr/bin/env node src/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGTERM
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/velarumpay /var/backups/velarumpay
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

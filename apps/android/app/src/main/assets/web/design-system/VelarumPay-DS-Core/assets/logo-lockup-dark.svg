@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 64" role="img" aria-label="VelarumPay">
+  <defs>
+    
+  </defs>
+  <g>
+    <rect width="64" height="64" rx="18" fill="#FFFFFF"></rect>
+    <path d="M14 39 C14 23, 50 23, 50 39" stroke="#2E7D43" stroke-width="5" fill="none" stroke-linecap="round"></path>
+    <circle cx="32" cy="43" r="6" fill="#2E7D43"></circle>
+  </g>
+  <text x="80" y="42" class="wm">
+    <tspan fill="#FFFFFF">Velarum</tspan><tspan fill="#9CBE82">Pay</tspan>
+  </text>
+</svg>

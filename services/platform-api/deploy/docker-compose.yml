@@ -1,0 +1,26 @@
+services:
+  platform-api:
+    build:
+      context: ../../..
+      dockerfile: services/platform-api/Dockerfile
+    env_file:
+      - ../.env
+    environment:
+      NODE_ENV: production
+      RUNTIME_ENV: production
+      PORT: "8787"
+      RELAY_STORE_DRIVER: sqlite
+      RELAY_STORE_PATH: /var/lib/velarumpay/relay-store.sqlite
+      RELAY_STORE_LEGACY_JSON: /var/lib/velarumpay/relay-store.json
+      ALLOW_UNSIGNED_OPENCLAW: "false"
+      ALLOW_UNSIGNED_OPENCLAW_LOCAL_ONLY: "true"
+    ports:
+      - "8787:8787"
+    volumes:
+      - velarumpay-data:/var/lib/velarumpay
+      - velarumpay-backups:/var/backups/velarumpay
+    restart: unless-stopped
+
+volumes:
+  velarumpay-data:
+  velarumpay-backups:

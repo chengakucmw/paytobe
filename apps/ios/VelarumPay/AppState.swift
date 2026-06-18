@@ -6,6 +6,13 @@ import UserNotifications
 import UIKit
 #endif
 
+enum AppTab: Hashable {
+    case home
+    case inbox
+    case history
+    case settings
+}
+
 @MainActor
 final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     @Published var wallet: StellarWallet?
@@ -21,9 +28,10 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     @Published var showingPairingScanner = false
     @Published var connections: [AgentConnection] = []
     @Published var selectedConnection: AgentConnection?
+    @Published var networks: [WalletNetworkConfig] = []
     @Published var progress: PaymentProgress?
     @Published var errorMessage: String?
-    @Published var demoSessionId: String?
+    @Published var selectedTab: AppTab = .home
 
     private let walletStore = WalletStore()
     private let localStore = LocalStore()
@@ -37,7 +45,12 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
         inbox = localStore.loadInbox()
         history = localStore.loadHistory()
         connections = localStore.loadConnections()
-        wallet = try? walletStore.load()
+        networks = localStore.loadAllNetworks()
+        let loadedWallet = try? walletStore.load()
+        wallet = loadedWallet
+        if let loadedWallet {
+            statusText = loadedWallet.isBackupVerified ? "Ready" : "Backup required"
+        }
         super.init()
         UNUserNotificationCenter.current().delegate = self
         Task { await requestNotificationPermission() }
@@ -53,11 +66,42 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 let generated = try await stellar.generateWallet()
                 try walletStore.save(generated)
                 wallet = generated
-                statusText = "Wallet generated"
+                statusText = "24-word wallet generated - backup required"
             } catch {
                 showError(error)
             }
         }
+    }
+
+    func restoreWallet(mnemonic: String, backupVerified: Bool) {
+        Task {
+            do {
+                let restored = try await stellar.restoreWallet(mnemonic: mnemonic, backupVerified: backupVerified)
+                try walletStore.save(restored)
+                wallet = restored
+                statusText = backupVerified ? "Wallet imported" : "Wallet imported - backup required"
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    func markWalletBackupVerified() {
+        do {
+            guard let wallet else { throw AppError.missingWallet }
+            let updated = wallet.markingBackupVerified()
+            try walletStore.save(updated)
+            self.wallet = updated
+            statusText = "Recovery phrase backup verified"
+        } catch {
+            showError(error)
+        }
+    }
+
+    func openSecuritySettings() {
+        selectedIntent = nil
+        selectedTab = .settings
+        statusText = "Open Settings > Security"
     }
 
     func clearWallet() {
@@ -75,6 +119,23 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
         relayURL = clean
         localStore.relayURL = clean
         statusText = "Relay URL saved"
+    }
+
+    var userNetworks: [WalletNetworkConfig] {
+        networks.filter { $0.source != WalletNetworkConfig.sourceBuiltIn }
+    }
+
+    func addNetwork(_ network: WalletNetworkConfig) {
+        localStore.upsertNetwork(network)
+        networks = localStore.loadAllNetworks()
+        statusText = "Network added"
+    }
+
+    func isNetworkEnabled(for intent: PaymentIntent) -> Bool {
+        if intent.network.lowercased().contains("stellar") || intent.network.lowercased().contains("solana") {
+            return true
+        }
+        return networks.contains { $0.matches(network: intent.network, chainId: intent.chainId) }
     }
 
     func registerRelay() {
@@ -213,41 +274,6 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
         }
     }
 
-    func startDemoSession() {
-        Task {
-            do {
-                guard let wallet else { throw AppError.missingWallet }
-                statusText = "Starting demo"
-                try await relay.register(config: relayConfig)
-                let session = try await relay.createDemoSession(
-                    config: relayConfig,
-                    label: "ios-demo",
-                    telegramBot: "Macmini1Bot",
-                    stellarAddress: wallet.address
-                )
-                demoSessionId = string(session, "session_id")
-                statusText = demoSessionId?.isEmpty == false ? "Demo ready" : "Demo started"
-                connectRelay()
-                syncInbox()
-            } catch {
-                showError(error)
-            }
-        }
-    }
-
-    func openTelegramDemo() {
-        guard let session = demoSessionId, !session.isEmpty else {
-            errorMessage = "Start the demo session first."
-            return
-        }
-        guard let url = URL(string: "https://t.me/Macmini1Bot?start=\(session)") else { return }
-        #if canImport(UIKit)
-        UIApplication.shared.open(url)
-        #else
-        statusText = url.absoluteString
-        #endif
-    }
-
     func pay(_ intent: PaymentIntent) {
         Task {
             do {
@@ -255,8 +281,17 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 guard intent.isPending else {
                     throw AppError.invalidResponse(intent.isExpired ? "Payment request expired." : "Payment request is already \(intent.status).")
                 }
-                guard isPaymentDetailSignable(intent) else {
+                let paymentReady = isPaymentDetailSignable(intent)
+                guard paymentReady else {
                     throw AppError.invalidResponse(paymentBlockedReason(intent))
+                }
+                guard WalletSecurityNavigationPolicy.canCreateSignature(
+                    walletLoaded: true,
+                    backupVerified: wallet.isBackupVerified,
+                    paymentReady: paymentReady
+                ) else {
+                    openSecuritySettings()
+                    throw AppError.invalidResponse(WalletSecurityNavigationPolicy.backupGateCopy)
                 }
                 guard intent.isStellarXLM else {
                     if intent.asset.uppercased() != "XLM", intent.network.lowercased().contains("stellar") {

@@ -6,31 +6,32 @@ final class RelayClient {
         var deviceId: String
         var token: String
 
-        var baseURL: URL {
+        var baseURL: URL? {
             let clean = relayURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            return URL(string: clean) ?? URL(string: "https://relay-agentfood.velarumai.com")!
+            guard !clean.isEmpty else { return nil }
+            return URL(string: clean)
         }
 
-        var websocketURL: URL {
+        var websocketURL: URL? {
             var value = relayURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            if URL(string: value) == nil {
-                value = "https://relay-agentfood.velarumai.com"
-            }
+            guard !value.isEmpty, URL(string: value) != nil else { return nil }
             if value.hasPrefix("https://") {
                 value = "wss://" + value.dropFirst("https://".count)
             } else if value.hasPrefix("http://") {
                 value = "ws://" + value.dropFirst("http://".count)
+            } else {
+                return nil
             }
-            var components = URLComponents(string: value + "/v1/ws/app") ?? URLComponents(string: "wss://relay-agentfood.velarumai.com/v1/ws/app")!
+            guard var components = URLComponents(string: value + "/v1/ws/app") else { return nil }
             components.queryItems = [
                 URLQueryItem(name: "device_id", value: deviceId),
                 URLQueryItem(name: "token", value: token)
             ]
-            return components.url!
+            return components.url
         }
     }
 
-    private struct PairingLookup {
+    struct PairingLookup: Equatable {
         var idOrCode: String
         var code: String
         var inputSource: String
@@ -44,18 +45,6 @@ final class RelayClient {
             "device_id": config.deviceId,
             "token": config.token
         ])
-    }
-
-    func createDemoSession(config: Config, label: String, telegramBot: String, stellarAddress: String, evmAddress: String = "") async throws -> [String: Any] {
-        let response = try await post(config: config, path: "/v1/demo/sessions", body: [
-            "device_id": config.deviceId,
-            "token": config.token,
-            "label": label,
-            "telegram_bot": telegramBot,
-            "stellar_address": stellarAddress,
-            "evm_address": evmAddress
-        ])
-        return response["session"] as? [String: Any] ?? response
     }
 
     func fetchPairingSession(config: Config, input: String) async throws -> PairingSession {
@@ -174,7 +163,11 @@ final class RelayClient {
 
     func connect(config: Config, onIntentId: @escaping (String) async -> Void, onMessage: @escaping (String) async -> Void) {
         disconnect()
-        let task = session.webSocketTask(with: config.websocketURL)
+        guard let url = config.websocketURL else {
+            Task { await onMessage("Set Relay URL first.") }
+            return
+        }
+        let task = session.webSocketTask(with: url)
         webSocket = task
         task.resume()
         Task {
@@ -220,7 +213,7 @@ final class RelayClient {
     }
 
     private func get(config: Config, path: String) async throws -> [String: Any] {
-        let url = endpoint(config: config, path: path)
+        let url = try endpoint(config: config, path: path)
         let (data, response) = try await session.data(from: url)
         guard let http = response as? HTTPURLResponse else { throw AppError.invalidResponse("Missing relay response.") }
         guard (200..<300).contains(http.statusCode) else {
@@ -242,7 +235,7 @@ final class RelayClient {
     }
 
     private func send(config: Config, method: String, path: String, body: [String: Any]) async throws -> [String: Any] {
-        var request = URLRequest(url: endpoint(config: config, path: path))
+        var request = URLRequest(url: try endpoint(config: config, path: path))
         request.httpMethod = method
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -262,8 +255,11 @@ final class RelayClient {
         return object
     }
 
-    private func endpoint(config: Config, path: String) -> URL {
-        URL(string: path, relativeTo: config.baseURL)!.absoluteURL
+    private func endpoint(config: Config, path: String) throws -> URL {
+        guard let baseURL = config.baseURL, let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
+            throw AppError.invalidResponse("Set Relay URL first.")
+        }
+        return url
     }
 
     private func paymentRequestId(from object: [String: Any]) -> String? {
@@ -288,7 +284,7 @@ final class RelayClient {
         return nil
     }
 
-    private func pairingLookup(from input: String) throws -> PairingLookup {
+    func pairingLookup(from input: String) throws -> PairingLookup {
         let clean = input.trimmingCharacters(in: .whitespacesAndNewlines)
         if clean.range(of: #"^[0-9]{6}$"#, options: .regularExpression) != nil {
             return PairingLookup(idOrCode: clean, code: clean, inputSource: "Short code")

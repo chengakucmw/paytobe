@@ -1,20 +1,190 @@
 import CryptoKit
 import Foundation
+import Security
 
 actor StellarService {
     private let testnetPassphrase = "Test SDF Network ; September 2015"
     private let publicPassphrase = "Public Global Stellar Network ; September 2015"
     private let fallbackMinimumCreateAccountStroops: Int64 = 10_000_000
+    private let defaultMnemonicWordCount = 24
+    private let supportedMnemonicWordCounts: Set<Int> = [12, 15, 18, 21, 24]
+    private let stellarDerivationPath = "m/44'/148'/0'"
 
     func generateWallet() throws -> StellarWallet {
-        let privateKey = Curve25519.Signing.PrivateKey()
-        let seed = privateKey.rawRepresentation
+        let phrase = try generateMnemonic(wordCount: defaultMnemonicWordCount)
+        return try wallet(fromMnemonic: phrase, backupVerified: false, source: "generated")
+    }
+
+    func restoreWallet(mnemonic: String, backupVerified: Bool) throws -> StellarWallet {
+        try wallet(fromMnemonic: mnemonic, backupVerified: backupVerified, source: "imported")
+    }
+
+    private func wallet(fromMnemonic mnemonic: String, backupVerified: Bool, source: String) throws -> StellarWallet {
+        let words = try validatedMnemonicWords(mnemonic)
+        let phrase = words.joined(separator: " ")
+        let seed = bip39Seed(mnemonic: phrase)
+        let privateSeed = try slip10Ed25519Seed(seed: seed, path: [44, 148, 0])
+        let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: privateSeed)
         let publicKey = privateKey.publicKey.rawRepresentation
         return StellarWallet(
-            seedBase64: seed.base64EncodedString(),
+            seedBase64: privateSeed.base64EncodedString(),
             publicKeyBase64: publicKey.base64EncodedString(),
-            address: try StellarStrKey.encodePublicKey(publicKey)
+            address: try StellarStrKey.encodePublicKey(publicKey),
+            recoveryPhrase: phrase,
+            mnemonicWordCount: words.count,
+            backupVerified: backupVerified,
+            derivationPath: stellarDerivationPath,
+            walletSource: source
         )
+    }
+
+    private func generateMnemonic(wordCount: Int) throws -> String {
+        guard wordCount == 24 else { throw AppError.invalidResponse("New wallets must use a 24-word recovery phrase.") }
+        let entropy = try secureRandomData(count: 32)
+        let words = try bip39Words()
+        let checksum = Data(SHA256.hash(data: entropy))
+        let entropyBits = entropy.count * 8
+        let checksumBits = entropyBits / 32
+        let totalBits = entropyBits + checksumBits
+        var phrase: [String] = []
+        for wordIndex in 0..<(totalBits / 11) {
+            var index = 0
+            for bitOffset in 0..<11 {
+                let bitIndex = wordIndex * 11 + bitOffset
+                index = (index << 1) | bit(at: bitIndex, entropy: entropy, checksum: checksum, entropyBits: entropyBits)
+            }
+            phrase.append(words[index])
+        }
+        return phrase.joined(separator: " ")
+    }
+
+    private func validatedMnemonicWords(_ mnemonic: String) throws -> [String] {
+        let words = mnemonic
+            .lowercased()
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+        guard supportedMnemonicWordCounts.contains(words.count) else {
+            throw AppError.invalidResponse("Recovery phrase must be 12, 15, 18, 21, or 24 words.")
+        }
+        let wordList = try bip39Words()
+        let wordIndex = Dictionary(uniqueKeysWithValues: wordList.enumerated().map { ($0.element, $0.offset) })
+        var bits: [Int] = []
+        for word in words {
+            guard let index = wordIndex[word] else {
+                throw AppError.invalidResponse("Recovery phrase contains a word that is not in the BIP-39 English list.")
+            }
+            for shift in stride(from: 10, through: 0, by: -1) {
+                bits.append((index >> shift) & 1)
+            }
+        }
+        let entropyBits = bits.count * 32 / 33
+        let checksumBits = bits.count - entropyBits
+        var entropy = Data(repeating: 0, count: entropyBits / 8)
+        for bitIndex in 0..<entropyBits where bits[bitIndex] == 1 {
+            entropy[bitIndex / 8] |= UInt8(1 << (7 - (bitIndex % 8)))
+        }
+        let checksum = Data(SHA256.hash(data: entropy))
+        for checksumIndex in 0..<checksumBits {
+            let expected = bit(at: checksumIndex, data: checksum)
+            guard bits[entropyBits + checksumIndex] == expected else {
+                throw AppError.invalidResponse("Recovery phrase checksum is invalid.")
+            }
+        }
+        return words
+    }
+
+    private func bip39Seed(mnemonic: String, passphrase: String = "") -> Data {
+        let password = mnemonic.decomposedStringWithCompatibilityMapping
+        let salt = ("mnemonic" + passphrase).decomposedStringWithCompatibilityMapping
+        return pbkdf2HmacSHA512(password: password, salt: salt, iterations: 2048, keyLength: 64)
+    }
+
+    private func pbkdf2HmacSHA512(password: String, salt: String, iterations: Int, keyLength: Int) -> Data {
+        let passwordKey = SymmetricKey(data: Data(password.utf8))
+        let saltData = Data(salt.utf8)
+        let hashLength = 64
+        let blockCount = Int(ceil(Double(keyLength) / Double(hashLength)))
+        var derived = Data()
+        for block in 1...blockCount {
+            var input = saltData
+            input.append(contentsOf: [
+                UInt8((block >> 24) & 0xff),
+                UInt8((block >> 16) & 0xff),
+                UInt8((block >> 8) & 0xff),
+                UInt8(block & 0xff)
+            ])
+            var u = Data(HMAC<SHA512>.authenticationCode(for: input, using: passwordKey))
+            var t = [UInt8](u)
+            for _ in 1..<iterations {
+                u = Data(HMAC<SHA512>.authenticationCode(for: u, using: passwordKey))
+                let uBytes = [UInt8](u)
+                for index in 0..<t.count {
+                    t[index] ^= uBytes[index]
+                }
+            }
+            derived.append(contentsOf: t)
+        }
+        return Data(derived.prefix(keyLength))
+    }
+
+    private func slip10Ed25519Seed(seed: Data, path: [UInt32]) throws -> Data {
+        var i = hmacSHA512(key: Data("ed25519 seed".utf8), data: seed)
+        var key = Data(i.prefix(32))
+        var chainCode = Data(i.suffix(32))
+        for child in path {
+            var data = Data([0])
+            data.append(key)
+            data.append(uint32BigEndian(child | 0x8000_0000))
+            i = hmacSHA512(key: chainCode, data: data)
+            key = Data(i.prefix(32))
+            chainCode = Data(i.suffix(32))
+        }
+        guard key.count == 32 else { throw AppError.invalidResponse("Invalid derived Stellar key.") }
+        return key
+    }
+
+    private func hmacSHA512(key: Data, data: Data) -> Data {
+        Data(HMAC<SHA512>.authenticationCode(for: data, using: SymmetricKey(data: key)))
+    }
+
+    private func uint32BigEndian(_ value: UInt32) -> Data {
+        Data([
+            UInt8((value >> 24) & 0xff),
+            UInt8((value >> 16) & 0xff),
+            UInt8((value >> 8) & 0xff),
+            UInt8(value & 0xff)
+        ])
+    }
+
+    private func bit(at bitIndex: Int, entropy: Data, checksum: Data, entropyBits: Int) -> Int {
+        if bitIndex < entropyBits {
+            return bit(at: bitIndex, data: entropy)
+        }
+        return bit(at: bitIndex - entropyBits, data: checksum)
+    }
+
+    private func bit(at bitIndex: Int, data: Data) -> Int {
+        let byte = data[bitIndex / 8]
+        return Int((byte >> UInt8(7 - (bitIndex % 8))) & 1)
+    }
+
+    private func secureRandomData(count: Int) throws -> Data {
+        var data = Data(repeating: 0, count: count)
+        let status = data.withUnsafeMutableBytes { buffer in
+            SecRandomCopyBytes(kSecRandomDefault, count, buffer.baseAddress!)
+        }
+        guard status == errSecSuccess else { throw AppError.keychain(status) }
+        return data
+    }
+
+    private func bip39Words() throws -> [String] {
+        guard let url = Bundle.main.url(forResource: "bip39_english", withExtension: "txt", subdirectory: "WebAssets") else {
+            throw AppError.invalidResponse("BIP-39 English word list is missing from the app bundle.")
+        }
+        let text = try String(contentsOf: url, encoding: .utf8)
+        let words = text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+        guard words.count == 2048 else { throw AppError.invalidResponse("BIP-39 English word list is invalid.") }
+        return words
     }
 
     func sendXLM(

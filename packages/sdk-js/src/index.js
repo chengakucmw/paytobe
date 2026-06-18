@@ -2,7 +2,7 @@ import {
   createTransactionContextSnapshot,
   normalizePaymentRequestV1,
   normalizeTransactionContextV1
-} from "../../protocol/src/index.js";
+} from "@velarumpay/protocol";
 
 export {
   createTransactionContextSnapshot,

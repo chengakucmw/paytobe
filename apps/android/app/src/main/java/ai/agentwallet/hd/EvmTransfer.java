@@ -17,9 +17,12 @@ import org.web3j.utils.Numeric;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
+import okhttp3.OkHttpClient;
+
 final class EvmTransfer {
     private static final String ERC20_TRANSFER_SELECTOR = "a9059cbb";
     private static final BigInteger ERC20_FALLBACK_GAS = BigInteger.valueOf(100_000);
+    private static final OkHttpClient HTTP = WalletHttp.oneShot();
 
     private EvmTransfer() {}
 
@@ -41,7 +44,7 @@ final class EvmTransfer {
             String amountNative,
             TransactionProgress progress
     ) throws Exception {
-        Web3j web3j = Web3j.build(new HttpService(rpcUrl));
+        Web3j web3j = Web3j.build(new HttpService(rpcUrl, HTTP));
         Credentials credentials = Credentials.create(Hex.bytesToHex(privateKey));
         EthGetTransactionCount nonceResp = web3j.ethGetTransactionCount(
                 credentials.getAddress(),
@@ -86,7 +89,7 @@ final class EvmTransfer {
             int decimals,
             TransactionProgress progress
     ) throws Exception {
-        Web3j web3j = Web3j.build(new HttpService(rpcUrl));
+        Web3j web3j = Web3j.build(new HttpService(rpcUrl, HTTP));
         Credentials credentials = Credentials.create(Hex.bytesToHex(privateKey));
         String from = credentials.getAddress();
         String contract = normalizeAddress(tokenContract, "token contract");

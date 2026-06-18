@@ -2,6 +2,32 @@ import Foundation
 
 let paymentRequestProtocol = "velarum.payment_request.v1"
 
+enum WalletSecurityNavigationPolicy {
+    static let surfaceHome = "home"
+    static let surfaceProfile = "profile"
+    static let surfaceSettingsSecurity = "settings/security"
+    static let backupRequiredReviewState = "backup_required"
+
+    static func allowsMnemonicEntry(surface: String) -> Bool {
+        let normalized = surface.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "_")
+        return normalized == surfaceSettingsSecurity || normalized.hasPrefix("\(surfaceSettingsSecurity)/")
+    }
+
+    static func requiresBackupGate(walletLoaded: Bool, backupVerified: Bool, paymentReady: Bool) -> Bool {
+        walletLoaded && paymentReady && !backupVerified
+    }
+
+    static func canCreateSignature(walletLoaded: Bool, backupVerified: Bool, paymentReady: Bool) -> Bool {
+        walletLoaded && backupVerified && paymentReady
+    }
+
+    static var backupGateCopy: String {
+        "Back up and verify the recovery phrase in Settings > Security before this device can sign or export secrets."
+    }
+}
+
 enum PaymentStatus: String, Codable {
     case pending
     case signed
@@ -16,6 +42,11 @@ struct StellarWallet: Codable, Equatable {
     var seedBase64: String
     var publicKeyBase64: String
     var address: String
+    var recoveryPhrase: String?
+    var mnemonicWordCount: Int?
+    var backupVerified: Bool?
+    var derivationPath: String?
+    var walletSource: String?
 
     var seed: Data {
         Data(base64Encoded: seedBase64) ?? Data()
@@ -23,6 +54,239 @@ struct StellarWallet: Codable, Equatable {
 
     var publicKey: Data {
         Data(base64Encoded: publicKeyBase64) ?? Data()
+    }
+
+    var isBackupVerified: Bool {
+        backupVerified == true
+    }
+
+    var displayMnemonicType: String {
+        guard let mnemonicWordCount, mnemonicWordCount > 0 else { return "Legacy Stellar key" }
+        return "BIP39 English - \(mnemonicWordCount) words"
+    }
+
+    func markingBackupVerified() -> StellarWallet {
+        var copy = self
+        copy.backupVerified = true
+        return copy
+    }
+}
+
+struct WalletNetworkConfig: Identifiable, Codable, Equatable {
+    static let familyEVM = "evm"
+    static let sourceBuiltIn = "built_in"
+    static let sourceUser = "user_added"
+    static let sourcePaymentRequest = "payment_request"
+    static let statusVerified = "verified"
+
+    var family: String
+    var name: String
+    var defaultRPCURL: String
+    var chainId: Int64
+    var currencySymbol: String
+    var blockExplorerURL: String
+    var source: String
+    var verificationStatus: String
+    var verifiedAtMs: Int64
+
+    var id: String {
+        family == Self.familyEVM && chainId > 0 ? "eip155:\(chainId)" : slug(name)
+    }
+
+    var displayLine: String {
+        let chain = chainId > 0 ? "Chain ID \(chainId)" : "No chain ID"
+        return currencySymbol.isEmpty ? chain : "\(chain) / \(currencySymbol)"
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case family
+        case name
+        case defaultRPCURL = "default_rpc_url"
+        case chainId = "chain_id"
+        case currencySymbol = "currency_symbol"
+        case blockExplorerURL = "block_explorer_url"
+        case source
+        case verificationStatus = "verification_status"
+        case verifiedAtMs = "verified_at_ms"
+    }
+
+    static var builtInEVMNetworks: [WalletNetworkConfig] {
+        [
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Ethereum",
+                defaultRPCURL: "https://cloudflare-eth.com",
+                chainId: 1,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://etherscan.io",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Base",
+                defaultRPCURL: "https://mainnet.base.org",
+                chainId: 8453,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://basescan.org",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Polygon",
+                defaultRPCURL: "https://polygon-rpc.com",
+                chainId: 137,
+                currencySymbol: "MATIC",
+                blockExplorerURL: "https://polygonscan.com",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            )
+        ]
+    }
+
+    func matches(network: String, chainId requestedChainId: Int64) -> Bool {
+        if requestedChainId > 0, chainId == requestedChainId { return true }
+        let target = slug(network)
+        guard !target.isEmpty else { return false }
+        let mine = slug(name)
+        return mine == target || mine.contains(target) || target.contains(mine)
+    }
+
+    private func slug(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+            .replacingOccurrences(of: ".", with: "_")
+    }
+}
+
+enum WalletNetworkValidator {
+    static func buildVerifiedEVMConfig(
+        name: String,
+        rpcURL: String,
+        chainId: String,
+        currencySymbol: String,
+        blockExplorerURL: String,
+        source: String,
+        allowLocalURLs: Bool
+    ) throws -> WalletNetworkConfig {
+        let cleanName = try required(name, "Network name")
+        let cleanRPC = try required(rpcURL, "Default RPC URL")
+        let parsedChainId = try parseFlexibleChainId(chainId)
+        let cleanSymbol = try required(currencySymbol, "Currency symbol").uppercased()
+        let cleanExplorer = blockExplorerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard cleanSymbol.count <= 12 else {
+            throw AppError.invalidResponse("Currency symbol must be 12 characters or fewer.")
+        }
+        try requireAllowedURL(cleanRPC, label: "Default RPC URL", allowLocalURLs: allowLocalURLs)
+        if !cleanExplorer.isEmpty {
+            try requireAllowedURL(cleanExplorer, label: "Block explorer URL", allowLocalURLs: allowLocalURLs)
+        }
+
+        return WalletNetworkConfig(
+            family: WalletNetworkConfig.familyEVM,
+            name: cleanName,
+            defaultRPCURL: cleanRPC,
+            chainId: parsedChainId,
+            currencySymbol: cleanSymbol,
+            blockExplorerURL: cleanExplorer,
+            source: source,
+            verificationStatus: WalletNetworkConfig.statusVerified,
+            verifiedAtMs: Int64(Date().timeIntervalSince1970 * 1000)
+        )
+    }
+
+    static func parseFlexibleChainId(_ value: String) throws -> Int64 {
+        let clean = try required(value, "Chain ID").lowercased()
+        let parsed: Int64?
+        if clean.hasPrefix("0x") {
+            parsed = Int64(clean.dropFirst(2), radix: 16)
+        } else {
+            parsed = Int64(clean)
+        }
+        guard let parsed, parsed > 0 else {
+            throw AppError.invalidResponse("Chain ID must be a decimal number or 0x-prefixed hex value.")
+        }
+        return parsed
+    }
+
+    static func parseRPCChainId(_ value: String) throws -> Int64 {
+        let clean = try required(value, "RPC chain ID").lowercased()
+        guard clean.hasPrefix("0x") else {
+            throw AppError.invalidResponse("RPC returned an invalid chain ID.")
+        }
+        return try parseFlexibleChainId(clean)
+    }
+
+    static func fingerprint(name: String, rpcURL: String, chainId: String, currencySymbol: String, blockExplorerURL: String) throws -> String {
+        [
+            try required(name, "Network name"),
+            try required(rpcURL, "Default RPC URL"),
+            "\(try parseFlexibleChainId(chainId))",
+            try required(currencySymbol, "Currency symbol").uppercased(),
+            blockExplorerURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        ].joined(separator: "|")
+    }
+
+    private static func requireAllowedURL(_ value: String, label: String, allowLocalURLs: Bool) throws {
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              let host = url.host?.lowercased(),
+              !host.isEmpty else {
+            throw AppError.invalidResponse("\(label) is not a valid URL.")
+        }
+        if scheme == "https" { return }
+        if allowLocalURLs, scheme == "http", ["localhost", "127.0.0.1", "10.0.2.2", "::1"].contains(host) { return }
+        throw AppError.invalidResponse("\(label) must use https.")
+    }
+
+    private static func required(_ value: String, _ label: String) throws -> String {
+        let clean = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { throw AppError.invalidResponse("\(label) is required.") }
+        return clean
+    }
+}
+
+enum WalletNetworkRPCVerifier {
+    static func verifyEVMRPC(rpcURL: String, expectedChainId: Int64) async throws -> String {
+        guard let url = URL(string: rpcURL) else {
+            throw AppError.invalidResponse("Default RPC URL is not a valid URL.")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: [
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "eth_chainId",
+            "params": []
+        ], options: [])
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw AppError.invalidResponse("Missing RPC response.")
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw AppError.invalidResponse("RPC returned HTTP \(http.statusCode).")
+        }
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AppError.invalidResponse("Invalid RPC JSON response.")
+        }
+        if let error = root["error"] as? [String: Any] {
+            throw AppError.invalidResponse(firstNonEmpty(string(error, "message"), "RPC returned an error."))
+        }
+        let result = string(root, "result")
+        let actual = try WalletNetworkValidator.parseRPCChainId(result)
+        guard actual == expectedChainId else {
+            throw AppError.invalidResponse("RPC chain ID \(actual) does not match entered Chain ID \(expectedChainId).")
+        }
+        return result
     }
 }
 
@@ -439,6 +703,7 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
     var expiresAtMs: Int64
     var rail: String
     var network: String
+    var chainId: Int64
     var asset: String
     var assetIssuer: String
     var tokenContract: String
@@ -546,6 +811,7 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
             expiresAtMs: request?.expiresAtMs ?? timeMs(object, "expires_at", fallback: int64(object, "expires_at_ms", fallback: now + 300_000)),
             rail: facts.rail,
             network: network,
+            chainId: facts.chainId,
             asset: facts.asset,
             assetIssuer: facts.assetIssuer,
             tokenContract: facts.tokenContract,

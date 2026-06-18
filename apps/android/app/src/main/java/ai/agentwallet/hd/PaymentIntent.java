@@ -38,6 +38,10 @@ final class PaymentIntent {
     final String horizonUrl;
     final boolean stellarTestnet;
     final String estimatedFee;
+    final String signingPayload;
+    final String signingPayloadEncoding;
+    final boolean signingPayloadDigest;
+    final String broadcastUrl;
     final String idempotencyKey;
     final String txHash;
     final String error;
@@ -124,6 +128,24 @@ final class PaymentIntent {
         stellarTestnet = request.stellarTestnet;
         horizonUrl = request.horizonUrl;
         estimatedFee = request.estimatedFee;
+        signingPayload = firstNonEmpty(
+                payment.optString("signing_payload", ""),
+                payment.optString("unsigned_payload", ""),
+                payment.optString("payload", "")
+        );
+        signingPayloadEncoding = normalizePayloadEncoding(firstNonEmpty(
+                payment.optString("signing_payload_encoding", ""),
+                payment.optString("payload_encoding", ""),
+                "hex"
+        ));
+        signingPayloadDigest = payment.optBoolean(
+                "signing_payload_is_digest",
+                payment.optBoolean("payload_is_digest", false)
+        );
+        broadcastUrl = firstNonEmpty(
+                payment.optString("broadcast_url", ""),
+                payment.optString("submit_url", "")
+        );
         idempotencyKey = request.idempotencyKey;
         txHash = request.txHash;
         error = request.error;
@@ -185,11 +207,38 @@ final class PaymentIntent {
                 && !asset.equalsIgnoreCase("XLM");
     }
 
+    boolean isRegisteredEvmNative() {
+        TransferAssetRegistry.Asset registered = TransferAssetRegistry.find(this);
+        return registered != null
+                && registered.signerImplemented
+                && !registered.requiresPreparedPayload()
+                && "evm".equals(registered.family)
+                && registered.tokenContract.length() == 0
+                && tokenContract.length() == 0
+                && !isBaseUsdc();
+    }
+
+    boolean isSolanaSol() {
+        return rail.equals("solana_sol") && asset.equalsIgnoreCase("SOL");
+    }
+
+    boolean requiresSignerAdapter() {
+        TransferAssetRegistry.Asset registered = TransferAssetRegistry.find(this);
+        return registered != null && !registered.signerImplemented;
+    }
+
+    boolean requiresPreparedPayloadSigner() {
+        TransferAssetRegistry.Asset registered = TransferAssetRegistry.find(this);
+        return registered != null && registered.requiresPreparedPayload();
+    }
+
     String title() {
         if (displayTitle.length() > 0) return displayTitle;
         if (isBaseUsdc()) return "Send " + amount + " USDC";
         if (isStellarXlm()) return "Send " + amount + " XLM";
         if (isStellarAsset()) return "Send " + amount + " " + asset;
+        if (isSolanaSol()) return "Send " + amount + " SOL";
+        if (isRegisteredEvmNative()) return "Send " + amount + " " + asset;
         return "Payment Request";
     }
 
@@ -236,6 +285,12 @@ final class PaymentIntent {
             }
         }
         return "";
+    }
+
+    private static String normalizePayloadEncoding(String value) {
+        String clean = value == null ? "" : value.trim().toLowerCase();
+        if (clean.equals("base64") || clean.equals("utf8") || clean.equals("text")) return clean;
+        return "hex";
     }
 
     private static List<OrderItem> readOrderItems(JSONArray array) {
@@ -287,14 +342,7 @@ final class PaymentIntent {
 
     private static String normalizePublicUrl(String value) {
         if (value == null) return "";
-        String clean = value.trim();
-        if (clean.startsWith("http://localhost:8090")) {
-            return "https://agentfood.velarumai.com" + clean.substring("http://localhost:8090".length());
-        }
-        if (clean.startsWith("http://127.0.0.1:8090")) {
-            return "https://agentfood.velarumai.com" + clean.substring("http://127.0.0.1:8090".length());
-        }
-        return clean;
+        return value.trim();
     }
 
     private static String stellarHorizonUrl(String value, boolean testnet) {

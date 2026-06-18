@@ -16,8 +16,6 @@ final class PaymentInboxStore {
     private static final String KEY_DEVICE_ID = "device_id";
     private static final String KEY_RELAY_URL = "relay_url";
     private static final String KEY_DEVICE_TOKEN = "device_token";
-    private static final String KEY_DEMO_SESSION_ID = "demo_session_id";
-    private static final String KEY_TELEGRAM_BOT = "telegram_bot";
 
     private PaymentInboxStore() {}
 
@@ -124,28 +122,11 @@ final class PaymentInboxStore {
     }
 
     static String relayUrl(Context context) {
-        return prefs(context).getString(KEY_RELAY_URL, "https://relay-agentfood.velarumai.com");
+        return prefs(context).getString(KEY_RELAY_URL, "");
     }
 
     static void setRelayUrl(Context context, String value) {
         prefs(context).edit().putString(KEY_RELAY_URL, value.replaceAll("/+$", "")).apply();
-    }
-
-    static String demoSessionId(Context context) {
-        return prefs(context).getString(KEY_DEMO_SESSION_ID, "");
-    }
-
-    static void setDemoSessionId(Context context, String value) {
-        prefs(context).edit().putString(KEY_DEMO_SESSION_ID, value == null ? "" : value).apply();
-    }
-
-    static String telegramBot(Context context) {
-        return prefs(context).getString(KEY_TELEGRAM_BOT, "");
-    }
-
-    static void setTelegramBot(Context context, String value) {
-        String clean = value == null ? "" : value.trim().replaceFirst("^@", "");
-        prefs(context).edit().putString(KEY_TELEGRAM_BOT, clean).apply();
     }
 
     static String deviceToken(Context context) {

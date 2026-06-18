@@ -10,6 +10,20 @@ Shared protocol constants, validators, and fixtures for VelarumPay v0.1.
 - enums for rails, statuses, truth source types, verification statuses, risk severities, and pairing scopes.
 - fixtures for valid, missing context, mismatch, AI-only, expired, Base USDC, and Stellar XLM cases.
 
+## Package
+
+Package name: `@velarumpay/protocol`  
+Version: `0.1.0`  
+Entry point: `./src/index.js`  
+Types: `./src/index.d.ts`
+
+Dry-run the release tarball:
+
+```bash
+cd /Users/yang/code/VelarumPayCode/packages/protocol
+npm run pack:dry
+```
+
 ## Constraints
 
 - Payment facts come from `payment`, not `display` or `metadata`.

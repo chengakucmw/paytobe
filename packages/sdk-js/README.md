@@ -2,6 +2,12 @@
 
 Minimal JavaScript SDK for local agents and app developers using VelarumPay Platform API v0.1.
 
+Package name: `@velarumpay/sdk-js`  
+Version: `0.1.0`  
+Entry point: `./src/index.js`  
+Types: `./src/index.d.ts`  
+Runtime dependency: `@velarumpay/protocol@0.1.0`
+
 ## Quickstart
 
 ```js
@@ -60,6 +66,22 @@ The SDK keeps API errors structured. A failed call returns `ok: false` with `err
 
 This SDK does not store private keys, seed phrases, signing material, or automatic payment authority.
 
+## Typed API Surface
+
+- `VelarumPayClientOptions`
+- `RequestOptions`
+- `ApiResult`
+- `ApiError`
+- `VelarumPayClient`
+- `createVelarumPayClient(options)`
+- `createPairingSession(payload, options)`
+- `createTransactionContext(payload, options)`
+- `createPaymentRequest(payload, options)`
+- `getPaymentRequest(requestId, options)`
+- `pollEvents(options)`
+- `validatePaymentRequest(payload, options)`
+- `validateTransactionContext(payload, options)`
+
 Quickstart fixtures live in `/Users/yang/code/VelarumPayCode/examples/payment-request-quickstart`. Formal protocol explanations live in the document workspace:
 
 - `/Users/yang/code/VelarumPay/Chinese/Architecture/velarumpay-platform-api-v0-1-engineering-contract-平台APIv0.1工程契约-2026-06-16.md`
@@ -70,4 +92,5 @@ Quickstart fixtures live in `/Users/yang/code/VelarumPayCode/examples/payment-re
 ```bash
 cd /Users/yang/code/VelarumPayCode/packages/sdk-js
 npm run check
+npm run pack:dry
 ```

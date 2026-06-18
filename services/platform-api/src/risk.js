@@ -1,4 +1,18 @@
-import { BASE_USDC_CONTRACT } from "../../../packages/protocol/src/index.js";
+import {
+  BASE_USDC_CONTRACT,
+  detectUnsupportedTransferTarget,
+  findSupportedTransferAsset,
+  transferAssetAdapterWarning,
+  validateTransferAddress
+} from "../../../packages/protocol/src/index.js";
+import {
+  addDecimalParts,
+  addDecimalStrings,
+  compareDecimalStrings,
+  decimalAbsDiff,
+  decimalString,
+  normalizeDecimalString
+} from "./decimal.js";
 
 export const ALLOWED_STATUSES = new Set([
   "pending",
@@ -16,6 +30,8 @@ export function evaluateIntent(intent, store, env = process.env) {
   const payment = intent.payment || {};
   const expiresAt = Date.parse(intent.expires_at || "");
   if (!expiresAt || expiresAt <= Date.now()) errors.push("Payment request is expired");
+  const blocked = detectUnsupportedTransferTarget(payment);
+  if (blocked.blocked) errors.push(blocked.message);
 
   if (payment.rail === "evm_erc20" || payment.rail === "base_usdc") {
     if (payment.network !== "base_mainnet") errors.push("Only base_mainnet is allowlisted for Base USDC payment requests");
@@ -35,12 +51,45 @@ export function evaluateIntent(intent, store, env = process.env) {
     checkWhitelist(env.ADDRESS_WHITELIST_STELLAR, payment.to, "Stellar recipient", errors, warnings);
     checkDailyLimit(store, "XLM", payment.amount, env.DAILY_LIMIT_XLM || "1000", errors);
   } else {
-    errors.push("Unsupported payment rail");
+    evaluateRegisteredTransferAsset(payment, store, env, errors, warnings);
   }
 
   if (!intent.idempotency_key) warnings.push("No idempotency key was provided");
   if (!intent.velarum?.request_id) warnings.push("No Velarum request id was provided");
   return { ok: errors.length === 0, errors, warnings };
+}
+
+function evaluateRegisteredTransferAsset(payment, store, env, errors, warnings) {
+  const asset = findSupportedTransferAsset(payment);
+  if (!asset) {
+    errors.push("Unsupported payment rail or asset");
+    return;
+  }
+  if (payment.network !== asset.network) errors.push(`${asset.symbol} is supported only on ${asset.network}`);
+  if ((payment.asset || "").toUpperCase() !== asset.symbol) errors.push(`Only ${asset.symbol} is allowlisted on ${asset.chain}`);
+  if (asset.chain_id !== undefined && Number(payment.chain_id) !== Number(asset.chain_id)) {
+    errors.push(`${asset.chain} chain id must be ${asset.chain_id}`);
+  }
+  if (asset.token_contract && (payment.token_contract || "").toLowerCase() !== asset.token_contract.toLowerCase()) {
+    errors.push(`${asset.chain} ${asset.symbol} token contract is not allowlisted`);
+  }
+  if (asset.decimals !== undefined && payment.decimals !== undefined && Number(payment.decimals) !== Number(asset.decimals)) {
+    errors.push(`${asset.chain} ${asset.symbol} decimals must be ${asset.decimals}`);
+  }
+  if (!validateTransferAddress(asset, payment.to || "")) {
+    errors.push(`${asset.chain} ${asset.symbol} recipient address is invalid`);
+  }
+  if (asset.execution_mode === "prepared_payload") {
+    if (!firstNonEmpty(payment.signing_payload, payment.unsigned_payload, payment.payload)) {
+      errors.push(`${asset.chain} ${asset.symbol} requires a prepared unsigned transaction payload for local signing`);
+    }
+    if (!firstNonEmpty(payment.broadcast_url, payment.submit_url)) {
+      errors.push(`${asset.chain} ${asset.symbol} requires a broadcast URL for the signed prepared payload`);
+    }
+  }
+  const adapterWarning = transferAssetAdapterWarning(asset);
+  if (adapterWarning) warnings.push(adapterWarning.message);
+  checkDailyLimit(store, asset.symbol, payment.amount, env[`DAILY_LIMIT_${asset.symbol}`] || "1000", errors);
 }
 
 export function evaluatePaymentRequest(request, contextResult = {}) {
@@ -93,8 +142,20 @@ function checkWhitelist(raw, address, label, errors, warnings) {
 }
 
 function checkDailyLimit(store, asset, amount, limit, errors) {
-  const next = Number(store.dailySpent(asset)) + Number(amount);
-  if (!Number.isFinite(next) || next > Number(limit)) errors.push(`Daily ${asset} limit exceeded`);
+  // Compare the running total against the cap in EXACT decimal arithmetic.
+  // The old code coerced everything to float64, so accumulated rounding
+  // error could leave a payment that truly exceeds the cap comparing as
+  // under it (H3). Fail CLOSED: an unparseable amount or a misconfigured
+  // limit rejects the payment rather than silently sliding past the cap
+  // (the old `next > NaN` quietly evaluated to false → allowed).
+  const amountStr = normalizeDecimalString(amount);
+  const limitStr = normalizeDecimalString(limit);
+  if (amountStr === null || limitStr === null) {
+    errors.push(`Daily ${asset} limit exceeded`);
+    return;
+  }
+  const next = addDecimalStrings(store.dailySpent(asset), amountStr);
+  if (compareDecimalStrings(next, limitStr) > 0) errors.push(`Daily ${asset} limit exceeded`);
 }
 
 function splitList(value) {
@@ -102,6 +163,10 @@ function splitList(value) {
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function firstNonEmpty(...values) {
+  return values.some((value) => value !== undefined && value !== null && String(value).trim().length > 0);
 }
 
 function compareContextCosts(payment, costs, errors, warnings) {
@@ -409,50 +474,9 @@ function sameToken(left, right) {
   return String(left || "").trim().toUpperCase() === String(right || "").trim().toUpperCase();
 }
 
-function decimalString(value) {
-  return typeof value === "string" && /^(0|[1-9]\d*)(\.\d+)?$/.test(value);
-}
-
-function compareDecimalStrings(left, right) {
-  const [leftUnits, rightUnits] = scaledDecimalPair(left, right);
-  if (leftUnits === rightUnits) return 0;
-  return leftUnits > rightUnits ? 1 : -1;
-}
-
-function decimalAbsDiff(left, right) {
-  const [leftUnits, rightUnits, scale] = scaledDecimalPair(left, right);
-  const diff = leftUnits > rightUnits ? leftUnits - rightUnits : rightUnits - leftUnits;
-  return decimalUnitsToString(diff, scale);
-}
-
-function addDecimalParts(parts) {
-  const values = parts.filter(decimalString);
-  if (!values.length) return "";
-  const scale = values.reduce((max, value) => Math.max(max, decimalScale(value)), 0);
-  const total = values.reduce((sum, value) => sum + decimalUnits(value, scale), 0n);
-  return decimalUnitsToString(total, scale);
-}
-
-function scaledDecimalPair(left, right) {
-  const scale = Math.max(decimalScale(left), decimalScale(right));
-  return [decimalUnits(left, scale), decimalUnits(right, scale), scale];
-}
-
-function decimalScale(value) {
-  return String(value).split(".")[1]?.length || 0;
-}
-
-function decimalUnits(value, scale) {
-  const [whole, fraction = ""] = String(value).split(".");
-  return BigInt(whole) * 10n ** BigInt(scale) + BigInt(fraction.padEnd(scale, "0") || "0");
-}
-
-function decimalUnitsToString(units, scale) {
-  if (scale === 0) return String(units);
-  const divisor = 10n ** BigInt(scale);
-  const whole = units / divisor;
-  const fraction = String(units % divisor).padStart(scale, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : String(whole);
-}
+// Exact decimal helpers (decimalString, compareDecimalStrings,
+// decimalAbsDiff, addDecimalParts) now live in ./decimal.js and are shared
+// with store.js so the daily spend cap and these context-cost comparisons
+// use one consistent BigInt implementation. See decimal.js for the H3 fix.
 
 export { BASE_USDC_CONTRACT };

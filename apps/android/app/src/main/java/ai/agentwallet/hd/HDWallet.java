@@ -15,12 +15,15 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 final class HDWallet {
+    static final int DEFAULT_MNEMONIC_WORD_COUNT = 24;
+    static final List<Integer> SUPPORTED_IMPORT_WORD_COUNTS = Arrays.asList(12, 15, 18, 21, 24);
     private static final SecureRandom RNG = new SecureRandom();
 
     final String mnemonic;
@@ -38,7 +41,7 @@ final class HDWallet {
     }
 
     static HDWallet create() throws Exception {
-        byte[] entropy = new byte[16];
+        byte[] entropy = new byte[32];
         RNG.nextBytes(entropy);
         List<String> words = MnemonicCode.INSTANCE.toMnemonic(entropy);
         String mnemonic = join(words);
@@ -47,10 +50,23 @@ final class HDWallet {
     }
 
     static HDWallet restore(String mnemonic) throws Exception {
-        List<String> words = Arrays.asList(mnemonic.trim().toLowerCase().split("\\s+"));
+        List<String> words = mnemonicWords(mnemonic);
+        if (!SUPPORTED_IMPORT_WORD_COUNTS.contains(words.size())) {
+            throw new IllegalArgumentException("Recovery phrase must be 12, 15, 18, 21, or 24 words.");
+        }
         MnemonicCode.INSTANCE.check(words);
         byte[] seed = MnemonicCode.toSeed(words, "");
         return fromMnemonic(join(words), seed);
+    }
+
+    static List<String> mnemonicWords(String mnemonic) {
+        String clean = mnemonic == null ? "" : mnemonic.trim().toLowerCase();
+        if (clean.isEmpty()) return Collections.emptyList();
+        return Arrays.asList(clean.split("\\s+"));
+    }
+
+    int wordCount() {
+        return mnemonicWords(mnemonic).size();
     }
 
     private static HDWallet fromMnemonic(String mnemonic, byte[] seed) throws Exception {
@@ -79,6 +95,25 @@ final class HDWallet {
         key = HDKeyDerivation.deriveChildKey(key, new ChildNumber(change, false));
         key = HDKeyDerivation.deriveChildKey(key, new ChildNumber(index, false));
         return key;
+    }
+
+    byte[] secp256k1PrivateKey(int coinType) {
+        DeterministicKey master = HDKeyDerivation.createMasterPrivateKey(seed);
+        return derive(master, 44, coinType, 0, 0, 0).getPrivKeyBytes();
+    }
+
+    byte[] secp256k1CompressedPublicKey(int coinType) {
+        BigInteger d = new BigInteger(1, secp256k1PrivateKey(coinType));
+        X9ECParameters params = SECNamedCurves.getByName("secp256k1");
+        ECPoint q = params.getG().multiply(d).normalize();
+        return q.getEncoded(true);
+    }
+
+    EdAccount ed25519Account(int coinType) throws Exception {
+        byte[] privateSeed = deriveSlip10(seed, 44, coinType, 0, 0);
+        Ed25519PrivateKeyParameters privateKey = new Ed25519PrivateKeyParameters(privateSeed, 0);
+        byte[] publicKey = privateKey.generatePublicKey().getEncoded();
+        return new EdAccount(privateSeed, publicKey, Base58.encode(publicKey), "m/44'/" + coinType + "'/0'/0'");
     }
 
     private static byte[] deriveSlip10(byte[] seed, int... path) throws Exception {
@@ -159,13 +194,9 @@ final class HDWallet {
 
     String serialize() {
         return "MNEMONIC=" + mnemonic + "\n"
-                + "EVM_PRIVATE=" + Hex.bytesToHex(evm.privateKey) + "\n"
+                + "MNEMONIC_WORD_COUNT=" + wordCount() + "\n"
                 + "EVM_ADDRESS=" + evm.address + "\n"
-                + "SOLANA_SEED=" + Hex.bytesToHex(solana.privateSeed) + "\n"
-                + "SOLANA_PUBLIC=" + Hex.bytesToHex(solana.publicKey) + "\n"
                 + "SOLANA_ADDRESS=" + solana.address + "\n"
-                + "STELLAR_SEED=" + Hex.bytesToHex(stellar.privateSeed) + "\n"
-                + "STELLAR_PUBLIC=" + Hex.bytesToHex(stellar.publicKey) + "\n"
                 + "STELLAR_ADDRESS=" + stellar.address;
     }
 

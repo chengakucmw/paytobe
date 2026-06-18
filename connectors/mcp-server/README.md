@@ -5,6 +5,12 @@ pairing, Transaction Context creation, Payment Request creation, and status
 reads. It does not hold wallet private keys, sign transactions, approve
 payments, reject payments, or update wallet status.
 
+Package name: `@velarumpay/mcp-server`  
+Version: `0.1.0`  
+CLI bin: `velarumpay-mcp-server`  
+Programmatic export: `tools` and `callTool` from `@velarumpay/mcp-server`  
+Types: `./src/tools.d.ts`
+
 ## Tools
 
 - `create_pairing_session`
@@ -28,6 +34,14 @@ connection token and scope checks for every create/read call.
 ```bash
 cd /Users/yang/code/VelarumPayCode/connectors/mcp-server
 npm run start
+```
+
+After workspace install, the packaged bin can also be exercised locally:
+
+```bash
+VELARUMPAY_API_BASE_URL=http://127.0.0.1:8787 \
+VELARUMPAY_CONNECTION_TOKEN=conn_tok_... \
+npx velarumpay-mcp-server
 ```
 
 Environment variables:
@@ -164,4 +178,5 @@ fixtures remain in:
 
 ```bash
 npm run check
+npm run pack:dry
 ```

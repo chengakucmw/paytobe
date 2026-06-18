@@ -1,0 +1,16 @@
+/* ============================================================
+   VelarumPay — Elevation (soft, low-opacity, neutral)
+   ============================================================ */
+:root {
+  --shadow-xs: 0 1px 2px rgba(26, 30, 26, 0.06);
+  --shadow-sm: 0 1px 3px rgba(26, 30, 26, 0.07), 0 1px 2px rgba(26, 30, 26, 0.04);
+  --shadow-md: 0 2px 8px rgba(26, 30, 26, 0.06), 0 8px 24px rgba(26, 30, 26, 0.05);
+  --shadow-lg: 0 4px 16px rgba(26, 30, 26, 0.08), 0 16px 40px rgba(26, 30, 26, 0.07);
+  --shadow-xl: 0 8px 28px rgba(26, 30, 26, 0.10), 0 28px 64px rgba(26, 30, 26, 0.10);
+
+  /* Card default — the soft float seen on reference white cards */
+  --shadow-card: 0 1px 3px rgba(26, 30, 26, 0.05), 0 10px 30px rgba(26, 30, 26, 0.05);
+
+  /* Brand-tinted glow for primary emphasis */
+  --shadow-brand: 0 6px 20px rgba(46, 125, 67, 0.28);
+}

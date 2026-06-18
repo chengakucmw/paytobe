@@ -52,7 +52,7 @@ Build VelarumPay Open Platform v0.1:
 1. Standardize `velarum.payment_request.v1`.
 2. Add local agent to wallet pairing.
 3. Convert wallet inbox from demo-specific intent handling to generic payment request handling.
-4. Keep AgentFood as a demo via `metadata.food_order`.
+4. Keep transaction contexts generic (for example `metadata.food_order`) instead of hard-coding app-specific demo flows.
 5. Add MCP / OpenClaw / Hermes connectors around the same protocol.
 
 ## Useful Commands
@@ -89,4 +89,10 @@ cd apps/android
 ./gradlew assembleDebug
 ```
 
-The Android project currently may require a local Gradle wrapper or Android Studio configuration depending on local setup.
+Release gate:
+
+```bash
+npm run release:gate
+```
+
+The release gate runs workspace checks, unit tests, quickstart smoke, cross-component smoke, Android `testDebugUnitTest` + `assembleDebug`, and the iOS simulator build. For non-release local checks on a machine without mobile toolchains, run `npm run release:gate -- --node-only`.

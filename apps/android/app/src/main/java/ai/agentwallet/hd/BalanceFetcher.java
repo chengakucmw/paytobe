@@ -28,7 +28,7 @@ final class BalanceFetcher {
     private static final String STELLAR_HORIZON_URL = "https://horizon.stellar.org";
     private static final String BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
     private static final String ERC20_BALANCE_OF = "70a08231";
-    private static final OkHttpClient HTTP = new OkHttpClient();
+    private static final OkHttpClient HTTP = WalletHttp.oneShot();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
     private BalanceFetcher() {}
@@ -51,14 +51,14 @@ final class BalanceFetcher {
     }
 
     private static JSONObject nativeEvm(HDWallet wallet, String rpcUrl, String network, String symbol) throws Exception {
-        Web3j web3j = Web3j.build(new HttpService(rpcUrl));
+        Web3j web3j = Web3j.build(new HttpService(rpcUrl, HTTP));
         EthGetBalance response = web3j.ethGetBalance(wallet.evm.address, DefaultBlockParameterName.LATEST).send();
         if (response.hasError()) throw new IllegalStateException(response.getError().getMessage());
         return asset(network + " " + symbol, network, symbol, wallet.evm.address, formatUnits(response.getBalance(), 18), "ok");
     }
 
     private static JSONObject baseUsdc(HDWallet wallet) throws Exception {
-        Web3j web3j = Web3j.build(new HttpService(BASE_RPC_URL));
+        Web3j web3j = Web3j.build(new HttpService(BASE_RPC_URL, HTTP));
         String data = "0x" + ERC20_BALANCE_OF + leftPad(wallet.evm.address.substring(2).toLowerCase(), 64);
         EthCall response = web3j.ethCall(
                 Transaction.createEthCallTransaction(wallet.evm.address, BASE_USDC, data),

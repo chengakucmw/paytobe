@@ -15,6 +15,12 @@ import {
   TRANSACTION_CONTEXT_TYPES,
   VERIFICATION_STATUSES
 } from "./constants.js";
+import {
+  detectUnsupportedTransferTarget,
+  findSupportedTransferAsset,
+  transferAssetAdapterWarning,
+  validateTransferAddress
+} from "./transfer-assets.js";
 
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const STELLAR_PUBLIC_KEY = /^G[A-Z2-7]{55}$/;
@@ -275,6 +281,15 @@ export function assertEnumCoverage() {
 
 function normalizePayment(payment, options = {}) {
   const warnings = [];
+  const blocked = detectUnsupportedTransferTarget(payment);
+  if (blocked.blocked) {
+    return failed(protocolError(blocked.code, blocked.message, {
+      field: "payment",
+      rail: payment.rail,
+      network: payment.network,
+      asset: payment.asset
+    }));
+  }
   const rail = String(payment.rail || "");
   if (!PAYMENT_RAILS.includes(rail)) {
     return failed(protocolError("unsupported_rail", "Payment rail is not supported", {
@@ -302,7 +317,8 @@ function normalizePayment(payment, options = {}) {
   }
 
   if (rail === "stellar_xlm") return normalizeStellarXlm(payment);
-  return normalizeBaseUsdc(payment, rail, options, warnings);
+  if (rail === "base_usdc" || rail === "evm_erc20") return normalizeBaseUsdc(payment, rail, options, warnings);
+  return normalizeRegisteredTransferAsset(payment, options, warnings);
 }
 
 function normalizeBaseUsdc(payment, rail, options, warnings) {
@@ -395,6 +411,108 @@ function normalizeStellarXlm(payment) {
   });
 }
 
+function normalizeRegisteredTransferAsset(payment, options, warnings) {
+  const asset = findSupportedTransferAsset(payment);
+  if (!asset) {
+    return failed(protocolError("unsupported_asset", "Payment asset is not registered for v1 real transfers", {
+      field: "payment.asset",
+      rail: payment.rail,
+      network: payment.network,
+      asset: payment.asset
+    }));
+  }
+  if (payment.network !== asset.network) {
+    return failed(protocolError("unsupported_network", `${asset.symbol} is supported only on ${asset.network}`, {
+      field: "payment.network",
+      network: payment.network,
+      expected_network: asset.network
+    }));
+  }
+  if (options.enabledNetworks && !options.enabledNetworks.includes(asset.network)) {
+    return failed(protocolError("network_disabled", `${asset.network} is supported but disabled for this wallet`, {
+      field: "payment.network",
+      network: asset.network
+    }));
+  }
+  if (String(payment.asset || "").toUpperCase() !== asset.symbol) {
+    return failed(protocolError("unsupported_asset", `${asset.chain} rail supports only ${asset.symbol}`, {
+      field: "payment.asset",
+      asset: payment.asset,
+      expected_asset: asset.symbol
+    }));
+  }
+  if (asset.chain_id !== undefined && Number(payment.chain_id) !== Number(asset.chain_id)) {
+    return failed(protocolError("invalid_chain_id", `${asset.chain} chain_id must be ${asset.chain_id}`, {
+      field: "payment.chain_id",
+      chain_id: payment.chain_id,
+      expected_chain_id: asset.chain_id
+    }));
+  }
+  if (asset.token_contract && String(payment.token_contract || "").toLowerCase() !== asset.token_contract.toLowerCase()) {
+    return failed(protocolError("invalid_token_contract", `${asset.chain} ${asset.symbol} token contract is not allowlisted`, {
+      field: "payment.token_contract",
+      token_contract: payment.token_contract
+    }));
+  }
+  if (asset.decimals !== undefined && payment.decimals !== undefined && Number(payment.decimals) !== Number(asset.decimals)) {
+    return failed(protocolError("invalid_decimals", `${asset.chain} ${asset.symbol} decimals must be ${asset.decimals}`, {
+      field: "payment.decimals",
+      decimals: payment.decimals,
+      expected_decimals: asset.decimals
+    }));
+  }
+  if (!validateTransferAddress(asset, payment.to)) {
+    return failed(protocolError("invalid_recipient", `${asset.chain} ${asset.symbol} recipient address is invalid`, {
+      field: "payment.to",
+      chain_family: asset.family
+    }));
+  }
+  const preparedPayload = firstNonEmptyValue(payment.signing_payload, payment.unsigned_payload, payment.payload);
+  const broadcastUrl = firstNonEmptyValue(payment.broadcast_url, payment.submit_url);
+  if (asset.execution_mode === "prepared_payload") {
+    if (!nonEmptyString(preparedPayload)) {
+      return failed(protocolError("prepared_payload_required", `${asset.chain} ${asset.symbol} requires a prepared unsigned transaction payload for local signing`, {
+        field: "payment.signing_payload",
+        rail: asset.rail,
+        execution_mode: asset.execution_mode
+      }));
+    }
+    if (!nonEmptyString(broadcastUrl)) {
+      return failed(protocolError("broadcast_url_required", `${asset.chain} ${asset.symbol} requires a broadcast URL for the signed prepared payload`, {
+        field: "payment.broadcast_url",
+        rail: asset.rail,
+        execution_mode: asset.execution_mode
+      }));
+    }
+  }
+
+  const adapterWarning = transferAssetAdapterWarning(asset);
+  if (adapterWarning) warnings.push(protocolError(adapterWarning.code, adapterWarning.message, adapterWarning.details));
+
+  return succeeded({
+    ...payment,
+    rail: asset.rail,
+    network: asset.network,
+    asset: asset.symbol,
+    amount: payment.amount,
+    to: payment.to,
+    chain_family: asset.family,
+    signer_status: asset.signer_status,
+    execution_mode: asset.execution_mode,
+    key_curve: asset.key_curve,
+    ...(asset.coin_type !== undefined ? { coin_type: asset.coin_type } : {}),
+    ...(asset.execution_mode === "prepared_payload" ? {
+      signing_payload: String(preparedPayload).trim(),
+      signing_payload_encoding: String(firstNonEmptyValue(payment.signing_payload_encoding, payment.payload_encoding, "hex")).trim().toLowerCase(),
+      signing_payload_is_digest: Boolean(payment.signing_payload_is_digest || payment.payload_is_digest),
+      broadcast_url: String(broadcastUrl).trim()
+    } : {}),
+    decimals: asset.decimals,
+    ...(asset.chain_id !== undefined ? { chain_id: asset.chain_id } : {}),
+    ...(asset.token_contract ? { token_contract: asset.token_contract } : {})
+  }, warnings);
+}
+
 function requireEqual(actual, expected, field, expectedValue, errors) {
   if (actual !== expected) {
     errors.push(protocolError(field === "protocol" ? "invalid_protocol" : "invalid_value", `${field} must be ${expectedValue}`, {
@@ -428,6 +546,13 @@ function normalizeArray(value, field, errors) {
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
+}
+
+function firstNonEmptyValue(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && String(value).trim().length > 0) return value;
+  }
+  return "";
 }
 
 function isRecord(value) {

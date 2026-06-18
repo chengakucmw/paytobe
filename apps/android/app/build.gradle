@@ -7,11 +7,11 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "ai.agentwallet.hd"
+        applicationId "com.velarumpay.wallet"
         minSdk 26
         targetSdk 35
         versionCode 18
-        versionName "1.0.4-payment-progress"
+        versionName "0.1.0-velarumpay"
         resourceConfigurations += ["en"]
     }
 
@@ -36,6 +36,12 @@ android {
                     "META-INF/FastDoubleParser-NOTICE",
                     "META-INF/*.kotlin_module"
             ]
+        }
+    }
+
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach {
+            outputFileName = "VelarumPay-${variant.name}.apk"
         }
     }
 }

@@ -78,6 +78,23 @@ The harness writes a machine-readable JSON result and a human-readable Markdown
 summary. It never reads private keys, seed phrases, signing keys, or mainnet
 funds.
 
+## Package Smoke
+
+The SDK and connector packages have typed entry points and dry-run tarball
+checks:
+
+```bash
+cd /Users/yang/code/VelarumPayCode
+npm run package:integrations
+```
+
+This verifies the packable file lists for:
+
+- `@velarumpay/protocol@0.1.0`
+- `@velarumpay/sdk-js@0.1.0`
+- `@velarumpay/mcp-server@0.1.0`
+- `@velarumpay/hermes-connector@0.1.0`
+
 ## CLI Quickstart
 
 Start the local Platform API first:

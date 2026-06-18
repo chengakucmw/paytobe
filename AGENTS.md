@@ -8,7 +8,7 @@
 6. Backend mainline lives in `services/platform-api`.
 7. Website mainline lives in `apps/website`.
 8. OpenClaw connector lives in `connectors/openclaw-telegram`.
-9. AgentFood is a demo, not wallet core.
+9. Keep the wallet core generic; do not ship app-specific demo flows (such as the former AgentFood demo) in wallet code.
 10. New payment features should use the Payment Request abstraction instead of hard-coded business flows.
 11. Keep server-side zero private keys: signing must happen in the user wallet.
 12. Keep user approval as the default for real payments.

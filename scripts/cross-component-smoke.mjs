@@ -317,6 +317,25 @@ async function main() {
       };
     });
 
+    await step(results, "observability.metrics_and_audit_guard", "api", async () => {
+      const metrics = await request(server.baseUrl, "GET", "/metrics");
+      assert(metrics.status === 200, "metrics endpoint did not return HTTP 200");
+      assert(metrics.text.includes("velarumpay_http_requests_total"), "metrics did not include HTTP request counter");
+      assert(metrics.text.includes("velarumpay_audit_events_total"), "metrics did not include audit event counter");
+      assert(
+        !metrics.text.includes(auth.connection.connection_token) && !metrics.text.includes(auth.wallet.token),
+        "metrics exposed a sensitive token"
+      );
+      const audit = await request(server.baseUrl, "GET", "/v1/audit/events");
+      assert(audit.status === 403, "audit events endpoint should require an ops token by default");
+      assert(audit.json?.error?.code === "audit_log_token_required", "audit guard returned the wrong error code");
+      return {
+        metrics_bytes: metrics.text.length,
+        audit_guard_status: audit.status,
+        audit_guard_code: audit.json.error.code
+      };
+    });
+
     await step(results, "negative.api_invalid_status_error", "api", async () => {
       const response = await request(
         server.baseUrl,
@@ -660,7 +679,8 @@ async function request(baseUrl, method, pathName, body = null, options = {}) {
   }
   return {
     status: response.status,
-    json
+    json,
+    text
   };
 }
 

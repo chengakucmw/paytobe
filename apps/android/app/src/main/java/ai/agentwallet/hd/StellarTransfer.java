@@ -22,7 +22,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 final class StellarTransfer {
-    private static final OkHttpClient HTTP = new OkHttpClient();
+    private static final OkHttpClient HTTP = WalletHttp.oneShot();
     private static final MediaType FORM = MediaType.get("application/x-www-form-urlencoded");
     private static final String TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
     private static final String PUBLIC_PASSPHRASE = "Public Global Stellar Network ; September 2015";

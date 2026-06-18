@@ -150,8 +150,8 @@ final class PaymentRequest {
                 payment.optString("contract", ""),
                 payment.optString("contract_address", "")
         );
-        rail = normalizeRail(firstNonEmpty(payment.optString("rail", ""), inferRail(network, asset, tokenContract)));
         chainId = payment.optLong("chain_id", "base_mainnet".equals(network) ? 8453L : 0L);
+        rail = normalizeRail(firstNonEmpty(payment.optString("rail", ""), inferRail(network, asset, tokenContract, chainId)));
         assetIssuer = firstNonEmpty(
                 payment.optString("asset_issuer", ""),
                 payment.optString("issuer", ""),
@@ -352,12 +352,15 @@ final class PaymentRequest {
         return value == null ? "" : value;
     }
 
-    private static String inferRail(String network, String asset, String tokenContract) {
+    private static String inferRail(String network, String asset, String tokenContract, long chainId) {
+        String registered = TransferAssetRegistry.inferRail(network, asset, tokenContract, chainId);
+        if (registered.length() > 0) return registered;
         String lowerNetwork = network == null ? "" : network.toLowerCase();
         if (lowerNetwork.contains("stellar") && "XLM".equalsIgnoreCase(asset)) return "stellar_xlm";
         if (lowerNetwork.contains("stellar")) return "stellar_asset";
         if ("base_mainnet".equals(lowerNetwork) && "USDC".equalsIgnoreCase(asset)) return "base_usdc";
         if (tokenContract != null && tokenContract.startsWith("0x")) return "evm_erc20";
+        if (lowerNetwork.contains("ethereum") || lowerNetwork.contains("base") || lowerNetwork.contains("polygon") || lowerNetwork.contains("evm")) return "evm_native";
         return "";
     }
 

@@ -3,7 +3,7 @@ import {
   createVelarumPayClient,
   validatePaymentRequest,
   validateTransactionContext
-} from "../../../packages/sdk-js/src/index.js";
+} from "@velarumpay/sdk-js";
 
 const DEFAULT_SCOPES = Object.freeze([
   "payment.requests.create",

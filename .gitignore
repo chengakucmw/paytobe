@@ -36,12 +36,17 @@ DerivedData/
 *.xcuserstate
 
 # Logs and runtime state
+data/
 *.log
 logs/
 tmp/
 *.tmp
 *.pid
 *.seed
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
 runtime-store*.json
 *runtime-store.json
 payment-inbox-store*.json

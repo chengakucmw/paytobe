@@ -3,7 +3,7 @@ import {
   createVelarumPayClient,
   validatePaymentRequest,
   validateTransactionContext
-} from "../../../packages/sdk-js/src/index.js";
+} from "@velarumpay/sdk-js";
 
 export const HERMES_DEFAULT_SCOPES = Object.freeze([
   "payment.requests.create",

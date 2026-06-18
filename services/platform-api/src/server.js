@@ -2,8 +2,21 @@ import cors from "cors";
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
-import { id, verifyHmac } from "./crypto.js";
+import { id } from "./crypto.js";
+import { loadDotEnv } from "./env.js";
 import { Store } from "./store.js";
+import { resolveTargetDevice } from "./routing.js";
+import {
+  assertRuntimeConfig,
+  createCorsOptions,
+  createRateLimitMiddleware,
+  createSecurityHeadersMiddleware,
+  loadRuntimeConfig,
+  runtimeHealth,
+  shouldAttemptLegacyOpenClaw,
+  verifyOpenClawRequest,
+  verifyOpenClawWebSocket
+} from "./security.js";
 import {
   adaptVelarum,
   createTransactionContextSnapshot,
@@ -11,8 +24,12 @@ import {
   normalizeTransactionContextV1
 } from "./velarum.js";
 import { canTransition, evaluateIntent, evaluatePaymentRequest, shouldRecordSpent } from "./risk.js";
-import { maybeFundDemoAccount } from "./stellar_funding.js";
+import { createObservability } from "./observability.js";
 
+loadDotEnv();
+
+const runtimeConfig = loadRuntimeConfig();
+const runtimeValidation = assertRuntimeConfig(runtimeConfig);
 const PORT = Number(process.env.PORT || 8787);
 const DEFAULT_PAIRING_TTL_SECONDS = 5 * 60;
 const MIN_PAIRING_TTL_SECONDS = 60;
@@ -59,13 +76,31 @@ const DEFAULT_PAIRING_SCOPES = [
   "payment.requests.read"
 ];
 const store = new Store();
+const observability = createObservability();
 const app = express();
+if (runtimeConfig.trust_proxy) app.set("trust proxy", 1);
 const server = http.createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 const appSockets = new Map();
 const openclawSockets = new Map();
 
-app.use(cors());
+app.use(observability.httpMiddleware());
+app.use(createSecurityHeadersMiddleware());
+app.use(cors(createCorsOptions(runtimeConfig)));
+app.use("/v1", createRateLimitMiddleware(runtimeConfig, {
+  name: "api",
+  max: runtimeConfig.rate_limit.max
+}));
+app.use([
+  "/v1/devices",
+  "/v1/pairing",
+  "/v1/connections",
+  "/v1/payment-intents",
+  "/v1/openclaw"
+], createRateLimitMiddleware(runtimeConfig, {
+  name: "auth",
+  max: runtimeConfig.rate_limit.auth_max
+}));
 app.use(express.json({
   limit: "256kb",
   verify: (req, _res, buf) => {
@@ -74,49 +109,69 @@ app.use(express.json({
 }));
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "agentwallet-relay", time: new Date().toISOString() });
+  const storage = store.info();
+  res.json({
+    ok: true,
+    service: "agentwallet-relay",
+    time: new Date().toISOString(),
+    observability: {
+      metrics: true,
+      audit_events_buffered: observability.auditEventCount()
+    },
+    storage: {
+      driver: storage.driver,
+      schema_version: storage.schema_version
+    },
+    runtime: runtimeHealth(runtimeConfig, runtimeValidation)
+  });
+});
+
+app.get("/metrics", (req, res) => {
+  const auth = observability.authorizeMetricsRequest(req);
+  if (!auth.ok) return sendApiError(res, auth.status, auth.code, auth.message);
+  refreshRuntimeMetrics();
+  res.set("content-type", "text/plain; version=0.0.4; charset=utf-8");
+  res.send(observability.prometheusText());
+});
+
+app.get("/v1/audit/events", (req, res) => {
+  const auth = observability.authorizeAuditRequest(req);
+  if (!auth.ok) return sendApiError(res, auth.status, auth.code, auth.message);
+  const result = observability.listAuditEvents({
+    since: req.query.since,
+    limit: req.query.limit,
+    action: req.query.action,
+    outcome: req.query.outcome,
+    resource_type: req.query.resource_type
+  });
+  res.json({ ok: true, ...result });
 });
 
 app.post("/v1/devices/app", (req, res) => {
   const { device_id, token } = req.body || {};
-  if (!device_id || !token) return res.status(400).json({ error: "device_id and token are required" });
+  if (!device_id || !token) {
+    return sendApiError(res, 400, "invalid_app_device_registration", "device_id and token are required");
+  }
   const device = store.registerDevice(device_id, token);
-  res.json({ ok: true, device });
+  observability.recordAuditEvent("app_device.registered", "success", {
+    actor: { type: "wallet_device", id: device.device_id },
+    resource: { type: "app_device", id: device.device_id }
+  });
+  res.json({ ok: true, device: deviceResponse(device) });
 });
 
-app.post("/v1/demo/sessions", async (req, res) => {
-  const auth = verifyAppBody(req);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
-  let session = store.createDemoSession(id("demo"), req.body.device_id, {
-    label: req.body.label || "AgentWallet Cafe Demo",
-    telegram_bot: req.body.telegram_bot || "",
-    stellar_address: req.body.stellar_address || "",
-    evm_address: req.body.evm_address || ""
+app.post("/v1/devices/app/:id/rotate-token", (req, res) => {
+  const auth = verifyAppBody({ body: { device_id: req.params.id, token: req.body?.token } });
+  if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
+  const newToken = String(req.body?.new_token || id("app_tok")).trim();
+  if (!newToken) return sendApiError(res, 400, "invalid_app_device_token", "new_token must not be empty", { field: "new_token" });
+  const device = store.rotateDeviceToken(req.params.id, newToken);
+  if (!device) return sendApiError(res, 404, "app_device_not_found", "App device not found");
+  observability.recordAuditEvent("app_device.token_rotated", "success", {
+    actor: { type: "wallet_device", id: req.params.id },
+    resource: { type: "app_device", id: req.params.id }
   });
-  const funding = await maybeFundDemoAccount(session);
-  session = store.updateDemoSession(session.session_id, { funding }) || session;
-  res.status(201).json({ ok: true, session });
-});
-
-app.get("/v1/demo/overview", (_req, res) => {
-  res.json({
-    ok: true,
-    sessions: store.listDemoSessions(),
-    telegram_bindings: store.listTelegramBindings(),
-    live_app_devices: liveSocketSummary(appSockets),
-    live_openclaw_devices: liveSocketSummary(openclawSockets)
-  });
-});
-
-app.post("/v1/demo/sessions/:id/telegram", (req, res) => {
-  const chatHash = String(req.body?.chat_hash || "");
-  if (!chatHash.startsWith("sha256:")) return res.status(400).json({ error: "chat_hash is required" });
-  const binding = store.bindTelegramChat(req.params.id, chatHash, {
-    telegram_user: req.body.telegram_user || "",
-    telegram_name: req.body.telegram_name || ""
-  });
-  if (!binding) return res.status(404).json({ error: "Demo session not found" });
-  res.json({ ok: true, binding });
+  res.json({ ok: true, device: deviceResponse(device), device_token: newToken });
 });
 
 app.post("/v1/transaction-contexts", (req, res) => {
@@ -134,6 +189,15 @@ app.post("/v1/transaction-contexts", (req, res) => {
 
   const context = store.putTransactionContext(normalized.value);
   if (auth.connection) store.touchConnection(auth.connection.connection_id);
+  observability.recordAuditEvent("transaction_context.upserted", "success", {
+    actor: auditActorFromAuth(auth),
+    resource: { type: "transaction_context", id: context.transaction_id },
+    labels: { status: context.status || "unknown" },
+    details: {
+      connection_id: context.connection_id || null,
+      evidence_count: Array.isArray(context.evidence) ? context.evidence.length : 0
+    }
+  });
   res.status(201).json({
     ok: true,
     context,
@@ -148,6 +212,13 @@ app.get("/v1/transaction-contexts/:transaction_id", (req, res) => {
   if (req.query.device_id || req.query.token) {
     const walletAuth = verifyAppQuery(req);
     if (!walletAuth.ok) return res.status(walletAuth.status).json({ ok: false, error: walletAuth.error });
+    // A valid device token only proves which device is calling, not that the
+    // device is entitled to THIS context. Bind the read to the device that
+    // approved the context's connection so an arbitrary device cannot read
+    // another wallet's Transaction Context (bug H6).
+    if (!store.deviceCanReadTransactionContext(req.query.device_id, context)) {
+      return sendApiError(res, 403, "scope_denied", "This device cannot read this Transaction Context");
+    }
     return res.json({ ok: true, context });
   }
 
@@ -187,6 +258,16 @@ app.post("/v1/pairing/sessions", (req, res) => {
     requested_scopes: scopes.value,
     expires_at: expiresAt
   });
+  observability.recordAuditEvent("pairing_session.created", "success", {
+    actor: { type: "agent", id: agent.value.agent_id, name: agent.value.agent_name },
+    resource: { type: "pairing_session", id: session.pairing_session_id },
+    labels: { status: session.status },
+    details: {
+      requested_scope_count: session.requested_scopes.length,
+      expires_at: session.expires_at
+    }
+  });
+  observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "created" });
 
   res.status(201).json({
     ok: true,
@@ -222,6 +303,7 @@ app.post("/v1/pairing/sessions/:id/approve", (req, res) => {
   }
   if (store.isPairingSessionExpired(session)) {
     store.updatePairingSession(session.pairing_session_id, { status: "expired" });
+    recordPairingExpired(session, { actorDeviceId: req.body?.device_id });
     return sendApiError(res, 410, "pairing_session_expired", "Pairing session expired");
   }
 
@@ -243,6 +325,19 @@ app.post("/v1/pairing/sessions/:id/approve", (req, res) => {
     approved_scopes: scopes.value,
     connection_id: connection.connection_id
   });
+  observability.recordAuditEvent("pairing_session.approved", "success", {
+    actor: { type: "wallet_device", id: req.body.device_id },
+    resource: { type: "pairing_session", id: session.pairing_session_id },
+    labels: { status: "approved" },
+    details: {
+      connection_id: connection.connection_id,
+      agent_id: connection.agent_id,
+      approved_scope_count: scopes.value.length,
+      expires_at: connection.expires_at
+    }
+  });
+  observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "approved" });
+  observability.incrementCounter("velarumpay_connections_total", { status: connection.status });
 
   res.status(201).json({
     ok: true,
@@ -268,6 +363,7 @@ app.post("/v1/pairing/sessions/:id/reject", (req, res) => {
   }
   if (store.isPairingSessionExpired(session)) {
     store.updatePairingSession(session.pairing_session_id, { status: "expired" });
+    recordPairingExpired(session, { actorDeviceId: req.body?.device_id });
     return sendApiError(res, 410, "pairing_session_expired", "Pairing session expired");
   }
 
@@ -276,6 +372,16 @@ app.post("/v1/pairing/sessions/:id/reject", (req, res) => {
     rejected_at: new Date().toISOString(),
     rejected_by_device_id: req.body.device_id
   });
+  observability.recordAuditEvent("pairing_session.rejected", "success", {
+    actor: { type: "wallet_device", id: req.body.device_id },
+    resource: { type: "pairing_session", id: updated.pairing_session_id },
+    labels: { status: updated.status },
+    details: {
+      agent_id: updated.agent_identity?.agent_id || "",
+      requested_scope_count: Array.isArray(updated.requested_scopes) ? updated.requested_scopes.length : 0
+    }
+  });
+  observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "rejected" });
   res.json({ ok: true, pairing_session: updated });
 });
 
@@ -305,6 +411,16 @@ app.patch("/v1/connections/:id", (req, res) => {
     return sendApiError(res, 409, "connection_revoked", "Revoked connections cannot be reactivated");
   }
   const updated = store.updateConnectionStatus(connection.connection_id, status);
+  observability.recordAuditEvent("connection.status_updated", "success", {
+    actor: { type: "wallet_device", id: req.body.device_id },
+    resource: { type: "connection", id: updated.connection_id },
+    labels: { status: updated.status },
+    details: {
+      agent_id: updated.agent_id,
+      pairing_session_id: updated.pairing_session_id
+    }
+  });
+  observability.incrementCounter("velarumpay_connection_status_updates_total", { status: updated.status });
   res.json({ ok: true, connection: connectionPublicResponse(updated) });
 });
 
@@ -327,13 +443,45 @@ app.delete("/v1/connections/:id", (req, res) => {
     status: updated.status,
     revoked_at: revokedAt
   });
+  observability.recordAuditEvent("connection.revoked", "success", {
+    actor: { type: "wallet_device", id: body.device_id },
+    resource: { type: "connection", id: updated.connection_id },
+    labels: { status: updated.status },
+    details: {
+      agent_id: updated.agent_id,
+      pairing_session_id: updated.pairing_session_id
+    }
+  });
+  observability.incrementCounter("velarumpay_connection_status_updates_total", { status: updated.status });
   res.json({ ok: true, connection: connectionPublicResponse(updated) });
 });
 
-app.get("/v1/demo/telegram-bindings/:chatHash", (req, res) => {
-  const binding = store.telegramBinding(req.params.chatHash);
-  if (!binding) return res.status(404).json({ ok: false, error: "Telegram chat is not bound" });
-  res.json({ ok: true, binding });
+app.post("/v1/connections/:id/rotate-token", (req, res) => {
+  const auth = verifyAppBody(req);
+  if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
+  const connection = store.connection(req.params.id);
+  if (!connection || connection.approved_by_device_id !== req.body.device_id) {
+    return sendApiError(res, 404, "connection_not_found", "Connection not found");
+  }
+  if (connection.status === "revoked") {
+    return sendApiError(res, 409, "connection_revoked", "Revoked connection tokens cannot be rotated");
+  }
+  const rotated = store.rotateConnectionToken(connection.connection_id, id("conn_tok"));
+  notifyOpenClaw(connection.connection_id, {
+    type: "connection.token_rotated",
+    connection_id: connection.connection_id,
+    status: connection.status
+  });
+  observability.recordAuditEvent("connection.token_rotated", "success", {
+    actor: { type: "wallet_device", id: req.body.device_id },
+    resource: { type: "connection", id: rotated.connection_id },
+    labels: { status: rotated.status },
+    details: {
+      agent_id: rotated.agent_id,
+      pairing_session_id: rotated.pairing_session_id
+    }
+  });
+  res.json({ ok: true, connection: connectionResponse(rotated) });
 });
 
 app.post("/v1/payment-requests", (req, res) => {
@@ -344,11 +492,25 @@ app.post("/v1/payment-requests", (req, res) => {
   const idempotencyKey = req.get("x-idempotency-key") || body.idempotency_key || "";
   if (idempotencyKey) {
     const existing = store.findPaymentRequestByIdempotency(idempotencyKey, auth.connection?.connection_id || body.connection_id || "");
-    if (existing) return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(existing) });
+    if (existing) {
+      observability.recordAuditEvent("payment_request.idempotency_duplicate", "success", {
+        actor: auditActorFromAuth(auth),
+        resource: { type: "payment_request", id: existing.request_id },
+        labels: paymentRequestMetricLabels(existing),
+        details: {
+          connection_id: existing.connection_id || null
+        }
+      });
+      observability.incrementCounter("velarumpay_payment_request_duplicates_total", paymentRequestMetricLabels(existing));
+      return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(existing) });
+    }
   }
 
-  const target = body.target_app_device_id || process.env.DEFAULT_APP_DEVICE_ID || store.firstDeviceId();
-  if (!target) return sendApiError(res, 400, "target_device_required", "No target app device is registered");
+  const targetResolution = resolveTargetDevice(auth, body, { defaultDeviceId: process.env.DEFAULT_APP_DEVICE_ID });
+  if (!targetResolution.ok) {
+    return sendApiError(res, targetResolution.status, targetResolution.code, targetResolution.message);
+  }
+  const target = targetResolution.target;
 
   const payload = buildPaymentRequestPayload(body, auth.connection, idempotencyKey);
   const normalized = normalizePaymentRequestV1(payload);
@@ -374,6 +536,19 @@ app.post("/v1/payment-requests", (req, res) => {
   });
   if (auth.connection) store.touchConnection(auth.connection.connection_id);
   notifyApp(target, { type: "payment_request", request_id: request.request_id, status: request.status });
+  observability.recordAuditEvent("payment_request.created", "success", {
+    actor: auditActorFromAuth(auth),
+    resource: { type: "payment_request", id: request.request_id },
+    labels: paymentRequestMetricLabels(request),
+    details: {
+      connection_id: request.connection_id || null,
+      transaction_id: request.transaction_id || null,
+      target_app_device_id: target,
+      warning_count: warnings.length,
+      risk_error_count: Array.isArray(risk.errors) ? risk.errors.length : 0
+    }
+  });
+  observability.incrementCounter("velarumpay_payment_requests_total", paymentRequestMetricLabels(request));
   res.status(201).json({
     ok: true,
     payment_request: paymentRequestProjection(request),
@@ -479,23 +654,42 @@ app.post("/v1/payment-requests/:id/status", (req, res) => {
     request_id: updated.request_id,
     status: updated.status
   });
+  observability.recordAuditEvent("payment_request.status_updated", "success", {
+    actor: { type: "wallet_device", id: req.body.device_id },
+    resource: { type: "payment_request", id: updated.request_id },
+    labels: paymentRequestMetricLabels(updated),
+    details: {
+      connection_id: updated.connection_id || null,
+      transaction_id: updated.transaction_id || null,
+      tx_hash: req.body.tx_hash || null,
+      has_error: Boolean(req.body.error)
+    }
+  });
+  observability.incrementCounter("velarumpay_payment_request_status_updates_total", paymentRequestMetricLabels(updated));
 
   res.json({ ok: true, payment_request: paymentRequestProjection(updated) });
 });
 
 app.post("/v1/payment-intents", (req, res) => {
   const auth = verifyOpenClaw(req);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  if (!auth.ok) return sendApiError(res, auth.status, auth.code || "openclaw_unauthorized", auth.error);
 
   const body = req.body || {};
   const idempotencyKey = req.get("x-idempotency-key") || body.idempotency_key || "";
+
+  // Resolve the target wallet device first so the idempotency lookup can be scoped
+  // to it. An idempotency key is caller-supplied, so a replay must only ever return
+  // an intent bound to the same device; otherwise it leaks another user's intent.
+  const targetResolution = resolveTargetDevice({ legacy: true }, body, { defaultDeviceId: process.env.DEFAULT_APP_DEVICE_ID });
+  if (!targetResolution.ok) {
+    return sendApiError(res, targetResolution.status, targetResolution.code, targetResolution.message);
+  }
+  const target = targetResolution.target;
+
   if (idempotencyKey) {
-    const existing = store.findByIdempotency(idempotencyKey);
+    const existing = store.findByIdempotency(idempotencyKey, target);
     if (existing) return res.status(200).json({ ok: true, duplicate: true, intent: existing });
   }
-
-  const target = body.target_app_device_id || process.env.DEFAULT_APP_DEVICE_ID || store.firstDeviceId();
-  if (!target) return res.status(400).json({ error: "No target app device is registered" });
 
   const now = new Date();
   const expires = body.expires_at ? new Date(body.expires_at) : new Date(Date.now() + 5 * 60 * 1000);
@@ -512,7 +706,7 @@ app.post("/v1/payment-intents", (req, res) => {
   };
 
   const velarum = adaptVelarum(intent);
-  if (!velarum.ok) return res.status(400).json({ error: velarum.error });
+  if (!velarum.ok) return sendApiError(res, 400, "invalid_velarum_payload", velarum.error);
 
   const risk = evaluateIntent(intent, store);
   intent.risk = {
@@ -520,7 +714,11 @@ app.post("/v1/payment-intents", (req, res) => {
     warnings: [...(intent.risk?.warnings || []), ...(velarum.warnings || []), ...risk.warnings],
     errors: risk.errors
   };
-  if (!risk.ok) return res.status(422).json({ error: "Risk policy rejected payment intent", details: risk.errors });
+  if (!risk.ok) {
+    return sendApiError(res, 422, "risk_policy_rejected", "Risk policy rejected payment intent", {
+      details: { errors: risk.errors }
+    });
+  }
 
   store.putIntent(intent);
   notifyApp(target, { type: "payment_intent", intent_id: intent.intent_id, status: intent.status });
@@ -529,27 +727,31 @@ app.post("/v1/payment-intents", (req, res) => {
 
 app.get("/v1/payment-intents", (req, res) => {
   const auth = verifyAppQuery(req);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
   store.expireStale();
   res.json({ ok: true, items: store.listForDevice(req.query.device_id) });
 });
 
 app.get("/v1/payment-intents/:id", (req, res) => {
   const auth = verifyAppQuery(req);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
   store.expireStale();
   const intent = store.intent(req.params.id);
-  if (!intent || intent.target_app_device_id !== req.query.device_id) return res.status(404).json({ error: "Not found" });
+  if (!intent || intent.target_app_device_id !== req.query.device_id) {
+    return sendApiError(res, 404, "payment_intent_not_found", "Payment Intent not found");
+  }
   res.json({ ok: true, intent: store.intent(req.params.id) });
 });
 
 app.post("/v1/payment-intents/:id/status", (req, res) => {
   const auth = verifyAppBody(req);
-  if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
+  if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
   const intent = store.intent(req.params.id);
-  if (!intent || intent.target_app_device_id !== req.body.device_id) return res.status(404).json({ error: "Not found" });
+  if (!intent || intent.target_app_device_id !== req.body.device_id) {
+    return sendApiError(res, 404, "payment_intent_not_found", "Payment Intent not found");
+  }
   const status = req.body.status;
-  if (!canTransition(status)) return res.status(400).json({ error: "Invalid status" });
+  if (!canTransition(status)) return sendApiError(res, 400, "invalid_status", "Invalid status", { field: "status" });
   const updated = store.updateStatus(intent.intent_id, status, {
     tx_hash: req.body.tx_hash || null,
     error: req.body.error || null
@@ -569,8 +771,18 @@ app.post("/v1/payment-intents/:id/status", (req, res) => {
 });
 
 app.get("/v1/openclaw/events", (req, res) => {
+  const auth = verifyOpenClaw(req);
+  if (!auth.ok) return sendApiError(res, auth.status, auth.code || "openclaw_unauthorized", auth.error);
   const since = Number(req.query.since || 0);
   res.json({ ok: true, items: store.eventsSince(since) });
+});
+
+app.use((error, _req, res, _next) => {
+  if (res.headersSent) return;
+  const status = error?.status || error?.statusCode || 500;
+  const code = status === 413 ? "payload_too_large" : status === 400 ? "invalid_json" : "internal_error";
+  const message = status >= 500 ? "Internal server error" : error.message || "Invalid request";
+  sendApiError(res, status, code, message);
 });
 
 server.on("upgrade", (req, socket, head) => {
@@ -588,8 +800,7 @@ wss.on("connection", (ws, _req, url) => {
   if (url.pathname === "/v1/ws/app") {
     const deviceId = url.searchParams.get("device_id") || "";
     const token = url.searchParams.get("token") || "";
-    const device = store.device(deviceId);
-    if (!device || device.token !== token) {
+    if (!store.verifyDeviceToken(deviceId, token)) {
       ws.close(1008, "unauthorized");
       return;
     }
@@ -621,10 +832,23 @@ wss.on("connection", (ws, _req, url) => {
     return;
   }
 
-  const deviceId = url.searchParams.get("device_id") || "default";
-  addSocket(openclawSockets, deviceId, ws);
-  ws.send(JSON.stringify({ type: "hello", role: "openclaw", device_id: deviceId }));
-  ws.on("close", () => removeSocket(openclawSockets, deviceId, ws));
+  if (url.pathname === "/v1/ws/openclaw") {
+    const auth = verifyOpenClawWebSocket(_req, url, runtimeConfig);
+    if (!auth.ok) {
+      ws.close(1008, auth.error || "unauthorized");
+      observability.recordAuditEvent("legacy_openclaw.websocket_rejected", "failure", {
+        actor: { type: "legacy_openclaw" },
+        resource: { type: "websocket", id: url.pathname },
+        labels: { code: auth.code || "unauthorized" }
+      });
+      return;
+    }
+    const deviceId = url.searchParams.get("device_id") || "default";
+    addSocket(openclawSockets, deviceId, ws);
+    ws.send(JSON.stringify({ type: "hello", role: "openclaw", device_id: deviceId }));
+    ws.on("close", () => removeSocket(openclawSockets, deviceId, ws));
+    return;
+  }
 });
 
 server.listen(PORT, () => {
@@ -639,11 +863,56 @@ function sendApiError(res, status, code, message, options = {}) {
   };
   if (options.field) error.field = options.field;
   if (options.details) error.details = options.details;
+  observability.markApiError(res, { status, code, field: error.field || options.details?.field || null });
   return res.status(status).json({ ok: false, error });
 }
 
 function sendAuthFailure(res, auth) {
   return sendApiError(res, auth.status || 401, auth.code || "unauthorized_connection", auth.message || "Unauthorized connection");
+}
+
+function refreshRuntimeMetrics() {
+  const storage = store.info();
+  observability.setGauge("velarumpay_store_info", {
+    driver: storage.driver,
+    schema_version: storage.schema_version || "none"
+  }, 1);
+  observability.setGauge("velarumpay_websocket_connections", { role: "app" }, countOpenSockets(appSockets));
+  observability.setGauge("velarumpay_websocket_connections", { role: "agent" }, countOpenSockets(openclawSockets));
+}
+
+function auditActorFromAuth(auth) {
+  if (auth?.connection) {
+    return {
+      type: "connection",
+      id: auth.connection.connection_id,
+      agent_id: auth.connection.agent_id || auth.connection.agent_identity?.agent_id || ""
+    };
+  }
+  if (auth?.legacy) return { type: "legacy_openclaw" };
+  return { type: "unknown" };
+}
+
+function paymentRequestMetricLabels(request) {
+  return {
+    status: request.status || "unknown",
+    rail: request.payment?.rail || "unknown",
+    network: request.payment?.network || "unknown",
+    risk_level: request.risk?.level || "unknown"
+  };
+}
+
+function recordPairingExpired(session, options = {}) {
+  observability.recordAuditEvent("pairing_session.expired", "failure", {
+    actor: { type: "wallet_device", id: options.actorDeviceId || "" },
+    resource: { type: "pairing_session", id: session.pairing_session_id },
+    labels: { status: "expired" },
+    details: {
+      agent_id: session.agent_identity?.agent_id || "",
+      expires_at: session.expires_at || null
+    }
+  });
+  observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "expired" });
 }
 
 function normalizeAgentIdentity(agent) {
@@ -768,6 +1037,15 @@ function pairingSessionResponse(session) {
   };
 }
 
+function deviceResponse(device) {
+  return {
+    device_id: device.device_id,
+    registered_at: device.registered_at,
+    last_seen_at: device.last_seen_at,
+    token_rotated_at: device.token_rotated_at || null
+  };
+}
+
 function connectionResponse(connection) {
   return {
     connection_id: connection.connection_id,
@@ -776,6 +1054,8 @@ function connectionResponse(connection) {
     agent_identity: connection.agent_identity,
     status: connection.status,
     created_at: connection.created_at,
+    updated_at: connection.updated_at,
+    token_rotated_at: connection.token_rotated_at || null,
     expires_at: connection.expires_at
   };
 }
@@ -799,13 +1079,13 @@ function connectionPublicResponse(connection) {
 function authorizeConnection(req, scope, options = {}) {
   const token = connectionTokenFromRequest(req);
   if (!token) {
-    if (options.allowLegacyOpenClaw && hasLegacyOpenClawCredential(req)) {
+    if (options.allowLegacyOpenClaw && shouldAttemptLegacyOpenClaw(req, runtimeConfig)) {
       const legacy = verifyOpenClaw(req);
       if (legacy.ok) return { ok: true, legacy: true };
       return {
         ok: false,
         status: legacy.status,
-        code: legacy.status === 401 ? "unauthorized_connection" : "legacy_auth_failed",
+        code: legacy.status === 401 ? "unauthorized_connection" : legacy.code || "legacy_auth_failed",
         message: legacy.error
       };
     }
@@ -844,10 +1124,6 @@ function connectionTokenFromRequest(req) {
   const match = authorization.match(/^Bearer\s+(.+)$/i);
   if (match) return match[1].trim();
   return String(req.get("x-connection-token") || req.query.connection_token || req.body?.connection_token || "").trim();
-}
-
-function hasLegacyOpenClawCredential(req) {
-  return process.env.ALLOW_UNSIGNED_OPENCLAW === "true" || Boolean(req.get("x-signature"));
 }
 
 function buildTransactionContextPayload(body, connection) {
@@ -1179,35 +1455,35 @@ function decimalString(value) {
 }
 
 function verifyOpenClaw(req) {
-  if (process.env.ALLOW_UNSIGNED_OPENCLAW === "true") return { ok: true };
-  const secret = process.env.OPENCLAW_DEVICE_SECRET || "";
-  if (!secret) return { ok: false, status: 500, error: "OPENCLAW_DEVICE_SECRET is not configured" };
-  const signature = req.get("x-signature") || "";
-  if (!verifyHmac(secret, req.rawBody || "", signature)) {
-    return { ok: false, status: 401, error: "Invalid OpenClaw signature" };
+  const result = verifyOpenClawRequest(req, runtimeConfig);
+  if (!result.ok) {
+    observability.recordAuditEvent("legacy_openclaw.auth_failed", "failure", {
+      actor: { type: "legacy_openclaw" },
+      resource: { type: "http_route", id: req.path || req.url || "" },
+      labels: { code: result.code || "openclaw_unauthorized" }
+    });
   }
-  return { ok: true };
+  return result;
 }
 
 function verifyAppQuery(req) {
   const deviceId = req.query.device_id;
   const token = req.query.token;
-  const device = store.device(deviceId);
-  if (!device || device.token !== token) return { ok: false, status: 401, error: "Invalid app device token" };
+  if (!store.verifyDeviceToken(deviceId, token)) return { ok: false, status: 401, error: "Invalid app device token" };
   return { ok: true };
 }
 
 function verifyAppBody(req) {
   const deviceId = req.body.device_id;
   const token = req.body.token;
-  const device = store.device(deviceId);
-  if (!device || device.token !== token) return { ok: false, status: 401, error: "Invalid app device token" };
+  if (!store.verifyDeviceToken(deviceId, token)) return { ok: false, status: 401, error: "Invalid app device token" };
   return { ok: true };
 }
 
 function verifyContextRead(req) {
   if (req.query.device_id || req.query.token) return verifyAppQuery(req);
-  if (process.env.ALLOW_UNSIGNED_OPENCLAW === "true") return { ok: true };
+  const legacy = verifyOpenClaw(req);
+  if (legacy.ok) return { ok: true };
   return { ok: false, status: 401, error: "device_id and token are required" };
 }
 
@@ -1247,6 +1523,12 @@ function liveSocketSummary(map) {
       connections: Array.from(sockets).filter((socket) => socket.readyState === socket.OPEN).length
     }))
     .filter((item) => item.connections > 0);
+}
+
+function countOpenSockets(map) {
+  return Array.from(map.values()).reduce((total, sockets) => {
+    return total + Array.from(sockets).filter((socket) => socket.readyState === socket.OPEN).length;
+  }, 0);
 }
 
 async function confirmLater(intent, txHash) {

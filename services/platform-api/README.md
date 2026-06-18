@@ -14,6 +14,7 @@ Local development API for VelarumPay payment requests, Transaction Context Lite,
 - Agent pairing sessions with QR URI and short code.
 - Connection-scoped tokens for standard Payment Request create/read.
 - Risk policy: chain/token allowlist, Base USDC contract allowlist, optional address whitelist, daily USDC/XLM limits, idempotency.
+- Structured audit events and Prometheus metrics for pairing, connection, Payment Request, HTTP, and API error paths.
 
 ## Run
 
@@ -21,8 +22,105 @@ Local development API for VelarumPay payment requests, Transaction Context Lite,
 cd /Users/yang/code/VelarumPayCode/services/platform-api
 cp .env.example .env
 npm install
-OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
+npm start
 ```
+
+The server loads `.env` automatically unless an environment variable is already
+set by the shell, systemd, Docker, or a managed runtime.
+
+## Storage
+
+The Platform API defaults to a SQLite store at `data/relay-store.sqlite`.
+The store enables WAL mode, runs schema migrations on startup, and persists relay
+state transactionally. If an older `data/relay-store.json` exists when the
+default SQLite store is first created, it is imported once and a
+`data/relay-store.json.migrated-to-sqlite` marker is written.
+
+Useful environment variables:
+
+```bash
+RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite
+RELAY_STORE_DRIVER=sqlite
+RELAY_STORE_LEGACY_JSON=/var/lib/velarumpay/relay-store.json
+```
+
+For local compatibility tests, `RELAY_STORE_DRIVER=json` or a `.json` store path
+keeps the legacy JSON-backed store.
+
+Create a store backup before deploys or schema changes:
+
+```bash
+npm run backup -- /var/backups/velarumpay/relay-store-before-deploy.sqlite
+```
+
+## Runtime Security
+
+The production preflight is strict by design:
+
+```bash
+NODE_ENV=production \
+RUNTIME_ENV=production \
+RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite \
+CORS_ALLOWED_ORIGINS=https://wallet.example.com \
+OPENCLAW_DEVICE_SECRET=replace-with-random-secret \
+npm run check:runtime-config
+```
+
+Production rejects weak OpenClaw secrets, unsigned legacy OpenClaw mode, wildcard
+or missing CORS allowlists, and relative store paths. Local development may use
+`ALLOW_UNSIGNED_OPENCLAW=true`, but unsigned legacy OpenClaw requests are still
+accepted only from localhost unless `ALLOW_UNSIGNED_OPENCLAW_LOCAL_ONLY=false`.
+
+Security-related environment variables:
+
+```bash
+CORS_ALLOWED_ORIGINS=https://wallet.example.com,https://ops.example.com
+RATE_LIMIT_WINDOW_MS=60000
+RATE_LIMIT_MAX=600
+AUTH_RATE_LIMIT_MAX=120
+OPENCLAW_DEVICE_SECRET=active-secret
+OPENCLAW_DEVICE_SECRET_PREVIOUS=previous-secret
+OPENCLAW_WS_TOKEN=legacy-websocket-token
+```
+
+Connection and app-device tokens are stored as hashes at rest. New plaintext
+tokens are returned only when created or rotated.
+
+## Deployment
+
+Docker Compose, systemd, health checks, preflight, and rollback notes live in:
+
+```text
+/Users/yang/code/VelarumPayCode/services/platform-api/deploy
+```
+
+## Observability and Audit Logs
+
+`GET /metrics` returns Prometheus text metrics, including HTTP request counters,
+request duration summaries, audit event counters, websocket gauges, and storage
+driver info. If `METRICS_TOKEN` or `OBSERVABILITY_TOKEN` is set, callers must
+send `Authorization: Bearer <token>` or `X-Observability-Token`.
+
+Audit events are written as structured JSON lines to stdout by default and kept
+in a bounded in-memory buffer for incident triage. `GET /v1/audit/events`
+requires `AUDIT_LOG_READ_TOKEN` or `OBSERVABILITY_TOKEN`; without one it returns
+`audit_log_token_required`.
+
+Useful environment variables:
+
+```bash
+METRICS_TOKEN=
+AUDIT_LOG_READ_TOKEN=change-me-audit-read-token
+OBSERVABILITY_TOKEN=
+AUDIT_EVENT_RETENTION=500
+AUDIT_LOG_STDOUT=true
+```
+
+Audit payloads redact tokens, secrets, signatures, pairing codes, private-key
+words, amounts, totals, fees, and costs. Addresses and transaction hashes are
+stored as short SHA-256 fingerprints. The audit event stream is intended for
+resource IDs, statuses, scope counts, risk levels, and error taxonomy, not raw
+payment credentials or wallet secrets.
 
 For a physical phone, set AgentWallet Relay URL to your Mac LAN IP, for example:
 
@@ -40,6 +138,7 @@ http://10.0.2.2:8787
 
 ```http
 POST /v1/devices/app
+POST /v1/devices/app/{device_id}/rotate-token
 POST /v1/pairing/sessions
 GET  /v1/pairing/sessions/{pairing_session_id_or_code}?code=...
 POST /v1/pairing/sessions/{pairing_session_id_or_code}/approve
@@ -47,6 +146,7 @@ POST /v1/pairing/sessions/{pairing_session_id_or_code}/reject
 GET  /v1/connections?device_id=...&token=...
 PATCH /v1/connections/{connection_id}
 DELETE /v1/connections/{connection_id}
+POST /v1/connections/{connection_id}/rotate-token
 POST /v1/transaction-contexts
 GET  /v1/transaction-contexts/{transaction_id}
 POST /v1/payment-requests
@@ -54,6 +154,8 @@ GET  /v1/payment-requests
 GET  /v1/payment-requests/events
 GET  /v1/payment-requests/{request_id}
 POST /v1/payment-requests/{request_id}/status
+GET  /v1/audit/events
+GET  /metrics
 POST /v1/payment-intents
 GET  /v1/payment-intents?device_id=...&token=...
 GET  /v1/payment-intents/{id}?device_id=...&token=...
@@ -61,7 +163,7 @@ POST /v1/payment-intents/{id}/status
 GET  /v1/openclaw/events?since=0
 WS   /v1/ws/app?device_id=...&token=...
 WS   /v1/ws/agent?connection_token=...
-WS   /v1/ws/openclaw?device_id=...
+WS   /v1/ws/openclaw?device_id=...&openclaw_token=...
 ```
 
 ## Pairing and Connection Tokens
@@ -127,7 +229,7 @@ Wallet apps manage approved connections with device credentials:
 }
 ```
 
-`GET /v1/connections` lists wallet-owned connections without returning token plaintext. `PATCH /v1/connections/{connection_id}` accepts `status: "active"` or `status: "paused"`. `DELETE /v1/connections/{connection_id}` marks the connection `revoked`. Paused or revoked connections are no longer accepted by standard Payment Request or Transaction Context endpoints because connection auth requires `status = "active"`.
+`GET /v1/connections` lists wallet-owned connections without returning token plaintext. `PATCH /v1/connections/{connection_id}` accepts `status: "active"` or `status: "paused"`. `POST /v1/connections/{connection_id}/rotate-token` returns a replacement `connection_token` once. `DELETE /v1/connections/{connection_id}` marks the connection `revoked`. Paused or revoked connections are no longer accepted by standard Payment Request or Transaction Context endpoints because connection auth requires `status = "active"`.
 
 ## Standard Payment Requests
 
@@ -140,7 +242,7 @@ X-Connection-Token: conn_tok_...
 
 `POST /v1/payment-requests` requires `payment.requests.create`. `GET /v1/payment-requests` and `GET /v1/payment-requests/{request_id}` require `payment.requests.read` for agent access and only return requests owned by that connection. Wallet device reads still use `device_id` and `token` query parameters.
 
-Connection auth errors return `unauthorized_connection`. Missing scope or cross-connection reads return `scope_denied`. The legacy OpenClaw shared-secret path is only kept as a migration fallback when an OpenClaw signature is supplied or `ALLOW_UNSIGNED_OPENCLAW=true` is set.
+Connection auth errors return `unauthorized_connection`. Missing scope or cross-connection reads return `scope_denied`. The legacy OpenClaw shared-secret path is only kept as a migration fallback when an OpenClaw signature is supplied or local-only `ALLOW_UNSIGNED_OPENCLAW=true` is set.
 
 `POST /v1/transaction-contexts` accepts `velarum.transaction_context.v1`, validates it, and stores the latest object by `transaction_id`. Standard callers should use a connection token with `transaction_contexts.create` or `transaction_contexts.read`; the legacy OpenClaw path remains available for migration and local quickstarts.
 

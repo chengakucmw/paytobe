@@ -22,7 +22,7 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 
 final class SolanaTransfer {
-    private static final OkHttpClient HTTP = new OkHttpClient();
+    private static final OkHttpClient HTTP = WalletHttp.oneShot();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final byte[] SYSTEM_PROGRAM = new byte[32];
     private static final byte[] TOKEN_PROGRAM = Base58.decode("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");

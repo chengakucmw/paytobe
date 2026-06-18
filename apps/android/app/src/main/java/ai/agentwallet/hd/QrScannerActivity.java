@@ -80,7 +80,7 @@ public class QrScannerActivity extends FragmentActivity {
 
         TextView title = text("Scan QR", 26, Color.WHITE, true);
         overlay.addView(title);
-        TextView subtitle = text("Point the camera at a pairing, demo setup, or transfer QR code.", 14, Color.rgb(216, 224, 218), false);
+        TextView subtitle = text("Point the camera at a payment, address, Agent pairing, setup, or link QR code.", 14, Color.rgb(216, 224, 218), false);
         subtitle.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams subLp = new LinearLayout.LayoutParams(-1, -2);
         subLp.topMargin = dp(8);

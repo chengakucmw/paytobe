@@ -1,18 +1,19 @@
+import {
+  SUPPORTED_TRANSFER_ASSETS,
+  SUPPORTED_TRANSFER_RAILS
+} from "./transfer-assets.js";
+
 export const PAYMENT_REQUEST_PROTOCOL = "velarum.payment_request.v1";
 export const TRANSACTION_CONTEXT_PROTOCOL = "velarum.transaction_context.v1";
 
 export const BASE_USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 export const PAYMENT_RAILS = Object.freeze([
-  "stellar_xlm",
-  "base_usdc",
+  ...SUPPORTED_TRANSFER_RAILS,
   "evm_erc20"
 ]);
 
-export const CANONICAL_PAYMENT_RAILS = Object.freeze([
-  "stellar_xlm",
-  "base_usdc"
-]);
+export const CANONICAL_PAYMENT_RAILS = Object.freeze([...SUPPORTED_TRANSFER_RAILS]);
 
 export const PAYMENT_STATUSES = Object.freeze([
   "pending",
@@ -105,7 +106,8 @@ export const TRANSACTION_CONTEXT_STATUSES = Object.freeze([
 ]);
 
 export const SUPPORTED_NETWORKS = Object.freeze([
-  "base_mainnet",
-  "stellar_public",
-  "stellar_testnet"
+  ...new Set([
+    ...SUPPORTED_TRANSFER_ASSETS.map((asset) => asset.network),
+    "stellar_testnet"
+  ])
 ]);

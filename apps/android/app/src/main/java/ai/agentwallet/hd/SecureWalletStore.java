@@ -20,10 +20,15 @@ final class SecureWalletStore {
     private static final String PREFS = "agentwallet_hd_transfer_store";
     private static final String PREF_IV = "wallet_iv";
     private static final String PREF_CT = "wallet_ciphertext";
+    private static final String PREF_BACKUP_VERIFIED = "wallet_backup_verified";
 
     private SecureWalletStore() {}
 
     static void save(Context context, String plaintext) throws Exception {
+        save(context, plaintext, false);
+    }
+
+    static void save(Context context, String plaintext, boolean backupVerified) throws Exception {
         SecretKey key = getOrCreateKey();
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
         cipher.init(Cipher.ENCRYPT_MODE, key);
@@ -31,6 +36,7 @@ final class SecureWalletStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
                 .putString(PREF_IV, Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
                 .putString(PREF_CT, Base64.encodeToString(ciphertext, Base64.NO_WRAP))
+                .putBoolean(PREF_BACKUP_VERIFIED, backupVerified)
                 .apply();
     }
 
@@ -51,6 +57,18 @@ final class SecureWalletStore {
 
     static boolean hasWallet(Context context) {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).contains(PREF_CT);
+    }
+
+    static boolean isBackupVerified(Context context) {
+        return hasWallet(context)
+                && context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(PREF_BACKUP_VERIFIED, false);
+    }
+
+    static void markBackupVerified(Context context) {
+        if (!hasWallet(context)) return;
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putBoolean(PREF_BACKUP_VERIFIED, true)
+                .apply();
     }
 
     private static SecretKey getOrCreateKey() throws Exception {

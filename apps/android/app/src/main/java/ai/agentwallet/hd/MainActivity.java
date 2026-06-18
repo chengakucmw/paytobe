@@ -9,7 +9,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.GradientDrawable;
@@ -22,6 +25,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
@@ -63,6 +67,9 @@ public class MainActivity extends FragmentActivity {
     private static final String TAB_MESSAGES = "messages";
     private static final String TAB_HISTORY = "history";
     private static final String TAB_SETTINGS = "settings";
+    private static final String STATE_ACTIVE_TAB = "ai.agentwallet.hd.state.ACTIVE_TAB";
+    private static final String STATE_INBOX_FILTER = "ai.agentwallet.hd.state.INBOX_FILTER";
+    private static final String STATE_OPEN_PAYMENT_INTENT_ID = "ai.agentwallet.hd.state.OPEN_PAYMENT_INTENT_ID";
     private static final int BG = Color.rgb(232, 240, 233);
     private static final int SURFACE = Color.WHITE;
     private static final int SOFT = Color.rgb(238, 245, 239);
@@ -89,7 +96,7 @@ public class MainActivity extends FragmentActivity {
     private static final int CHAIN_STELLAR = Color.rgb(27, 31, 42);
     private static final int CHAIN_BASE = Color.rgb(0, 82, 255);
     private static final int CHAIN_POLYGON = Color.rgb(130, 71, 229);
-    private static final OkHttpClient IMAGE_HTTP = new OkHttpClient();
+    private static final OkHttpClient IMAGE_HTTP = WalletHttp.oneShot();
 
     private LinearLayout content;
     private TextView status;
@@ -104,7 +111,12 @@ public class MainActivity extends FragmentActivity {
     private AlertDialog activeSheet;
     private String activeTab = TAB_WALLET;
     private String inboxFilter = PaymentInboxFilter.FILTER_PENDING;
+    // Intent id of the payment request whose detail sheet is currently open (for save/restore).
+    private String openPaymentIntentId;
+    // Pending restore target captured from savedInstanceState; reopened once onCreate finishes.
+    private String restoredPaymentIntentId;
     private boolean balanceRefreshInFlight;
+    private boolean sensitiveScreenActive;
     private HDWallet wallet;
     private RelayClient relayClient;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -113,6 +125,15 @@ public class MainActivity extends FragmentActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        restoreUiState(savedInstanceState);
+        getWindow().getDecorView().setSystemUiVisibility(
+                View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        );
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -126,6 +147,45 @@ public class MainActivity extends FragmentActivity {
         startRelayPushService();
         syncInboxSilently();
         handleAppIntent(getIntent());
+        restoreOpenPaymentSheetIfNeeded();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (activeTab != null) outState.putString(STATE_ACTIVE_TAB, activeTab);
+        if (inboxFilter != null) outState.putString(STATE_INBOX_FILTER, inboxFilter);
+        if (openPaymentIntentId != null) outState.putString(STATE_OPEN_PAYMENT_INTENT_ID, openPaymentIntentId);
+    }
+
+    // Restore lightweight UI state (tab + inbox filter) before the first render so the
+    // user lands back where they were after a rotation-driven or process-death recreation.
+    private void restoreUiState(Bundle savedInstanceState) {
+        if (savedInstanceState == null) return;
+        String savedTab = savedInstanceState.getString(STATE_ACTIVE_TAB);
+        if (savedTab != null && savedTab.length() > 0) activeTab = savedTab;
+        String savedFilter = savedInstanceState.getString(STATE_INBOX_FILTER);
+        if (savedFilter != null && savedFilter.length() > 0) inboxFilter = savedFilter;
+        restoredPaymentIntentId = savedInstanceState.getString(STATE_OPEN_PAYMENT_INTENT_ID);
+    }
+
+    // Reopen the payment request the user was reviewing when the activity was destroyed,
+    // unless another flow (e.g. a notification tap) has already opened a sheet.
+    private void restoreOpenPaymentSheetIfNeeded() {
+        String intentId = restoredPaymentIntentId;
+        restoredPaymentIntentId = null;
+        if (intentId == null || intentId.trim().length() == 0) return;
+        if (activeSheet != null) return;
+        try {
+            PaymentIntent local = PaymentInboxStore.find(this, intentId.trim());
+            if (local != null) {
+                activeTab = TAB_MESSAGES;
+                renderActiveTab();
+                updateTabButtons();
+                paymentDetailsSheet(local);
+            }
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
@@ -150,18 +210,21 @@ public class MainActivity extends FragmentActivity {
         LinearLayout header = vertical();
         header.setPadding(dp(20), statusBarHeight() + dp(12), dp(20), dp(14));
         LinearLayout top = row();
+        LinearLayout brandWrap = row();
+        brandWrap.setGravity(Gravity.CENTER_VERTICAL);
+        brandWrap.addView(walletMark(), new LinearLayout.LayoutParams(dp(56), dp(56)));
         LinearLayout brand = vertical();
-        brand.addView(text("AgentWallet", 18, INK, true));
-        brand.addView(text("Local signing wallet", 12, MUTED, false));
-        top.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        brand.addView(text("VelarumPay", 30, INK, true));
+        brand.addView(text("Personal wallet", 20, FADED, false));
+        LinearLayout.LayoutParams brandCopyLp = new LinearLayout.LayoutParams(0, -2, 1);
+        brandCopyLp.leftMargin = dp(14);
+        brandWrap.addView(brand, brandCopyLp);
+        top.addView(brandWrap, new LinearLayout.LayoutParams(0, -2, 1));
         LinearLayout headerActions = row();
-        status = pill("", GREEN, GREEN_SOFT, Color.TRANSPARENT);
-        status.setTextSize(11);
-        headerActions.addView(status);
-        Button scan = compactButton("Scan", this::openScanner);
-        LinearLayout.LayoutParams scanLp = new LinearLayout.LayoutParams(-2, dp(34));
-        scanLp.leftMargin = dp(8);
-        headerActions.addView(scan, scanLp);
+        headerActions.addView(circleIconButton(DrawnIconButton.MODE_SEARCH, () -> toast("Search")));
+        LinearLayout.LayoutParams scanLp = new LinearLayout.LayoutParams(dp(58), dp(58));
+        scanLp.leftMargin = dp(12);
+        headerActions.addView(circleIconButton(DrawnIconButton.MODE_SCAN, this::openScanner), scanLp);
         top.addView(headerActions);
         header.addView(top);
         root.addView(header);
@@ -184,7 +247,10 @@ public class MainActivity extends FragmentActivity {
             String saved = SecureWalletStore.load(this);
             if (saved == null) return;
             wallet = HDWallet.parse(saved);
-            renderPublicWallet();
+            // Preserve a restored tab instead of forcing the wallet tab; on a fresh
+            // launch activeTab is still TAB_WALLET, so behaviour is unchanged.
+            renderActiveTab();
+            updateTabButtons();
             updateStatus();
             refreshBalances();
         } catch (Exception e) {
@@ -199,13 +265,11 @@ public class MainActivity extends FragmentActivity {
         LinearLayout tabs = row();
         tabs.setPadding(dp(4), dp(4), dp(4), dp(4));
         tabs.setBackground(round(SURFACE, dp(26), LINE, 1));
-        tabWallet = tabButton("Wallet", () -> switchTab(TAB_WALLET));
+        tabWallet = tabButton("Home", () -> switchTab(TAB_WALLET));
         tabMessages = tabButton("Inbox", () -> switchTab(TAB_MESSAGES));
-        tabHistory = tabButton("History", () -> switchTab(TAB_HISTORY));
-        tabSettings = tabButton("Settings", () -> switchTab(TAB_SETTINGS));
+        tabSettings = tabButton("Profile", () -> switchTab(TAB_SETTINGS));
         tabs.addView(tabWallet, new LinearLayout.LayoutParams(0, dp(48), 1));
         tabs.addView(tabMessages, new LinearLayout.LayoutParams(0, dp(48), 1));
-        tabs.addView(tabHistory, new LinearLayout.LayoutParams(0, dp(48), 1));
         tabs.addView(tabSettings, new LinearLayout.LayoutParams(0, dp(48), 1));
         shell.addView(tabs);
         return shell;
@@ -267,14 +331,14 @@ public class MainActivity extends FragmentActivity {
     private String headerTitleFor(String tab) {
         if (TAB_MESSAGES.equals(tab)) return "Inbox";
         if (TAB_HISTORY.equals(tab)) return "History";
-        if (TAB_SETTINGS.equals(tab)) return "Settings";
-        return "Wallet";
+        if (TAB_SETTINGS.equals(tab)) return "Profile";
+        return "Home";
     }
 
     private String headerSubtitleFor(String tab) {
         if (TAB_MESSAGES.equals(tab)) return "Review agent payment requests before anything is signed.";
         if (TAB_HISTORY.equals(tab)) return "Broadcasted and confirmed transfers from this device.";
-        if (TAB_SETTINGS.equals(tab)) return "Wallet recovery, relay connection, and demo controls.";
+        if (TAB_SETTINGS.equals(tab)) return "Wallet identity, connected agents, security, and activity.";
         return "Multi-chain balances, local signing, and receive addresses.";
     }
 
@@ -286,11 +350,7 @@ public class MainActivity extends FragmentActivity {
         }
         content.addView(portfolioCard());
         addGap(content, 14);
-        content.addView(walletQuickActionsCard());
-        addGap(content, 14);
-        content.addView(receiveAddressesCard());
-        addGap(content, 14);
-        content.addView(warning("This app signs transactions locally. Always test with testnets first. Mainnet transactions move real funds and cannot be reversed."));
+        content.addView(cryptoAssetsCard());
         addGap(content, 14);
         content.addView(transferLauncherCard());
     }
@@ -386,29 +446,131 @@ public class MainActivity extends FragmentActivity {
 
     private void renderSettingsTab() {
         content.removeAllViews();
-        LinearLayout card = card();
-        card.addView(sectionEyebrow("Control center"));
-        addGap(card, 8);
-        card.addView(text("Settings", 26, INK, true));
-        addGap(card, 6);
-        card.addView(text("Wallet recovery, relay connection, and local security controls.", 14, MUTED, false));
-        addGap(card, 12);
-        LinearLayout r1 = row();
-        r1.addView(primaryButton("Generate", this::generateWallet), weight());
-        r1.addView(outlineButton("Load", this::loadWallet), weightLeft());
-        card.addView(r1);
-        addGap(card, 10);
-        LinearLayout r2 = row();
-        r2.addView(primaryButton("Back Up Wallet", this::backupWalletSheet), weight());
-        r2.addView(outlineButton("Restore", this::restoreSheet), weightLeft());
-        card.addView(r2);
-        addGap(card, 10);
-        card.addView(dangerButton("Clear Saved Wallet", this::clearWallet), new LinearLayout.LayoutParams(-1, dp(48)));
-        content.addView(card);
+        content.addView(walletIdentityCard());
         addGap(content, 14);
-        content.addView(relayConnectionCard());
+        content.addView(securitySettingsCard());
         addGap(content, 14);
         content.addView(agentConnectionsCard());
+        addGap(content, 14);
+        content.addView(profileShortcutCard("Activity history", "All balance changes, signatures, broadcasts, blocked requests, and expired records.", this::openActivityFromSheet));
+        addGap(content, 14);
+        content.addView(profileShortcutCard("Developer quickstart", "Create Payment Requests, attach Transaction Context, and wait for user signatures.", this::connectAgentSheet));
+        addGap(content, 14);
+        content.addView(networksCard());
+        addGap(content, 14);
+        content.addView(relayConnectionCard());
+    }
+
+    private View walletIdentityCard() {
+        LinearLayout card = card();
+        card.setPadding(dp(20), dp(20), dp(20), dp(20));
+        LinearLayout row = row();
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        TextView avatar = text("V", 24, GREEN, true);
+        avatar.setGravity(Gravity.CENTER);
+        avatar.setBackground(round(GREEN_SOFT, dp(18), Color.TRANSPARENT, 0));
+        row.addView(avatar, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        LinearLayout copy = vertical();
+        copy.addView(text(wallet == null ? "Local wallet" : "Local wallet ready", 20, INK, true));
+        copy.addView(text(wallet == null ? "No wallet loaded" : shortAddress(wallet.evm.address), 13, MUTED, false));
+        LinearLayout.LayoutParams copyLp = new LinearLayout.LayoutParams(0, -2, 1);
+        copyLp.leftMargin = dp(14);
+        row.addView(copy, copyLp);
+        row.addView(pill("Wallet ID", GREEN, GREEN_SOFT, Color.TRANSPARENT));
+        card.addView(row);
+        addGap(card, 14);
+        card.addView(text("Set your wallet ID, avatar, and display name. These fields help you recognize this wallet and do not expose private keys.", 14, MUTED, false));
+        return card;
+    }
+
+    private View profileShortcutCard(String title, String copy, Runnable action) {
+        LinearLayout card = card();
+        card.setOnClickListener(v -> action.run());
+        LinearLayout top = row();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(text(title, 18, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(text("›", 24, GREEN, true));
+        card.addView(top);
+        addGap(card, 8);
+        card.addView(text(copy, 14, MUTED, false));
+        return card;
+    }
+
+    private View securitySettingsCard() {
+        LinearLayout card = card();
+        card.addView(sectionEyebrow("Settings / Security"));
+        addGap(card, 8);
+        card.addView(text("Security", 24, INK, true));
+        addGap(card, 6);
+        card.addView(text("Create, back up, import, and recover this wallet from one security surface. Signing stays locked until the offline backup is verified.", 14, MUTED, false));
+        addGap(card, 12);
+
+        boolean hasWallet = wallet != null || SecureWalletStore.hasWallet(this);
+        boolean backupVerified = SecureWalletStore.isBackupVerified(this);
+        card.addView(securitySettingRow(
+                "Security overview",
+                "Local signing, device authentication, and recovery controls.",
+                hasWallet ? (backupVerified ? "Ready" : "Backup needed") : "No wallet",
+                this::securityOverviewSheet
+        ));
+        addGap(card, 10);
+        card.addView(securitySettingRow(
+                "Recovery phrase backup",
+                "View and verify the offline backup before any signature can be created.",
+                backupVerified ? "Verified" : "Required",
+                this::backupWalletSheet
+        ));
+        addGap(card, 10);
+        card.addView(securitySettingRow(
+                "Import or recover wallet",
+                "Restore an existing BIP-39 English recovery phrase on this device.",
+                "12-24 words",
+                this::restoreSheet
+        ));
+        addGap(card, 10);
+        card.addView(securitySettingRow(
+                "Create wallet flow",
+                "New wallets default to a 24-word BIP-39 English recovery phrase.",
+                hasWallet ? "Replace" : "New",
+                this::generateWallet
+        ));
+        addGap(card, 10);
+        card.addView(securitySettingRow(
+                "Device risk controls",
+                "Cloud backup is off in v1; secrets stay encrypted with Android Keystore.",
+                "Local only",
+                this::deviceRiskSheet
+        ));
+        addGap(card, 12);
+
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Load saved wallet", this::loadWallet), weight());
+        actions.addView(dangerButton("Clear local wallet", this::clearWallet), weightLeft());
+        card.addView(actions);
+        return card;
+    }
+
+    private View securitySettingRow(String title, String copy, String statusLabel, Runnable action) {
+        LinearLayout item = vertical();
+        item.setPadding(dp(14), dp(14), dp(14), dp(14));
+        item.setBackground(round(SUNKEN, dp(16), LINE, 1));
+        item.setOnClickListener(v -> action.run());
+
+        LinearLayout top = row();
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(text(title, 16, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(pill(statusLabel, securityStatusColor(statusLabel), SURFACE, Color.TRANSPARENT));
+        item.addView(top);
+        addGap(item, 6);
+        item.addView(text(copy, 13, MUTED, false));
+        return item;
+    }
+
+    private int securityStatusColor(String statusLabel) {
+        String value = statusLabel == null ? "" : statusLabel.toLowerCase();
+        if (value.contains("verified") || value.contains("ready") || value.contains("local")) return GREEN;
+        if (value.contains("required") || value.contains("needed") || value.contains("replace")) return GOLD;
+        return BLUE;
     }
 
     private View relayConnectionCard() {
@@ -417,14 +579,11 @@ public class MainActivity extends FragmentActivity {
         addGap(card, 8);
         card.addView(text("Connection", 24, INK, true));
         addGap(card, 6);
-        card.addView(text("Relay, device, and demo binding details for Telegram payment requests.", 14, MUTED, false));
+        card.addView(text("Relay and device registration details for Payment Requests.", 14, MUTED, false));
         addGap(card, 12);
-        card.addView(field("Relay URL", PaymentInboxStore.relayUrl(this), false));
+        String relayUrl = PaymentInboxStore.relayUrl(this);
+        card.addView(field("Relay URL", relayUrl.length() == 0 ? "Not configured" : relayUrl, false));
         card.addView(field("Device ID", PaymentInboxStore.deviceId(this), true));
-        String demoSessionId = PaymentInboxStore.demoSessionId(this);
-        if (demoSessionId.length() > 0) card.addView(field("Demo Session", demoSessionId, true));
-        String telegramBot = PaymentInboxStore.telegramBot(this);
-        if (telegramBot.length() > 0) card.addView(field("Telegram Bot", telegramBot, false));
         addGap(card, 12);
         LinearLayout actions = row();
         actions.addView(outlineButton("Relay Settings", this::relaySettingsSheet), weight());
@@ -433,6 +592,49 @@ public class MainActivity extends FragmentActivity {
         addGap(card, 10);
         card.addView(outlineButton("Sync Inbox", this::syncInbox), new LinearLayout.LayoutParams(-1, dp(48)));
         return card;
+    }
+
+    private View networksCard() {
+        LinearLayout card = card();
+        card.addView(sectionEyebrow("Networks"));
+        addGap(card, 8);
+        card.addView(text("Enabled networks", 24, INK, true));
+        addGap(card, 6);
+        card.addView(text("Add an EVM-compatible network after verifying that the RPC endpoint reports the exact Chain ID. Personal RPC settings stay on this device.", 14, MUTED, false));
+        addGap(card, 12);
+        card.addView(field("Built-in networks", "Ethereum, Base, Polygon, Solana, Stellar", false));
+        List<WalletNetworkConfig> userNetworks = WalletNetworkStore.userAdded(this);
+        if (!userNetworks.isEmpty()) {
+            addGap(card, 10);
+            card.addView(text("Custom networks", 16, INK, true));
+            addGap(card, 8);
+            for (WalletNetworkConfig network : userNetworks) {
+                card.addView(networkRow(network));
+                addGap(card, 8);
+            }
+        }
+        addGap(card, 10);
+        card.addView(primaryButton("Add network", () -> addNetworkSheet(null)), new LinearLayout.LayoutParams(-1, dp(48)));
+        return card;
+    }
+
+    private View networkRow(WalletNetworkConfig network) {
+        LinearLayout box = vertical();
+        box.setPadding(dp(14), dp(12), dp(14), dp(12));
+        box.setBackground(round(SUNKEN, dp(16), LINE, 1));
+        LinearLayout top = row();
+        top.addView(text(network.name, 15, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        top.addView(pill("Verified", GREEN, GREEN_SOFT, Color.TRANSPARENT));
+        box.addView(top);
+        addGap(box, 4);
+        box.addView(text(network.displayLine(), 12, MUTED, false));
+        if (network.rpcUrl.length() > 0) {
+            addGap(box, 6);
+            TextView rpc = text(network.rpcUrl, 12, FADED, false);
+            rpc.setTypeface(Typeface.MONOSPACE);
+            box.addView(rpc);
+        }
+        return box;
     }
 
     private View agentConnectionsCard() {
@@ -482,29 +684,58 @@ public class MainActivity extends FragmentActivity {
         LinearLayout card = card();
         card.addView(pill("Local only", GREEN, GREEN_SOFT, Color.TRANSPARENT));
         addGap(card, 12);
-        card.addView(text("Set Up Wallet", 30, INK, true));
+        card.addView(text("No wallet loaded", 30, INK, true));
         addGap(card, 6);
-        card.addView(text("Create, load, or restore a wallet before receiving and signing payments.", 15, MUTED, false));
+        card.addView(text("Home shows balances and assets after a wallet is loaded. Create, import, or recover a wallet from Settings > Security.", 15, MUTED, false));
         addGap(card, 16);
         LinearLayout r1 = row();
-        r1.addView(primaryButton("Generate", this::generateWallet), weight());
-        r1.addView(outlineButton("Load", this::loadWallet), weightLeft());
+        r1.addView(primaryButton("Open Settings", () -> switchTab(TAB_SETTINGS)), weight());
+        r1.addView(outlineButton("Load saved wallet", this::loadWallet), weightLeft());
         card.addView(r1);
-        addGap(card, 12);
-        card.addView(outlineButton("Restore Wallet", this::restoreSheet), new LinearLayout.LayoutParams(-1, dp(48)));
         addGap(card, 14);
-        card.addView(warning("Your receive addresses appear here after a wallet is loaded."));
+        card.addView(warning("Wallet setup and backup controls live only under Settings > Security."));
         return card;
+    }
+
+    private void securityOverviewSheet() {
+        LinearLayout body = sheetBase("Security");
+        body.addView(text("Settings > Security is the only place for wallet creation, recovery phrase backup, and import/recovery flows.", 13, MUTED, false));
+        addGap(body, 10);
+        body.addView(field("Mnemonic entry surface", WalletSecurityNavigationPolicy.SURFACE_SETTINGS_SECURITY, false));
+        body.addView(field("Backup status", SecureWalletStore.isBackupVerified(this) ? "Verified" : "Required before signing", false));
+        body.addView(field("Signing gate", "Wallet loaded + backup verified + payment checks passed", false));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(primaryButton("Recovery backup", this::backupWalletSheet), weight());
+        actions.addView(outlineButton("Import or recover", this::restoreSheet), weightLeft());
+        showSheetWithActions(body, actions);
+    }
+
+    private void deviceRiskSheet() {
+        LinearLayout body = sheetBase("Device risk controls");
+        body.addView(warning("Cloud backup, MPC/social recovery, and private-key-only import are not enabled in this mobile build."));
+        addGap(body, 10);
+        body.addView(field("Secret storage", "Android Keystore encrypted local wallet", false));
+        body.addView(field("Sensitive screens", "Copy and screenshots are disabled while secrets are visible", false));
+        body.addView(field("Signing", "Requires local wallet, verified backup, and user approval", false));
+        showSheetWithActions(body, primaryButton("Done", this::closeActiveSheet));
+    }
+
+    private void openSecuritySettingsFromSheet() {
+        closeActiveSheet();
+        switchTab(TAB_SETTINGS);
     }
 
     private void generateWallet() {
         try {
+            boolean stayInSettings = TAB_SETTINGS.equals(activeTab);
             wallet = HDWallet.create();
-            SecureWalletStore.save(this, wallet.serialize());
-            renderPublicWallet();
+            SecureWalletStore.save(this, wallet.serialize(), false);
+            renderWalletLoaded(stayInSettings);
             updateStatus();
             refreshBalances();
-            toast("HD wallet generated and encrypted locally");
+            toast("24-word wallet generated and encrypted locally");
+            backupWalletSheet();
         } catch (Exception e) {
             error("Generate failed", e);
         }
@@ -518,7 +749,7 @@ public class MainActivity extends FragmentActivity {
                 return;
             }
             wallet = HDWallet.parse(saved);
-            renderPublicWallet();
+            renderWalletLoaded(TAB_SETTINGS.equals(activeTab));
             updateStatus();
             refreshBalances();
             toast("Wallet loaded");
@@ -528,25 +759,59 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void restoreSheet() {
-        LinearLayout body = sheetBase("Restore Wallet");
-        EditText input = input("Enter BIP39 mnemonic");
+        LinearLayout body = sheetBase("Import Recovery Phrase");
+        body.addView(text("Import a BIP-39 English recovery phrase from an offline backup. Supported lengths: 12, 15, 18, 21, or 24 words.", 13, MUTED, false));
+        addGap(body, 10);
+        body.addView(warning("Cloud backup, MPC/social recovery, and private-key-only import are not enabled for this mobile build."));
+        addGap(body, 10);
+        EditText input = input("Enter recovery phrase");
         input.setMinLines(3);
         input.setSingleLine(false);
         body.addView(input);
-        addGap(body, 12);
-        body.addView(primaryButton("Restore", () -> {
+        CheckBox backedUp = checkbox("I already have this recovery phrase backed up offline.", false);
+        body.addView(backedUp);
+        Button previewButton = primaryButton("Preview Addresses", () -> {
             try {
-                wallet = HDWallet.restore(input.getText().toString());
-                SecureWalletStore.save(this, wallet.serialize());
-                renderPublicWallet();
-                updateStatus();
-                refreshBalances();
-                toast("Wallet restored");
+                HDWallet preview = HDWallet.restore(input.getText().toString());
+                restorePreviewSheet(preview, backedUp.isChecked());
             } catch (Exception e) {
                 error("Restore failed", e);
             }
-        }));
-        showSheet(body);
+        });
+        showSheetWithActions(body, previewButton);
+    }
+
+    private void restorePreviewSheet(HDWallet preview, boolean backupConfirmed) {
+        LinearLayout body = sheetBase("Address Preview");
+        body.addView(text("Confirm these derived addresses before importing the recovery phrase onto this device.", 13, MUTED, false));
+        addGap(body, 10);
+        body.addView(field("Mnemonic type", "BIP39 English - " + preview.wordCount() + " words", false));
+        body.addView(field("EVM path", preview.evm.path, false));
+        body.addView(field("EVM address", preview.evm.address, true));
+        body.addView(field("Solana path", preview.solana.path, false));
+        body.addView(field("Solana address", preview.solana.address, true));
+        body.addView(field("Stellar path", preview.stellar.path, false));
+        body.addView(field("Stellar address", preview.stellar.address, true));
+        addGap(body, 12);
+        body.addView(warning(backupConfirmed
+                ? "This device will treat the recovery phrase as already backed up."
+                : "Backup verification will be required before signing or exporting secrets."));
+        Button importButton = primaryButton("Import to this Device", () -> {
+            try {
+                boolean stayInSettings = TAB_SETTINGS.equals(activeTab);
+                wallet = preview;
+                SecureWalletStore.save(this, wallet.serialize(), backupConfirmed);
+                renderWalletLoaded(stayInSettings);
+                updateStatus();
+                refreshBalances();
+                closeActiveSheet();
+                toast(backupConfirmed ? "Wallet imported" : "Wallet imported - backup required");
+                if (!backupConfirmed) backupWalletSheet();
+            } catch (Exception e) {
+                error("Import failed", e);
+            }
+        });
+        showSheetWithActions(body, importButton);
     }
 
     private void clearWallet() {
@@ -568,11 +833,22 @@ public class MainActivity extends FragmentActivity {
         updateTabButtons();
     }
 
+    private void renderWalletLoaded(boolean stayInSettings) {
+        if (stayInSettings) {
+            activeTab = TAB_SETTINGS;
+            renderActiveTab();
+            updateTabButtons();
+            return;
+        }
+        renderPublicWallet();
+    }
+
     private View publicCard() {
         LinearLayout card = card();
         card.addView(text("Derived accounts", 19, INK, true));
         addGap(card, 10);
-        card.addView(field("Mnemonic type", "BIP39 English - 12 words", false));
+        card.addView(field("Mnemonic type", "BIP39 English - " + wallet.wordCount() + " words", false));
+        card.addView(field("Backup status", SecureWalletStore.isBackupVerified(this) ? "Verified" : "Required before signing", false));
         card.addView(field("EVM path", wallet.evm.path, false));
         card.addView(field("EVM address", wallet.evm.address, true));
         card.addView(field("EVM networks", "Ethereum, Base, Polygon, and EVM-compatible chains", false));
@@ -586,16 +862,45 @@ public class MainActivity extends FragmentActivity {
     private View portfolioCard() {
         JSONObject balances = BalanceStore.cached(this);
         LinearLayout card = card();
-        card.setPadding(dp(20), dp(20), dp(20), dp(20));
-        card.setBackground(round(GREEN_DARK, dp(24), GREEN_DARK, 0));
-        card.addView(pill("Encrypted on this device", GREEN_DARK, GREEN_SOFT, Color.TRANSPARENT));
+        card.setPadding(dp(24), dp(24), dp(24), dp(24));
+        card.setBackground(round(GREEN, dp(24), GREEN, 0));
+        JSONObject usdc = BalanceStore.asset(balances, "base_usdc");
+        String usdcBalance = usdc.optString("balance", "0.00");
+        String statusValue = usdc.optString("status", "idle");
+        if ("error".equals(statusValue)) usdcBalance = "--";
+        if (usdcBalance == null || usdcBalance.trim().length() == 0 || "Not refreshed".equals(usdcBalance)) usdcBalance = "0.00";
+        card.addView(text("TOTAL BALANCE", 18, Color.rgb(214, 233, 219), true));
+        addGap(card, 18);
+        LinearLayout amount = row();
+        amount.setGravity(Gravity.BOTTOM);
+        amount.addView(text(usdcBalance, 54, Color.WHITE, true));
+        TextView token = text("USDC", 22, Color.WHITE, true);
+        LinearLayout.LayoutParams tokenLp = new LinearLayout.LayoutParams(-2, -2);
+        tokenLp.leftMargin = dp(8);
+        tokenLp.bottomMargin = dp(10);
+        amount.addView(token, tokenLp);
+        card.addView(amount);
         addGap(card, 14);
-        card.addView(text("Wallet Accounts", 30, Color.WHITE, true));
-        addGap(card, 6);
-        card.addView(text("Balances refresh from public endpoints. Tap an asset row to view its receive QR and address details.", 14, GREEN_SOFT, false));
-        addGap(card, 12);
-        card.addView(text("Last refresh: " + BalanceStore.updatedAt(balances), 12, Color.rgb(196, 221, 202), false));
-        addGap(card, 14);
+        card.addView(text("≈ $" + usdcBalance, 24, Color.rgb(214, 233, 219), false));
+        addGap(card, 34);
+        LinearLayout actions = row();
+        actions.addView(button("✈  Send", INK, SURFACE, Color.TRANSPARENT, this::sendAssetPickerSheet), weight());
+        actions.addView(button("↓  Receive", INK, SURFACE, Color.TRANSPARENT, this::receiveAssetPickerSheet), weightLeft());
+        card.addView(actions);
+        return card;
+    }
+
+    private View cryptoAssetsCard() {
+        JSONObject balances = BalanceStore.cached(this);
+        LinearLayout card = card();
+        card.setPadding(dp(22), dp(22), dp(22), dp(22));
+        card.setBackground(round(Color.rgb(238, 245, 239), dp(28), LINE, 1));
+        LinearLayout head = row();
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        head.addView(text("Crypto assets", 32, INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        head.addView(circleTextButton(balanceRefreshInFlight ? "..." : "+", this::refreshBalances), new LinearLayout.LayoutParams(dp(58), dp(58)));
+        card.addView(head);
+        addGap(card, 22);
         card.addView(assetBalanceRow("XLM", "Stellar", "xlm", wallet.stellar.address, balances));
         addGap(card, 10);
         card.addView(assetBalanceRow("SOL", "Solana", "sol", wallet.solana.address, balances));
@@ -607,8 +912,8 @@ public class MainActivity extends FragmentActivity {
         card.addView(assetBalanceRow("MATIC", "Polygon", "polygon_matic", wallet.evm.address, balances));
         addGap(card, 10);
         card.addView(assetBalanceRow("USDC", "Base", "base_usdc", wallet.evm.address, balances));
-        addGap(card, 16);
-        card.addView(goldButton(balanceRefreshInFlight ? "Refreshing..." : "Refresh Balances", this::refreshBalances), new LinearLayout.LayoutParams(-1, dp(50)));
+        addGap(card, 12);
+        card.addView(text("Last refresh: " + BalanceStore.updatedAt(balances), 12, MUTED, false));
         return card;
     }
 
@@ -622,22 +927,22 @@ public class MainActivity extends FragmentActivity {
                 : ("inactive".equals(status) ? "Inactive account" : balance + " " + symbol);
 
         LinearLayout box = vertical();
-        box.setPadding(dp(12), dp(12), dp(12), dp(12));
-        box.setBackground(round(SURFACE, dp(18), Color.TRANSPARENT, 0));
+        box.setPadding(dp(18), dp(18), dp(18), dp(18));
+        box.setBackground(round(SURFACE, dp(28), Color.TRANSPARENT, 0));
 
         LinearLayout top = row();
-        top.addView(tokenGlyph(symbol, key), new LinearLayout.LayoutParams(dp(42), dp(42)));
+        top.addView(tokenGlyph(symbol, key), new LinearLayout.LayoutParams(dp(64), dp(64)));
         LinearLayout names = vertical();
-        names.addView(text(symbol + " on " + network, 16, INK, true));
-        names.addView(text(shortAddress(address), 12, MUTED, false));
+        names.addView(text(symbol + " on " + network, 22, INK, true));
+        names.addView(text(shortAddress(address), 15, FADED, false));
         LinearLayout.LayoutParams namesLp = new LinearLayout.LayoutParams(0, -2, 1);
-        namesLp.leftMargin = dp(12);
+        namesLp.leftMargin = dp(16);
         top.addView(names, namesLp);
 
         LinearLayout amount = vertical();
         amount.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
-        amount.addView(text(line, 14, statusColor(status), true));
-        amount.addView(text("Details", 11, FADED, true));
+        amount.addView(text(line, 16, statusColor(status), true));
+        amount.addView(text("Details", 15, FADED, true));
         top.addView(amount);
         box.addView(top);
         if ("inactive".equals(status)) {
@@ -648,7 +953,7 @@ public class MainActivity extends FragmentActivity {
             addGap(box, 8);
             box.addView(text(error, 12, RED, false));
         }
-        box.setOnClickListener(v -> assetReceiveDetailSheet(symbol, network, key, address, line));
+        box.setOnClickListener(v -> assetActionsSheet(symbol, network, key, address, line));
         return box;
     }
 
@@ -663,9 +968,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(field("Current balance", balanceLine, false));
         body.addView(field("Receive address", address, true));
         body.addView(warning(receiveWarning(symbol, network)));
-        addGap(body, 12);
-        body.addView(primaryButton("Copy Address", () -> copy(symbol + " address", address)), new LinearLayout.LayoutParams(-1, dp(48)));
-        showSheet(body);
+        showSheetWithActions(body, primaryButton("Copy Address", () -> copy(symbol + " address", address)));
     }
 
     private String receiveWarning(String symbol, String network) {
@@ -742,19 +1045,15 @@ public class MainActivity extends FragmentActivity {
     private void receiveAddressesSheet() {
         if (!requireWallet()) return;
         LinearLayout body = sheetBase("Receive");
-        body.addView(text("Deposit only on the matching network. Sending assets to the wrong address type can permanently lose funds.", 13, MUTED, false));
+        body.addView(pill("Ethereum", CHAIN_ETH, SOFT, Color.TRANSPARENT));
         addGap(body, 10);
-        body.addView(field("Ethereum address", wallet.evm.address, true));
-        body.addView(field("Base address", wallet.evm.address, true));
-        body.addView(field("Polygon address", wallet.evm.address, true));
-        body.addView(warning("Ethereum, Base, and Polygon use the same EVM address format, but assets must be sent on the intended network."));
-        body.addView(field("Solana address", wallet.solana.address, true));
-        body.addView(warning("Use Solana only for SOL and SPL tokens."));
-        body.addView(field("Stellar address", wallet.stellar.address, true));
-        body.addView(warning("Stellar requires the account to be activated with XLM before it can receive normal payments."));
-        addGap(body, 12);
-        body.addView(primaryButton("Done", this::closeActiveSheet));
-        showSheet(body);
+        body.addView(qrImage(wallet.evm.address));
+        addGap(body, 14);
+        body.addView(field("Asset", "ETH", false));
+        body.addView(field("Network", "Ethereum", false));
+        body.addView(field("Receive address", wallet.evm.address, true));
+        body.addView(warning("Use this address only for ETH on Ethereum. Wrong-network deposits can permanently lose funds."));
+        showSheetWithActions(body, primaryButton("Copy Address", () -> copy("ETH address", wallet.evm.address)));
     }
 
     private View transferLauncherCard() {
@@ -777,52 +1076,418 @@ public class MainActivity extends FragmentActivity {
         return card;
     }
 
+    private void sendEntrySheet() {
+        if (!requireWallet()) return;
+        LinearLayout body = sheetBase("Send");
+        body.addView(primaryButton("Scan payment QR", () -> {
+            closeActiveSheet();
+            openScanner();
+        }), new LinearLayout.LayoutParams(-1, dp(50)));
+        addGap(body, 12);
+        body.addView(outlineButton("Manual EVM Native Asset", this::evmTransferSheet), new LinearLayout.LayoutParams(-1, dp(48)));
+        addGap(body, 10);
+        body.addView(outlineButton("Manual ERC-20 Token", this::evmTokenTransferSheet), new LinearLayout.LayoutParams(-1, dp(48)));
+        addGap(body, 10);
+        body.addView(outlineButton("Manual SOL", this::solanaTransferSheet), new LinearLayout.LayoutParams(-1, dp(48)));
+        addGap(body, 10);
+        body.addView(outlineButton("Manual XLM", this::stellarTransferSheet), new LinearLayout.LayoutParams(-1, dp(48)));
+        showSheet(body);
+    }
+
+    // ===== Prototype-faithful per-asset Send flow (real mainnet broadcast) =====
+    // Endpoints and the Base USDC contract mirror BalanceFetcher so balances and
+    // sends always target the same mainnet networks.
+    private static final String SEND_ETHEREUM_RPC = "https://ethereum-rpc.publicnode.com";
+    private static final String SEND_BASE_RPC = "https://mainnet.base.org";
+    private static final String SEND_POLYGON_RPC = "https://polygon-bor-rpc.publicnode.com";
+    private static final String SEND_SOLANA_RPC = "https://api.mainnet-beta.solana.com";
+    private static final String SEND_STELLAR_HORIZON = "https://horizon.stellar.org";
+    private static final String SEND_BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+    private static final String TRON_ADDRESS_REGEX = "^T[1-9A-HJ-NP-Za-km-z]{25,40}$";
+
+    private static final class SendAsset {
+        final String key;            // BalanceStore key
+        final String symbol;
+        final String network;        // display chain
+        final String family;         // evm | solana | stellar
+        final String feeText;
+        final String addressRegex;   // recipient validation
+        final long chainId;          // evm only
+        final String tokenContract;  // erc20 token (USDC) else ""
+        final int decimals;          // erc20 decimals
+
+        SendAsset(String key, String symbol, String network, String family, String feeText,
+                  String addressRegex, long chainId, String tokenContract, int decimals) {
+            this.key = key;
+            this.symbol = symbol;
+            this.network = network;
+            this.family = family;
+            this.feeText = feeText;
+            this.addressRegex = addressRegex;
+            this.chainId = chainId;
+            this.tokenContract = tokenContract;
+            this.decimals = decimals;
+        }
+    }
+
+    private List<SendAsset> sendableAssets() {
+        List<SendAsset> out = new ArrayList<>();
+        out.add(new SendAsset("xlm", "XLM", "Stellar", "stellar", "~0.00001 XLM", "^G[A-Z2-7]{55}$", 0L, "", 7));
+        out.add(new SendAsset("sol", "SOL", "Solana", "solana", "~0.000005 SOL", "^[1-9A-HJ-NP-Za-km-z]{32,44}$", 0L, "", 9));
+        out.add(new SendAsset("eth", "ETH", "Ethereum", "evm", "Network gas in ETH", "^0x[0-9a-fA-F]{40}$", 1L, "", 18));
+        out.add(new SendAsset("base_eth", "ETH", "Base", "evm", "Network gas in ETH", "^0x[0-9a-fA-F]{40}$", 8453L, "", 18));
+        out.add(new SendAsset("polygon_matic", "MATIC", "Polygon", "evm", "Network gas in MATIC", "^0x[0-9a-fA-F]{40}$", 137L, "", 18));
+        out.add(new SendAsset("base_usdc", "USDC", "Base", "evm", "Network gas in ETH", "^0x[0-9a-fA-F]{40}$", 8453L, SEND_BASE_USDC, 6));
+        return out;
+    }
+
+    private SendAsset findSendAsset(String key) {
+        if (key == null) return null;
+        for (SendAsset asset : sendableAssets()) {
+            if (asset.key.equals(key)) return asset;
+        }
+        return null;
+    }
+
+    private String sendAssetAddress(SendAsset asset) {
+        if ("stellar".equals(asset.family)) return wallet.stellar.address;
+        if ("solana".equals(asset.family)) return wallet.solana.address;
+        return wallet.evm.address;
+    }
+
+    private String sendAssetBalance(SendAsset asset) {
+        JSONObject balances = BalanceStore.cached(this);
+        JSONObject entry = BalanceStore.asset(balances, asset.key);
+        String balance = entry.optString("balance", "");
+        String status = entry.optString("status", "");
+        if (balance == null) return "";
+        balance = balance.trim();
+        if (balance.length() == 0 || "--".equals(balance) || "Not refreshed".equals(balance)) return "";
+        if ("error".equals(status) || "inactive".equals(status)) return "";
+        return balance;
+    }
+
+    private void sendAssetPickerSheet() {
+        if (!requireWallet()) return;
+        LinearLayout body = sheetBase("Send");
+        body.addView(text("Choose an asset to send. Network, address derivation, and fee are filled in automatically.", 13, MUTED, false));
+        addGap(body, 12);
+        for (SendAsset asset : sendableAssets()) {
+            body.addView(sendAssetRow(asset));
+            addGap(body, 10);
+        }
+        addGap(body, 4);
+        body.addView(outlineButton("Advanced / other chains", () -> {
+            closeActiveSheet();
+            sendEntrySheet();
+        }), new LinearLayout.LayoutParams(-1, dp(46)));
+        showSheet(body);
+    }
+
+    private View sendAssetRow(SendAsset asset) {
+        LinearLayout box = row();
+        box.setGravity(Gravity.CENTER_VERTICAL);
+        box.setPadding(dp(16), dp(16), dp(16), dp(16));
+        box.setBackground(round(SOFT, dp(18), LINE, 1));
+        box.addView(tokenGlyph(asset.symbol, asset.key), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        LinearLayout names = vertical();
+        names.addView(text(asset.symbol + " on " + asset.network, 17, INK, true));
+        String balance = sendAssetBalance(asset);
+        names.addView(text(balance.length() > 0 ? ("Balance " + balance + " " + asset.symbol) : "Tap to send", 13, MUTED, false));
+        LinearLayout.LayoutParams namesLp = new LinearLayout.LayoutParams(0, -2, 1);
+        namesLp.leftMargin = dp(14);
+        box.addView(names, namesLp);
+        box.setOnClickListener(v -> sendDraftSheet(asset));
+        return box;
+    }
+
+    private void sendDraftSheet(SendAsset asset) {
+        sendDraftSheet(asset, "", "");
+    }
+
+    private void sendDraftSheet(SendAsset asset, String prefillTo, String prefillAmount) {
+        if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
+        LinearLayout body = sheetBase("Send " + asset.symbol);
+        body.addView(pill(asset.symbol + " on " + asset.network, chainColor(asset.key), SOFT, Color.TRANSPARENT));
+        addGap(body, 12);
+        String balance = sendAssetBalance(asset);
+        body.addView(field("From", shortAddress(sendAssetAddress(asset)), false));
+        body.addView(field("Available", balance.length() > 0 ? (balance + " " + asset.symbol) : "Refresh balances to see available", false));
+        body.addView(field("Network fee", asset.feeText, false));
+        addGap(body, 8);
+        EditText to = input("Recipient " + asset.symbol + " address on " + asset.network);
+        setIfPresent(to, prefillTo);
+        body.addView(to);
+        EditText amount = input("Amount in " + asset.symbol + ", e.g. 0.01");
+        setIfPresent(amount, prefillAmount);
+        body.addView(amount);
+        body.addView(warning("Send only on " + asset.network + ". Wrong-network or TRON / TRX / TRC20 transfers are not supported and can permanently lose funds."));
+        Button review = primaryButton("Review transfer", () -> {
+            String toValue = to.getText().toString().trim();
+            String amountValue = amount.getText().toString().trim();
+            String issue = validateSend(asset, toValue, amountValue, balance);
+            if (issue.length() > 0) {
+                toast(issue);
+                return;
+            }
+            sendReviewSheet(asset, toValue, amountValue);
+        });
+        showSheetWithActions(body, review);
+    }
+
+    private String validateSend(SendAsset asset, String to, String amount, String balance) {
+        if (to.length() == 0) return "Enter a recipient address";
+        if (to.matches(TRON_ADDRESS_REGEX)) return "TRON / TRX / TRC20 is not supported by VelarumPay";
+        if (!to.matches(asset.addressRegex)) return "Recipient is not a valid " + asset.network + " address";
+        double parsed;
+        try {
+            parsed = Double.parseDouble(amount);
+        } catch (Exception e) {
+            return "Enter a valid amount";
+        }
+        if (!(parsed > 0)) return "Amount must be greater than zero";
+        if (balance.length() > 0) {
+            try {
+                if (parsed > Double.parseDouble(balance)) return "Amount exceeds your " + asset.symbol + " balance";
+            } catch (Exception ignored) {
+            }
+        }
+        return "";
+    }
+
+    private void sendReviewSheet(SendAsset asset, String to, String amount) {
+        LinearLayout body = sheetBase("Review transfer");
+        LinearLayout amountBox = vertical();
+        amountBox.setGravity(Gravity.CENTER_HORIZONTAL);
+        amountBox.addView(text("You will send", 13, MUTED, false));
+        amountBox.addView(text(amount + " " + asset.symbol, 34, INK, true));
+        body.addView(amountBox);
+        addGap(body, 14);
+        body.addView(field("Asset", asset.symbol + " on " + asset.network, false));
+        body.addView(field("Recipient", to, true));
+        body.addView(field("Network fee", asset.feeText, false));
+        body.addView(field("From", sendAssetAddress(asset), true));
+        if (asset.tokenContract.length() > 0) body.addView(field("Token contract", asset.tokenContract, true));
+        addGap(body, 8);
+        body.addView(warning("Signing happens locally on this device, then the signed transaction is broadcast to " + asset.network + " mainnet. This cannot be undone."));
+        Button sign = primaryButton("Sign & Broadcast", () -> authenticate(
+                "Send " + asset.symbol,
+                "Confirm local signing and mainnet broadcast.",
+                () -> executeSend(asset, to, amount)));
+        LinearLayout actions = vertical();
+        actions.addView(sign, new LinearLayout.LayoutParams(-1, dp(50)));
+        addGap(actions, 10);
+        actions.addView(outlineButton("Back to edit", () -> sendDraftSheet(asset, to, amount)), new LinearLayout.LayoutParams(-1, dp(46)));
+        showSheetWithActions(body, actions);
+    }
+
+    private void executeSend(SendAsset asset, String to, String amount) {
+        closeActiveSheet();
+        if ("stellar".equals(asset.family)) {
+            runAsync("Send XLM", asset.symbol, "stellar_public", amount, to, () -> StellarTransfer.sendXlm(
+                    SEND_STELLAR_HORIZON,
+                    false,
+                    wallet.stellar.privateSeed,
+                    wallet.stellar.publicKey,
+                    to,
+                    amount));
+            return;
+        }
+        if ("solana".equals(asset.family)) {
+            runAsync("Send SOL", asset.symbol, "Solana", amount, to, () -> SolanaTransfer.sendSol(
+                    SEND_SOLANA_RPC,
+                    wallet.solana.privateSeed,
+                    wallet.solana.publicKey,
+                    to,
+                    amount));
+            return;
+        }
+        final String rpc = asset.chainId == 8453L ? SEND_BASE_RPC
+                : asset.chainId == 137L ? SEND_POLYGON_RPC
+                : SEND_ETHEREUM_RPC;
+        if (asset.tokenContract.length() > 0) {
+            runAsync("Send " + asset.symbol, asset.symbol, asset.network, amount, to, () -> EvmTransfer.sendErc20(
+                    rpc,
+                    asset.chainId,
+                    wallet.evm.privateKey,
+                    asset.tokenContract,
+                    to,
+                    amount,
+                    asset.decimals));
+        } else {
+            runAsync("Send " + asset.symbol, asset.symbol, asset.network, amount, to, () -> EvmTransfer.sendNative(
+                    rpc,
+                    asset.chainId,
+                    wallet.evm.privateKey,
+                    to,
+                    amount));
+        }
+    }
+
+    private void receiveAssetPickerSheet() {
+        if (!requireWallet()) return;
+        LinearLayout body = sheetBase("Receive");
+        body.addView(text("Choose an asset to receive. Each network has its own address and QR code.", 13, MUTED, false));
+        addGap(body, 12);
+        for (SendAsset asset : sendableAssets()) {
+            final SendAsset current = asset;
+            final String address = sendAssetAddress(asset);
+            LinearLayout box = row();
+            box.setGravity(Gravity.CENTER_VERTICAL);
+            box.setPadding(dp(16), dp(16), dp(16), dp(16));
+            box.setBackground(round(SOFT, dp(18), LINE, 1));
+            box.addView(tokenGlyph(asset.symbol, asset.key), new LinearLayout.LayoutParams(dp(48), dp(48)));
+            LinearLayout names = vertical();
+            names.addView(text(asset.symbol + " on " + asset.network, 17, INK, true));
+            names.addView(text(shortAddress(address), 13, MUTED, false));
+            LinearLayout.LayoutParams namesLp = new LinearLayout.LayoutParams(0, -2, 1);
+            namesLp.leftMargin = dp(14);
+            box.addView(names, namesLp);
+            String balance = sendAssetBalance(asset);
+            String balanceLine = balance.length() > 0 ? (balance + " " + asset.symbol) : "Refresh balances to see amount";
+            box.setOnClickListener(v -> assetReceiveDetailSheet(current.symbol, current.network, current.key, address, balanceLine));
+            body.addView(box);
+            addGap(body, 10);
+        }
+        showSheet(body);
+    }
+
+    private void assetActionsSheet(String symbol, String network, String key, String address, String balanceLine) {
+        LinearLayout body = sheetBase(symbol + " on " + network);
+        if (balanceLine != null && balanceLine.length() > 0) body.addView(field("Balance", balanceLine, false));
+        body.addView(field("Address", address, true));
+        addGap(body, 12);
+        SendAsset sendAsset = findSendAsset(key);
+        LinearLayout actions = row();
+        if (sendAsset != null) {
+            final SendAsset current = sendAsset;
+            actions.addView(primaryButton("Send", () -> {
+                closeActiveSheet();
+                sendDraftSheet(current);
+            }), weight());
+            actions.addView(outlineButton("Receive", () -> {
+                closeActiveSheet();
+                assetReceiveDetailSheet(symbol, network, key, address, balanceLine);
+            }), weightLeft());
+        } else {
+            actions.addView(primaryButton("Receive", () -> {
+                closeActiveSheet();
+                assetReceiveDetailSheet(symbol, network, key, address, balanceLine);
+            }), weight());
+        }
+        showSheetWithActions(body, actions);
+    }
+
+    private SendAsset findSendAssetForScanned(ScannedPayment payment) {
+        if (payment == null || payment.to == null || payment.to.length() == 0) return null;
+        if (payment.isStellar()) {
+            return (payment.asset.length() == 0 || "XLM".equalsIgnoreCase(payment.asset)) ? findSendAsset("xlm") : null;
+        }
+        if (payment.isSolana()) {
+            return payment.tokenContract.length() == 0 ? findSendAsset("sol") : null;
+        }
+        if (payment.isEvm()) {
+            long cid = 0L;
+            try {
+                if (payment.chainId.length() > 0) cid = Long.parseLong(payment.chainId.trim());
+            } catch (Exception ignored) {
+            }
+            if (payment.tokenContract.length() > 0) {
+                if (cid == 8453L && payment.tokenContract.equalsIgnoreCase(SEND_BASE_USDC)) return findSendAsset("base_usdc");
+                return null;
+            }
+            if (cid == 8453L) return findSendAsset("base_eth");
+            if (cid == 137L) return findSendAsset("polygon_matic");
+            return findSendAsset("eth");
+        }
+        return null;
+    }
+
     private void backupWalletSheet() {
         if (!requireWallet()) return;
         LinearLayout body = sheetBase("Back Up Wallet");
-        body.addView(text("The recovery phrase restores the whole wallet. The individual private keys are advanced backups for specific chains.", 13, MUTED, false));
+        body.addView(text("The 24-word recovery phrase restores the whole multi-chain wallet on a new device.", 13, MUTED, false));
         addGap(body, 10);
-        body.addView(warning("Anyone with this backup can move your funds. Store it offline and never paste it into chat, email, cloud notes, or screenshots."));
+        body.addView(warning("Anyone with this recovery phrase can move your funds. Store it offline and never paste it into chat, email, cloud notes, or screenshots."));
         addGap(body, 10);
         CheckBox privatePlace = checkbox("I am in a private place and can write this backup offline.", false);
         CheckBox understand = checkbox("I understand that losing this backup can permanently lose the wallet.", false);
         body.addView(privatePlace);
         body.addView(understand);
-        addGap(body, 12);
-        body.addView(primaryButton("Show Backup", () -> {
+        Button showBackup = primaryButton("Show Backup", () -> {
             if (!privatePlace.isChecked() || !understand.isChecked()) {
                 toast("Confirm backup safety first");
                 return;
             }
             authenticate("Back up wallet", "Confirm before showing recovery secrets.", this::backupSecretsSheet);
-        }));
-        showSheet(body);
+        });
+        showSheetWithActions(body, showBackup);
+    }
+
+    private void backupGateSheet() {
+        if (!requireWallet()) return;
+        LinearLayout body = sheetBase("Backup required");
+        body.addView(text(WalletSecurityNavigationPolicy.backupGateCopy(), 13, MUTED, false));
+        addGap(body, 10);
+        body.addView(field("Required surface", "Settings > Security > Recovery phrase backup", false));
+        body.addView(field("Backup status", SecureWalletStore.isBackupVerified(this) ? "Verified" : "Required before signing", false));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(primaryButton("Back up now", this::backupWalletSheet), weight());
+        actions.addView(outlineButton("Open Settings", this::openSecuritySettingsFromSheet), weightLeft());
+        showSheetWithActions(body, actions);
     }
 
     private void backupSecretsSheet() {
-        LinearLayout body = sheetBase("Wallet Backup");
-        body.addView(warning("Write the recovery phrase offline. Do not share any value on this screen."));
-        body.addView(field("Recovery phrase", wallet.mnemonic, true));
-        body.addView(field("EVM private key", "0x" + Hex.bytesToHex(wallet.evm.privateKey), true));
-        body.addView(field("Solana private seed", Hex.bytesToHex(wallet.solana.privateSeed), true));
-        body.addView(field("Solana secret key base58", Base58.encode(Base58.concat(wallet.solana.privateSeed, wallet.solana.publicKey)), true));
-        body.addView(field("Stellar secret seed", StellarStrKey.encodeSeed(wallet.stellar.privateSeed), true));
+        enableSensitiveScreen();
+        LinearLayout body = sheetBase("Recovery Phrase");
+        body.addView(warning("Write these words offline in the exact order. Copy and screenshots are disabled for this screen."));
+        addGap(body, 10);
+        body.addView(mnemonicGrid(HDWallet.mnemonicWords(wallet.mnemonic)));
+        showSensitiveSheetWithActions(body, primaryButton("I Wrote It Down", this::backupChallengeSheet));
+    }
+
+    private void backupChallengeSheet() {
+        enableSensitiveScreen();
+        List<String> words = HDWallet.mnemonicWords(wallet.mnemonic);
+        int[] positions = challengePositions(words.size());
+        LinearLayout body = sheetBase("Verify Backup");
+        body.addView(text("Enter the requested words from your offline backup to confirm that the recovery phrase was recorded correctly.", 13, MUTED, false));
         addGap(body, 12);
-        body.addView(primaryButton("Done", this::closeActiveSheet));
-        showSheet(body);
+        List<EditText> answers = new ArrayList<>();
+        for (int position : positions) {
+            EditText answer = input("Word #" + (position + 1));
+            answers.add(answer);
+            body.addView(answer);
+        }
+        Button verify = primaryButton("Verify Backup", () -> {
+            for (int i = 0; i < positions.length; i++) {
+                String expected = words.get(positions[i]);
+                String actual = answers.get(i).getText().toString().trim().toLowerCase();
+                if (!expected.equals(actual)) {
+                    toast("Word #" + (positions[i] + 1) + " does not match");
+                    return;
+                }
+            }
+            SecureWalletStore.markBackupVerified(this);
+            disableSensitiveScreen();
+            closeActiveSheet();
+            updateStatus();
+            renderActiveTab();
+            toast("Recovery phrase backup verified");
+        });
+        showSensitiveSheetWithActions(body, verify);
     }
 
     private void renderSecrets() {
         content.removeAllViews();
-        content.addView(warning("Secrets are visible. Do not screenshot, paste into chat, or share this screen."));
+        content.addView(warning("Use Back Up Wallet to view and verify the recovery phrase. Private-key export is intentionally not part of the default backup flow."));
         addGap(content, 12);
         LinearLayout card = card();
-        card.addView(text("Revealed secrets", 19, INK, true));
-        card.addView(field("Mnemonic", wallet.mnemonic, true));
-        card.addView(field("EVM private key", "0x" + Hex.bytesToHex(wallet.evm.privateKey), true));
-        card.addView(field("Solana private seed", Hex.bytesToHex(wallet.solana.privateSeed), true));
-        card.addView(field("Solana secret key base58", Base58.encode(Base58.concat(wallet.solana.privateSeed, wallet.solana.publicKey)), true));
-        card.addView(field("Stellar secret seed", StellarStrKey.encodeSeed(wallet.stellar.privateSeed), true));
+        card.addView(text("Backup status", 19, INK, true));
+        card.addView(field("Recovery phrase", wallet.wordCount() + "-word BIP39 English", false));
+        card.addView(field("Verification", SecureWalletStore.isBackupVerified(this) ? "Verified" : "Required before signing", false));
         content.addView(card);
         addGap(content, 12);
         content.addView(receiveAddressesCard());
@@ -838,6 +1503,7 @@ public class MainActivity extends FragmentActivity {
 
     private void evmTransferSheet(String rpcValue, String chainValue, String toValue, String amountValue) {
         if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send EVM Native Asset");
         EditText rpc = input("RPC URL, e.g. https://sepolia.infura.io/v3/...");
         EditText chain = input("Chain ID, e.g. 11155111, 8453, 137");
@@ -852,7 +1518,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(to);
         body.addView(amount);
         body.addView(warning("This sends native ETH/MATIC/etc. Use testnet first."));
-        body.addView(primaryButton("Sign and Broadcast", () -> authenticate("Send EVM transaction", "Confirm local signing and broadcast.", () -> {
+        Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send EVM transaction", "Confirm local signing and broadcast.", () -> {
             runAsync("EVM transfer", "Native", "EVM " + chain.getText().toString().trim(), amount.getText().toString().trim(), to.getText().toString().trim(), () -> EvmTransfer.sendNative(
                     rpc.getText().toString().trim(),
                     Long.parseLong(chain.getText().toString().trim()),
@@ -860,8 +1526,8 @@ public class MainActivity extends FragmentActivity {
                     to.getText().toString().trim(),
                     amount.getText().toString().trim()
             ));
-        })));
-        showSheet(body);
+        }));
+        showSheetWithActions(body, sign);
     }
 
     private void evmTokenTransferSheet() {
@@ -870,6 +1536,7 @@ public class MainActivity extends FragmentActivity {
 
     private void evmTokenTransferSheet(String rpcValue, String chainValue, String tokenValue, String toValue, String amountValue, String decimalsValue) {
         if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send ERC-20 Token");
         EditText rpc = input("RPC URL, e.g. https://sepolia.infura.io/v3/...");
         EditText chain = input("Chain ID, e.g. 11155111, 8453, 137");
@@ -890,7 +1557,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(amount);
         body.addView(decimals);
         body.addView(warning("This signs transfer(address,uint256). Verify the token contract and decimals before broadcasting."));
-        body.addView(primaryButton("Sign and Broadcast", () -> authenticate("Send ERC-20 token", "Confirm local token signing and broadcast.", () -> {
+        Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send ERC-20 token", "Confirm local token signing and broadcast.", () -> {
             runAsync("ERC-20 transfer", "Token", "EVM " + chain.getText().toString().trim(), amount.getText().toString().trim(), to.getText().toString().trim(), () -> EvmTransfer.sendErc20(
                     rpc.getText().toString().trim(),
                     Long.parseLong(chain.getText().toString().trim()),
@@ -900,8 +1567,8 @@ public class MainActivity extends FragmentActivity {
                     amount.getText().toString().trim(),
                     Integer.parseInt(decimals.getText().toString().trim())
             ));
-        })));
-        showSheet(body);
+        }));
+        showSheetWithActions(body, sign);
     }
 
     private void solanaTransferSheet() {
@@ -910,6 +1577,7 @@ public class MainActivity extends FragmentActivity {
 
     private void solanaTransferSheet(String rpcValue, String toValue, String amountValue) {
         if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send SOL");
         EditText rpc = input("RPC URL, e.g. https://api.devnet.solana.com");
         EditText to = input("Recipient Solana address");
@@ -921,7 +1589,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(to);
         body.addView(amount);
         body.addView(warning("This signs a System Program SOL transfer and broadcasts it."));
-        body.addView(primaryButton("Sign and Broadcast", () -> authenticate("Send SOL", "Confirm local signing and broadcast.", () -> {
+        Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send SOL", "Confirm local signing and broadcast.", () -> {
             runAsync("Solana transfer", "SOL", "Solana", amount.getText().toString().trim(), to.getText().toString().trim(), () -> SolanaTransfer.sendSol(
                     rpc.getText().toString().trim(),
                     wallet.solana.privateSeed,
@@ -929,8 +1597,8 @@ public class MainActivity extends FragmentActivity {
                     to.getText().toString().trim(),
                     amount.getText().toString().trim()
             ));
-        })));
-        showSheet(body);
+        }));
+        showSheetWithActions(body, sign);
     }
 
     private void splTokenTransferSheet() {
@@ -939,6 +1607,7 @@ public class MainActivity extends FragmentActivity {
 
     private void splTokenTransferSheet(String rpcValue, String mintValue, String toValue, String amountValue, String decimalsValue) {
         if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send SPL Token");
         EditText rpc = input("RPC URL, e.g. https://api.devnet.solana.com");
         EditText mint = input("SPL token mint address");
@@ -958,7 +1627,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(decimals);
         body.addView(createAta);
         body.addView(warning("This uses the classic SPL Token Program and signs a TransferChecked instruction."));
-        body.addView(primaryButton("Sign and Broadcast", () -> authenticate("Send SPL token", "Confirm local token signing and broadcast.", () -> {
+        Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send SPL token", "Confirm local token signing and broadcast.", () -> {
             runAsync("SPL token transfer", "SPL", "Solana", amount.getText().toString().trim(), to.getText().toString().trim(), () -> SolanaTransfer.sendSplToken(
                     rpc.getText().toString().trim(),
                     wallet.solana.privateSeed,
@@ -969,8 +1638,8 @@ public class MainActivity extends FragmentActivity {
                     Integer.parseInt(decimals.getText().toString().trim()),
                     createAta.isChecked()
             ));
-        })));
-        showSheet(body);
+        }));
+        showSheetWithActions(body, sign);
     }
 
     private void stellarTransferSheet() {
@@ -979,6 +1648,7 @@ public class MainActivity extends FragmentActivity {
 
     private void stellarTransferSheet(String horizonValue, String networkValue, String toValue, String amountValue) {
         if (!requireWallet()) return;
+        if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send XLM");
         EditText horizon = input("Horizon URL, e.g. https://horizon-testnet.stellar.org");
         EditText network = input("Network: testnet or public");
@@ -993,7 +1663,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(to);
         body.addView(amount);
         body.addView(warning("The app checks the recipient before broadcasting. If the recipient is not activated, eligible XLM sends use Stellar Create Account."));
-        body.addView(primaryButton("Sign and Broadcast", () -> authenticate("Send XLM", "Confirm local signing and Horizon submission.", () -> {
+        Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send XLM", "Confirm local signing and Horizon submission.", () -> {
             runAsync("Stellar transfer", "XLM", network.getText().toString().trim().toLowerCase().contains("test") ? "stellar_testnet" : "stellar_public", amount.getText().toString().trim(), to.getText().toString().trim(), () -> StellarTransfer.sendXlm(
                     horizon.getText().toString().trim(),
                     network.getText().toString().trim().toLowerCase().contains("test"),
@@ -1002,8 +1672,8 @@ public class MainActivity extends FragmentActivity {
                     to.getText().toString().trim(),
                     amount.getText().toString().trim()
             ));
-        })));
-        showSheet(body);
+        }));
+        showSheetWithActions(body, sign);
     }
 
     private void relaySettingsSheet() {
@@ -1014,10 +1684,10 @@ public class MainActivity extends FragmentActivity {
         body.addView(field("App device token", PaymentInboxStore.deviceToken(this), true));
         body.addView(relay);
         body.addView(warning("Use the HTTPS tunnel URL for a real phone. Android emulator can use http://10.0.2.2:8787."));
-        body.addView(primaryButton("Save and Register", () -> {
+        Button save = primaryButton("Save and Register", () -> {
             saveRelayUrlAndRegister(relay.getText().toString().trim());
-        }));
-        showSheet(body);
+        });
+        showSheetWithActions(body, save);
     }
 
     private void connectAgentSheet() {
@@ -1025,21 +1695,20 @@ public class MainActivity extends FragmentActivity {
         EditText input = input("Pairing short code or velarumpay://pair URI");
         body.addView(input);
         body.addView(warning("Review the agent identity and requested scopes before approval. Pairing is not payment approval and never grants signing permission."));
-        addGap(body, 12);
-        body.addView(primaryButton("Review Pairing", () -> {
+        LinearLayout actions = row();
+        actions.addView(primaryButton("Review Pairing", () -> {
             PairingLink link = parsePairingLink(input.getText().toString());
             if (link == null) {
                 error("Pairing failed", new IllegalArgumentException("Enter a 6-digit short code or velarumpay://pair URI."));
                 return;
             }
             loadPairingSession(link);
-        }), new LinearLayout.LayoutParams(-1, dp(48)));
-        addGap(body, 10);
-        body.addView(outlineButton("Scan QR", () -> {
+        }), weight());
+        actions.addView(outlineButton("Scan QR", () -> {
             closeActiveSheet();
             openScanner();
-        }), new LinearLayout.LayoutParams(-1, dp(48)));
-        showSheet(body);
+        }), weightLeft());
+        showSheetWithActions(body, actions);
     }
 
     private void handleAppIntent(Intent intent) {
@@ -1095,7 +1764,7 @@ public class MainActivity extends FragmentActivity {
         if (!"relay".equalsIgnoreCase(host)
                 && !"configure-relay".equalsIgnoreCase(host)
                 && !"setup".equalsIgnoreCase(host)) return false;
-        String relayUrl = data.getQueryParameter("url");
+        String relayUrl = firstNonEmpty(data.getQueryParameter("url"), data.getQueryParameter("relay_url"));
         if (relayUrl == null || relayUrl.trim().length() == 0) {
             error("Relay setup link failed", new IllegalArgumentException("Missing url parameter"));
             return true;
@@ -1106,24 +1775,9 @@ public class MainActivity extends FragmentActivity {
             return true;
         }
         String finalRelayUrl = relayUrl;
-        if ("setup".equalsIgnoreCase(host)) {
-            String bot = data.getQueryParameter("bot");
-            String label = data.getQueryParameter("label");
-            if (bot == null || bot.trim().length() == 0) bot = "Macmini1boybot";
-            if (label == null || label.trim().length() == 0) label = "AgentFood Demo";
-            String finalBot = bot.trim().replaceFirst("^@", "");
-            String finalLabel = label.trim();
-            new AlertDialog.Builder(this)
-                    .setTitle("Start AgentFood Demo")
-                    .setMessage("This will create or load a wallet, connect Relay, and create a Telegram demo session.")
-                    .setNegativeButton("Cancel", null)
-                    .setPositiveButton("Start Demo", (dialog, which) -> startDemoSetup(finalRelayUrl, finalBot, finalLabel))
-                    .show();
-            return true;
-        }
         new AlertDialog.Builder(this)
                 .setTitle("Configure Relay URL")
-                .setMessage("Set AgentWallet Relay URL to:\n\n" + finalRelayUrl)
+                .setMessage("Set VelarumPay Relay URL to:\n\n" + finalRelayUrl)
                 .setNegativeButton("Cancel", null)
                 .setPositiveButton("Save and Register", (dialog, which) -> saveRelayUrlAndRegister(finalRelayUrl))
                 .show();
@@ -1147,10 +1801,19 @@ public class MainActivity extends FragmentActivity {
             loadPairingSession(pairingLink);
             return;
         }
-        if (isVelarumSetupUrl(uri)) {
-            String query = uri.getEncodedQuery();
-            Uri deep = Uri.parse("agentwallet://setup" + (query == null || query.length() == 0 ? "" : "?" + query));
-            handleRelayConfigUri(deep);
+        String unsupportedTransfer = TransferAssetRegistry.unsupportedReason("", raw, "", raw);
+        if (unsupportedTransfer.length() > 0) {
+            blockedScannedTransferSheet(raw, unsupportedTransfer);
+            return;
+        }
+        try {
+            PaymentIntent scannedIntent = ScannedPaymentRequestParser.parseIntent(raw);
+            if (scannedIntent != null) {
+                openScannedPaymentIntent(scannedIntent);
+                return;
+            }
+        } catch (Exception e) {
+            error("Scanned payment failed", e);
             return;
         }
         ScannedPayment payment = parseScannedPayment(raw);
@@ -1161,14 +1824,30 @@ public class MainActivity extends FragmentActivity {
         scannedTextSheet(raw);
     }
 
-    private boolean isVelarumSetupUrl(Uri uri) {
-        if (uri == null) return false;
-        String scheme = uri.getScheme();
-        String host = uri.getHost();
-        String path = uri.getPath();
-        return ("https".equalsIgnoreCase(scheme) || "http".equalsIgnoreCase(scheme))
-                && "agentfood.velarumai.com".equalsIgnoreCase(host)
-                && "/setup".equalsIgnoreCase(path);
+    private void openScannedPaymentIntent(PaymentIntent intent) {
+        try {
+            PaymentIntent existing = PaymentInboxStore.find(this, intent.id);
+            PaymentIntent current = existing;
+            if (existing == null || PaymentIntent.STATUS_PENDING.equals(existing.status)) {
+                PaymentInboxStore.upsert(this, intent);
+                current = PaymentInboxStore.find(this, intent.id);
+            }
+            if (current == null) current = intent;
+            activeTab = TAB_MESSAGES;
+            renderActiveTab();
+            updateTabButtons();
+            paymentDetailsSheet(current);
+            toast("Scanned payment ready");
+        } catch (Exception e) {
+            error("Scanned payment failed", e);
+        }
+    }
+
+    private void blockedScannedTransferSheet(String raw, String reason) {
+        LinearLayout body = sheetBase("Blocked Transfer QR");
+        body.addView(warning(reason));
+        body.addView(field("QR content", raw, true));
+        showSheetWithActions(body, outlineButton("Scan another QR", this::openScanner));
     }
 
     private PairingLink parsePairingLink(String raw) {
@@ -1244,7 +1923,8 @@ public class MainActivity extends FragmentActivity {
                 }
                 approvePairing(session, approved);
             }), weightLeft());
-            body.addView(actions);
+            showSheetWithActions(body, actions);
+            return;
         }
         showSheet(body);
     }
@@ -1287,9 +1967,7 @@ public class MainActivity extends FragmentActivity {
         body.addView(field("Connection", connection.connectionId, true));
         body.addView(field("Approved scopes", connection.scopeSummary(), false));
         body.addView(warning("Every payment still requires user review and local signing on this device. The connection token is stored but never shown here."));
-        addGap(body, 12);
-        body.addView(primaryButton("View Connection", () -> agentConnectionDetailSheet(connection)), new LinearLayout.LayoutParams(-1, dp(48)));
-        showSheet(body);
+        showSheetWithActions(body, primaryButton("View Connection", () -> agentConnectionDetailSheet(connection)));
     }
 
     private void syncConnections() {
@@ -1330,7 +2008,8 @@ public class MainActivity extends FragmentActivity {
             AgentConnection actionConnection = current;
             actions.addView(outlineButton(label, () -> updateAgentConnectionStatus(actionConnection, nextStatus)), weight());
             actions.addView(dangerButton("Revoke", () -> confirmRevokeAgent(actionConnection)), weightLeft());
-            body.addView(actions);
+            showSheetWithActions(body, actions);
+            return;
         }
         showSheet(body);
     }
@@ -1395,19 +2074,19 @@ public class MainActivity extends FragmentActivity {
     private void scannedTextSheet(String raw) {
         LinearLayout body = sheetBase("Scanned QR");
         body.addView(field("QR content", raw, true));
-        addGap(body, 12);
         if (raw.startsWith("https://") || raw.startsWith("http://")) {
-            body.addView(primaryButton("Open Link", () -> {
+            Button open = primaryButton("Open Link", () -> {
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(raw)));
                 } catch (Exception e) {
                     error("Open link failed", e);
                 }
-            }), new LinearLayout.LayoutParams(-1, dp(48)));
+            });
+            showSheetWithActions(body, open);
         } else {
             body.addView(warning("This QR code was scanned, but it is not a supported setup or transfer format."));
+            showSheet(body);
         }
-        showSheet(body);
     }
 
     private void scannedPaymentSheet(ScannedPayment payment, String raw) {
@@ -1417,28 +2096,29 @@ public class MainActivity extends FragmentActivity {
         if (payment.asset.length() > 0) body.addView(field("Asset", payment.asset, false));
         if (payment.network.length() > 0) body.addView(field("Network", payment.network, false));
         body.addView(field("QR content", raw, true));
-        addGap(body, 12);
+        View actions = null;
         if (payment.isStellar()) {
             if ("XLM".equalsIgnoreCase(payment.asset)) {
-                body.addView(primaryButton("Send XLM", () -> stellarTransferSheet(
+                actions = primaryButton("Send XLM", () -> stellarTransferSheet(
                         payment.horizonUrl.length() > 0 ? payment.horizonUrl : "https://horizon.stellar.org",
                         payment.stellarTestnet ? "testnet" : "public",
                         payment.to,
                         payment.amount
-                )), new LinearLayout.LayoutParams(-1, dp(48)));
+                ));
             } else {
                 body.addView(warning("This QR requests a Stellar non-XLM asset. The recipient account must already exist and have a matching trustline; this app version only broadcasts Stellar XLM."));
             }
         } else if (payment.isEvm()) {
-            body.addView(primaryButton("Send Native Asset", () -> evmTransferSheet(
-                    payment.rpcUrl,
-                    payment.chainId,
-                    payment.to,
-                    payment.amount
-            )), new LinearLayout.LayoutParams(-1, dp(48)));
             if (payment.tokenContract.length() > 0) {
-                addGap(body, 10);
-                body.addView(outlineButton("Send Token", () -> evmTokenTransferSheet(
+                LinearLayout evmActions = vertical();
+                evmActions.addView(primaryButton("Send Native Asset", () -> evmTransferSheet(
+                        payment.rpcUrl,
+                        payment.chainId,
+                        payment.to,
+                        payment.amount
+                )), new LinearLayout.LayoutParams(-1, dp(48)));
+                addGap(evmActions, 10);
+                evmActions.addView(outlineButton("Send Token", () -> evmTokenTransferSheet(
                         payment.rpcUrl,
                         payment.chainId,
                         payment.tokenContract,
@@ -1446,19 +2126,48 @@ public class MainActivity extends FragmentActivity {
                         payment.amount,
                         payment.decimals
                 )), new LinearLayout.LayoutParams(-1, dp(48)));
+                actions = evmActions;
+            } else {
+                actions = primaryButton("Send Native Asset", () -> evmTransferSheet(
+                    payment.rpcUrl,
+                    payment.chainId,
+                    payment.to,
+                    payment.amount
+                ));
             }
         } else if (payment.isSolana()) {
-            body.addView(primaryButton(payment.tokenContract.length() > 0 ? "Send SPL Token" : "Send SOL", () -> {
+            actions = primaryButton(payment.tokenContract.length() > 0 ? "Send SPL Token" : "Send SOL", () -> {
                 if (payment.tokenContract.length() > 0) {
                     splTokenTransferSheet(payment.rpcUrl, payment.tokenContract, payment.to, payment.amount, payment.decimals);
                 } else {
                     solanaTransferSheet(payment.rpcUrl, payment.to, payment.amount);
                 }
-            }), new LinearLayout.LayoutParams(-1, dp(48)));
+            });
         } else {
             body.addView(warning("Choose the matching send screen for this scanned address before broadcasting."));
         }
-        showSheet(body);
+        SendAsset cleanAsset = findSendAssetForScanned(payment);
+        if (cleanAsset != null) {
+            final SendAsset routed = cleanAsset;
+            LinearLayout wrapper = vertical();
+            wrapper.addView(primaryButton("Continue to send " + routed.symbol, () -> {
+                closeActiveSheet();
+                sendDraftSheet(routed, payment.to, payment.amount);
+            }), new LinearLayout.LayoutParams(-1, dp(50)));
+            if (actions != null) {
+                addGap(wrapper, 12);
+                wrapper.addView(sectionEyebrow("Advanced"));
+                addGap(wrapper, 6);
+                wrapper.addView(actions);
+            }
+            showSheetWithActions(body, wrapper);
+            return;
+        }
+        if (actions == null) {
+            showSheet(body);
+        } else {
+            showSheetWithActions(body, actions);
+        }
     }
 
     private ScannedPayment parseScannedPayment(String raw) {
@@ -1578,80 +2287,6 @@ public class MainActivity extends FragmentActivity {
             if (value != null && value.trim().length() > 0) return value.trim();
         }
         return "";
-    }
-
-    private void startDemoSetup(String relayUrl, String telegramBot, String label) {
-        try {
-            if (wallet == null) {
-                wallet = SecureWalletStore.hasWallet(this)
-                        ? HDWallet.parse(SecureWalletStore.load(this))
-                        : HDWallet.create();
-                SecureWalletStore.save(this, wallet.serialize());
-            }
-        } catch (Exception e) {
-            error("Demo setup failed", e);
-            return;
-        }
-        PaymentInboxStore.setRelayUrl(this, relayUrl.trim());
-        PaymentInboxStore.setTelegramBot(this, telegramBot);
-        String stellarAddress = wallet.stellar.address;
-        String evmAddress = wallet.evm.address;
-        toast("Starting demo setup");
-        new Thread(() -> {
-            try {
-                RelayClient.register(this);
-                JSONObject session = RelayClient.createDemoSession(this, label, telegramBot, stellarAddress, evmAddress);
-                runOnUiThread(() -> {
-                    updateStatus();
-                    renderPublicWallet();
-                    startRelayPushService();
-                    connectRelay();
-                    syncInboxSilently();
-                    showDemoReadySheet(session, telegramBot);
-                });
-            } catch (Exception e) {
-                runOnUiThread(() -> error("Demo setup failed", e));
-            }
-        }).start();
-    }
-
-    private void showDemoReadySheet(JSONObject session, String telegramBot) {
-        String sessionId = session.optString("session_id", PaymentInboxStore.demoSessionId(this));
-        LinearLayout body = sheetBase("Demo Ready");
-        body.addView(field("Relay URL", PaymentInboxStore.relayUrl(this), true));
-        body.addView(field("Demo session", sessionId, true));
-        body.addView(field("Telegram bot", telegramBot, false));
-        body.addView(field("Stellar address", wallet == null ? "" : wallet.stellar.address, true));
-        JSONObject funding = session.optJSONObject("funding");
-        if (funding != null) {
-            body.addView(field("Funding status", funding.optString("status", ""), false));
-            if (funding.optString("tx_hash", "").length() > 0) body.addView(field("Funding tx", funding.optString("tx_hash", ""), true));
-            if (funding.optString("reason", "").length() > 0) body.addView(field("Funding note", funding.optString("reason", ""), false));
-            if (funding.optString("error", "").length() > 0) body.addView(warning("Funding error: " + funding.optString("error", "")));
-        }
-        addGap(body, 10);
-        body.addView(warning("Use Telegram to order food. The payment request will be sent to this phone."));
-        addGap(body, 12);
-        body.addView(primaryButton("Open Telegram", () -> openTelegramDemo(telegramBot, sessionId)), new LinearLayout.LayoutParams(-1, dp(48)));
-        addGap(body, 10);
-        body.addView(outlineButton("Sync Inbox", this::syncInbox), new LinearLayout.LayoutParams(-1, dp(48)));
-        showSheet(body);
-    }
-
-    private void openTelegramDemo(String telegramBot, String sessionId) {
-        if (telegramBot == null || telegramBot.length() == 0 || sessionId == null || sessionId.length() == 0) {
-            error("Telegram setup failed", new IllegalArgumentException("Missing Telegram bot or demo session"));
-            return;
-        }
-        Uri uri = Uri.parse("https://t.me/" + telegramBot)
-                .buildUpon()
-                .appendQueryParameter("start", sessionId)
-                .build();
-        try {
-            startActivity(new Intent(Intent.ACTION_VIEW, uri));
-        } catch (Exception e) {
-            error("Telegram setup failed", e);
-        }
     }
 
     private void openExternalUrl(String value, String errorTitle) {
@@ -1777,7 +2412,7 @@ public class MainActivity extends FragmentActivity {
             card.addView(pill(inboxCountLabel(filtered.size(), inboxFilter), GREEN, GREEN_SOFT, Color.TRANSPARENT));
             if (intents.isEmpty()) {
                 addGap(card, 10);
-                card.addView(warning("No pending requests. Connect an agent or run the quickstart, then sync Inbox."));
+                card.addView(warning("No pending requests. Connect a trusted agent, then sync Inbox."));
             } else if (filtered.isEmpty()) {
                 addGap(card, 10);
                 card.addView(warning(emptyInboxFilterCopy(inboxFilter)));
@@ -2017,11 +2652,15 @@ public class MainActivity extends FragmentActivity {
         LinearLayout body = sheetBase(intent.hasOrderDetails() ? "Order Payment" : "Payment Request");
         String state = paymentDetailState(intent);
         RiskPolicy.Result risk = paymentDetailRisk(intent, state);
-        boolean canSign = isPaymentDetailSignable(intent, state, risk);
+        boolean paymentReady = isPaymentDetailSignable(intent, state, risk);
+        boolean backupVerified = SecureWalletStore.isBackupVerified(this);
+        boolean backupGateRequired = WalletSecurityNavigationPolicy.requiresBackupGate(wallet != null, backupVerified, paymentReady);
+        boolean canSign = WalletSecurityNavigationPolicy.canCreateSignature(wallet != null, backupVerified, paymentReady);
+        String displayState = backupGateRequired ? WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED : state;
 
         body.addView(sectionEyebrow("Payment Facts"));
         addGap(body, 8);
-        body.addView(field("Status", paymentDetailStatusLabel(state), false));
+        body.addView(field("Status", paymentDetailStatusLabel(displayState), false));
         body.addView(field("Source", intent.sourceLabel(), false));
         body.addView(field("Amount", intent.amount + " " + intent.asset, false));
         if (intent.orderTotalUsd.length() > 0) body.addView(field("Order total", "$" + intent.orderTotalUsd, false));
@@ -2034,7 +2673,7 @@ public class MainActivity extends FragmentActivity {
         if (intent.estimatedFee.length() > 0) body.addView(field("Estimated fee", intent.estimatedFee, false));
 
         addGap(body, 12);
-        body.addView(paymentDetailStateCard(intent, state, risk, canSign));
+        body.addView(paymentDetailStateCard(intent, displayState, risk, canSign));
 
         addGap(body, 12);
         body.addView(truthPanelCard(intent.request));
@@ -2065,9 +2704,13 @@ public class MainActivity extends FragmentActivity {
             addGap(body, 10);
             body.addView(warning("This is a simulated food order, but the blockchain payment is real. Pay only if the order details, recipient, and amount match what you expect."));
         }
-        addGap(body, 12);
-        addPaymentDetailActions(body, intent, state, risk, canSign);
-        showSheet(body);
+        LinearLayout actions = vertical();
+        addPaymentDetailActions(actions, intent, displayState, risk, canSign);
+        showSheetWithActions(body, actions);
+        // Remember which request is being reviewed so it can be reopened after a
+        // configuration change or process death. showSheet() clears this by default,
+        // so it must be set after the sheet is shown.
+        openPaymentIntentId = intent.id;
     }
 
     private String paymentDetailState(PaymentIntent intent) {
@@ -2078,6 +2721,9 @@ public class MainActivity extends FragmentActivity {
                 intent.request.riskLevel,
                 intent.isExpired()
         );
+        if ("network_disabled".equals(state) && localNetworkResolved(intent)) {
+            state = "pending";
+        }
         if (("pending".equals(state) || "awaiting_signature".equals(state)
                 || "needs_review".equals(state) || "source_review_required".equals(state))
                 && PaymentIntent.STATUS_PENDING.equals(intent.status)
@@ -2113,15 +2759,24 @@ public class MainActivity extends FragmentActivity {
 
     private boolean isPaymentDetailSignable(PaymentIntent intent, String state, RiskPolicy.Result risk) {
         String value = PaymentInboxFilter.normalizeState(state);
+        boolean signingAllowed = intent.request.signingAllowed || localNetworkResolved(intent);
         return ("pending".equals(value) || "awaiting_signature".equals(value))
                 && isPayableIntent(intent)
-                && intent.request.signingAllowed
+                && signingAllowed
                 && risk != null
                 && risk.allowed
                 && risk.errors.isEmpty();
     }
 
+    private boolean localNetworkResolved(PaymentIntent intent) {
+        String reviewState = PaymentInboxFilter.normalizeState(intent.request.reviewState);
+        String riskStatus = PaymentInboxFilter.normalizeState(intent.request.riskReviewStatus);
+        return ("network_disabled".equals(reviewState) || "network_disabled".equals(riskStatus))
+                && WalletNetworkStore.isEnabled(this, intent.network, intent.chainId);
+    }
+
     private String paymentDetailStatusLabel(String state) {
+        if (WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED.equals(PaymentInboxFilter.normalizeState(state))) return "Backup required";
         return PaymentInboxFilter.label(state);
     }
 
@@ -2157,6 +2812,7 @@ public class MainActivity extends FragmentActivity {
     private String paymentDetailStateTitle(String state, boolean canSign) {
         String value = PaymentInboxFilter.normalizeState(state);
         if (canSign) return "Ready to sign";
+        if (WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED.equals(value)) return "Backup required before signing";
         if ("missing_context".equals(value) || "needs_review".equals(value) || "source_review_required".equals(value)) return "Context needs review";
         if ("blocked".equals(value)) return "Blocked by risk policy";
         if ("network_disabled".equals(value)) return "Network disabled";
@@ -2173,6 +2829,7 @@ public class MainActivity extends FragmentActivity {
     private String paymentDetailStateCopy(PaymentIntent intent, String state, boolean canSign) {
         String value = PaymentInboxFilter.normalizeState(state);
         if (canSign) return "Payment facts and local risk checks are ready. You can reject the request or continue to local signing on this device.";
+        if (WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED.equals(value)) return WalletSecurityNavigationPolicy.backupGateCopy();
         if ("missing_context".equals(value)) return "Required transaction context or evidence is missing. Payment facts remain visible, but signing is unavailable until the agent repairs the context.";
         if ("needs_review".equals(value) || "source_review_required".equals(value)) return "Critical context needs review before signing can resume. Request more context or reject the request.";
         if ("blocked".equals(value)) return "A blocking risk rule prevents this request from being signed. Review the dossier or reject the request.";
@@ -2191,7 +2848,11 @@ public class MainActivity extends FragmentActivity {
         String value = PaymentInboxFilter.normalizeState(state);
         if (canSign || "confirmed".equals(value)) return GREEN;
         if ("broadcasting".equals(value) || "signed_locally".equals(value)) return BLUE;
-        if ("missing_context".equals(value) || "needs_review".equals(value) || "source_review_required".equals(value) || "network_disabled".equals(value)) return GOLD;
+        if (WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED.equals(value)
+                || "missing_context".equals(value)
+                || "needs_review".equals(value)
+                || "source_review_required".equals(value)
+                || "network_disabled".equals(value)) return GOLD;
         return RED;
     }
 
@@ -2213,6 +2874,12 @@ public class MainActivity extends FragmentActivity {
 
     private void addPaymentDetailActions(LinearLayout body, PaymentIntent intent, String state, RiskPolicy.Result risk, boolean canSign) {
         String value = PaymentInboxFilter.normalizeState(state);
+        if (WalletSecurityNavigationPolicy.STATE_BACKUP_REQUIRED.equals(value)) {
+            addTwoPaymentActions(body,
+                    primaryButton("Back up now", this::backupWalletSheet),
+                    outlineButton("Open Settings", this::openSecuritySettingsFromSheet));
+            return;
+        }
         if (canSign) {
             LinearLayout actions = row();
             actions.addView(dangerButton("Reject", () -> rejectIntent(intent)), weight());
@@ -2234,7 +2901,7 @@ public class MainActivity extends FragmentActivity {
         }
         if ("network_disabled".equals(value)) {
             addTwoPaymentActions(body,
-                    primaryButton("Open networks", this::openNetworkSettings),
+                    primaryButton("Enable network", () -> addNetworkSheet(intent)),
                     dangerButton("Reject request", () -> rejectIntent(intent)));
             return;
         }
@@ -2277,9 +2944,277 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void openNetworkSettings() {
-        closeActiveSheet();
-        switchTab(TAB_SETTINGS);
-        toast("Review network settings before signing");
+        networksSheet();
+    }
+
+    private void networksSheet() {
+        LinearLayout body = sheetBase("Networks");
+        body.addView(text("Verified custom EVM networks are stored locally. Adding a network never signs, approves, or broadcasts a Payment Request by itself.", 13, MUTED, false));
+        addGap(body, 12);
+        body.addView(field("Built-in EVM", "Ethereum / 1, Base / 8453, Polygon / 137", false));
+        body.addView(field("Built-in non-EVM", "Stellar and Solana receive/review support", false));
+        List<WalletNetworkConfig> userNetworks = WalletNetworkStore.userAdded(this);
+        if (!userNetworks.isEmpty()) {
+            addGap(body, 12);
+            body.addView(sectionEyebrow("Custom"));
+            addGap(body, 8);
+            for (WalletNetworkConfig network : userNetworks) {
+                body.addView(networkRow(network));
+                addGap(body, 8);
+            }
+        }
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Close", this::closeActiveSheet), weight());
+        actions.addView(primaryButton("Add network", () -> addNetworkSheet(null)), weightLeft());
+        showSheetWithActions(body, actions);
+    }
+
+    private void addNetworkSheet(PaymentIntent sourceIntent) {
+        LinearLayout body = sheetBase("Add network");
+        body.addView(text("Verify the RPC endpoint before enabling a custom EVM-compatible network. The Chain ID returned by RPC must match the value entered here.", 13, MUTED, false));
+        if (sourceIntent != null) {
+            addGap(body, 12);
+            LinearLayout request = card();
+            request.setElevation(0);
+            request.setBackground(round(AMBER_SOFT, dp(18), Color.rgb(231, 220, 170), 1));
+            request.addView(text("Requested network", 15, INK, true));
+            addGap(request, 6);
+            request.addView(text(valueOr(sourceIntent.network, "Unknown network") + networkChainSuffix(sourceIntent), 13, INK_SOFT, false));
+            request.addView(text("Adding this network only enables local review. You still approve or reject the request separately.", 12, MUTED, false));
+            body.addView(request);
+        }
+        addGap(body, 12);
+
+        body.addView(sectionEyebrow("Network name"));
+        EditText name = input("Enter network name");
+        body.addView(name);
+        body.addView(sectionEyebrow("Default RPC URL"));
+        EditText rpcUrl = input("Add a URL");
+        body.addView(rpcUrl);
+        body.addView(sectionEyebrow("Chain ID"));
+        EditText chainId = input("Enter Chain ID");
+        body.addView(chainId);
+        body.addView(sectionEyebrow("Currency symbol"));
+        EditText symbol = input("Enter symbol");
+        body.addView(symbol);
+        body.addView(sectionEyebrow("Block explorer URL"));
+        EditText explorer = input("Add a URL");
+        body.addView(explorer);
+
+        prefillAddNetworkDraft(sourceIntent, name, rpcUrl, chainId, symbol, explorer);
+
+        TextView verification = text("Test RPC before adding the network.", 13, MUTED, false);
+        verification.setPadding(dp(14), dp(12), dp(14), dp(12));
+        verification.setBackground(round(SOFT, dp(16), LINE, 1));
+        body.addView(verification);
+        addGap(body, 12);
+
+        String[] verifiedFingerprint = {""};
+        Button addButton = primaryButton("Add network", () -> addVerifiedNetworkFromDraft(
+                sourceIntent,
+                name,
+                rpcUrl,
+                chainId,
+                symbol,
+                explorer,
+                verifiedFingerprint
+        ));
+        addButton.setEnabled(false);
+
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Test RPC", () -> testNetworkDraft(
+                name,
+                rpcUrl,
+                chainId,
+                symbol,
+                explorer,
+                verification,
+                addButton,
+                verifiedFingerprint
+        )), weight());
+        actions.addView(addButton, weightLeft());
+        showSheetWithActions(body, actions);
+    }
+
+    private void testNetworkDraft(
+            EditText name,
+            EditText rpcUrl,
+            EditText chainId,
+            EditText symbol,
+            EditText explorer,
+            TextView verification,
+            Button addButton,
+            String[] verifiedFingerprint
+    ) {
+        WalletNetworkConfig draft;
+        String fingerprint;
+        try {
+            draft = draftNetworkConfig(name, rpcUrl, chainId, symbol, explorer, WalletNetworkConfig.SOURCE_USER);
+            fingerprint = WalletNetworkValidator.fingerprint(
+                    name.getText().toString(),
+                    rpcUrl.getText().toString(),
+                    chainId.getText().toString(),
+                    symbol.getText().toString(),
+                    explorer.getText().toString()
+            );
+        } catch (Exception e) {
+            toast(trimError(e.getMessage()));
+            verification.setText(trimError(e.getMessage()));
+            verification.setTextColor(RED);
+            addButton.setEnabled(false);
+            verifiedFingerprint[0] = "";
+            return;
+        }
+        verification.setText("Testing RPC chain ID...");
+        verification.setTextColor(MUTED);
+        addButton.setEnabled(false);
+        verifiedFingerprint[0] = "";
+        new Thread(() -> {
+            try {
+                WalletNetworkVerifier.Result result = WalletNetworkVerifier.verifyEvmRpc(draft.rpcUrl, draft.chainId);
+                runOnUiThread(() -> {
+                    verifiedFingerprint[0] = fingerprint;
+                    verification.setText("RPC verified: " + result.rpcChainId + " / Chain ID " + result.decimalChainId);
+                    verification.setTextColor(GREEN);
+                    addButton.setEnabled(true);
+                    toast("RPC verified");
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    verification.setText(trimError(e.getMessage()));
+                    verification.setTextColor(RED);
+                    addButton.setEnabled(false);
+                    verifiedFingerprint[0] = "";
+                    error("RPC verification failed", e);
+                });
+            }
+        }).start();
+    }
+
+    private void addVerifiedNetworkFromDraft(
+            PaymentIntent sourceIntent,
+            EditText name,
+            EditText rpcUrl,
+            EditText chainId,
+            EditText symbol,
+            EditText explorer,
+            String[] verifiedFingerprint
+    ) {
+        try {
+            String currentFingerprint = WalletNetworkValidator.fingerprint(
+                    name.getText().toString(),
+                    rpcUrl.getText().toString(),
+                    chainId.getText().toString(),
+                    symbol.getText().toString(),
+                    explorer.getText().toString()
+            );
+            if (!currentFingerprint.equals(verifiedFingerprint[0])) {
+                toast("Test RPC again before adding");
+                return;
+            }
+            String source = sourceIntent == null ? WalletNetworkConfig.SOURCE_USER : WalletNetworkConfig.SOURCE_PAYMENT_REQUEST;
+            WalletNetworkConfig config = draftNetworkConfig(name, rpcUrl, chainId, symbol, explorer, source);
+            WalletNetworkStore.upsert(this, config);
+            if (sourceIntent == null) {
+                closeActiveSheet();
+                if (TAB_SETTINGS.equals(activeTab)) renderSettingsTab();
+                toast("Network added");
+            } else {
+                networkAddedForRequestSheet(sourceIntent, config);
+            }
+        } catch (Exception e) {
+            error("Add network failed", e);
+        }
+    }
+
+    private WalletNetworkConfig draftNetworkConfig(
+            EditText name,
+            EditText rpcUrl,
+            EditText chainId,
+            EditText symbol,
+            EditText explorer,
+            String source
+    ) {
+        return WalletNetworkValidator.buildVerifiedEvmConfig(
+                name.getText().toString(),
+                rpcUrl.getText().toString(),
+                chainId.getText().toString(),
+                symbol.getText().toString(),
+                explorer.getText().toString(),
+                source,
+                isDebuggableBuild()
+        );
+    }
+
+    private void networkAddedForRequestSheet(PaymentIntent intent, WalletNetworkConfig config) {
+        LinearLayout body = sheetBase("Network added");
+        body.addView(text(config.name + " is verified and enabled on this device. The payment request has not been signed or approved.", 13, MUTED, false));
+        addGap(body, 12);
+        body.addView(field("Network", config.name, false));
+        body.addView(field("Chain ID", String.valueOf(config.chainId), false));
+        body.addView(field("RPC", config.rpcUrl, true));
+        addGap(body, 12);
+        LinearLayout actions = row();
+        actions.addView(outlineButton("Done", this::closeActiveSheet), weight());
+        actions.addView(primaryButton("Review request", () -> paymentDetailsSheet(intent)), weightLeft());
+        showSheetWithActions(body, actions);
+    }
+
+    private void prefillAddNetworkDraft(PaymentIntent intent, EditText name, EditText rpcUrl, EditText chainId, EditText symbol, EditText explorer) {
+        if (intent == null) return;
+        name.setText(defaultNetworkName(intent));
+        rpcUrl.setText(firstNonEmpty(intent.rpcUrl, defaultRpcUrl(intent)));
+        long id = intent.chainId > 0 ? intent.chainId : defaultChainId(intent);
+        if (id > 0) chainId.setText(String.valueOf(id));
+        symbol.setText(defaultCurrencySymbol(intent));
+        explorer.setText(defaultBlockExplorerUrl(intent));
+    }
+
+    private String defaultNetworkName(PaymentIntent intent) {
+        String lower = valueOr(intent.network, "").toLowerCase(java.util.Locale.US);
+        if (lower.contains("base") && lower.contains("sepolia")) return "Base Sepolia";
+        if (lower.contains("base")) return "Base";
+        if (lower.contains("polygon")) return "Polygon";
+        if (lower.contains("ethereum") || lower.contains("sepolia")) return "Ethereum Sepolia";
+        return titleCase(firstNonEmpty(intent.network, "Custom EVM Network").replace("_", " "));
+    }
+
+    private long defaultChainId(PaymentIntent intent) {
+        String lower = valueOr(intent.network, "").toLowerCase(java.util.Locale.US);
+        if (lower.contains("base") && lower.contains("sepolia")) return 84532L;
+        if (lower.contains("base")) return 8453L;
+        if (lower.contains("polygon")) return 137L;
+        if (lower.contains("sepolia")) return 11155111L;
+        return 0L;
+    }
+
+    private String defaultRpcUrl(PaymentIntent intent) {
+        String lower = valueOr(intent.network, "").toLowerCase(java.util.Locale.US);
+        if (lower.contains("base") && lower.contains("sepolia")) return "https://sepolia.base.org";
+        if (lower.contains("base")) return "https://mainnet.base.org";
+        if (lower.contains("polygon")) return "https://polygon-rpc.com";
+        return "";
+    }
+
+    private String defaultBlockExplorerUrl(PaymentIntent intent) {
+        String lower = valueOr(intent.network, "").toLowerCase(java.util.Locale.US);
+        if (lower.contains("base") && lower.contains("sepolia")) return "https://sepolia.basescan.org";
+        if (lower.contains("base")) return "https://basescan.org";
+        if (lower.contains("polygon")) return "https://polygonscan.com";
+        if (lower.contains("sepolia")) return "https://sepolia.etherscan.io";
+        return "";
+    }
+
+    private String defaultCurrencySymbol(PaymentIntent intent) {
+        String lower = valueOr(intent.network, "").toLowerCase(java.util.Locale.US);
+        if (lower.contains("polygon")) return "MATIC";
+        return "ETH";
+    }
+
+    private String networkChainSuffix(PaymentIntent intent) {
+        long id = intent.chainId > 0 ? intent.chainId : defaultChainId(intent);
+        return id > 0 ? " / Chain ID " + id : "";
     }
 
     private void openActivityFromSheet() {
@@ -2354,9 +3289,9 @@ public class MainActivity extends FragmentActivity {
         addGap(body, 12);
         body.addView(dossierRowsCard("Payment mapping", "final chain action", dossier.paymentMappingRows));
 
-        addGap(body, 12);
-        addDossierActions(body, intent);
-        showSheet(body);
+        LinearLayout actions = vertical();
+        addDossierActions(actions, intent);
+        showSheetWithActions(body, actions);
     }
 
     private View dossierRiskCard(TransactionDossier dossier) {
@@ -2635,7 +3570,7 @@ public class MainActivity extends FragmentActivity {
         LinearLayout card = card();
         card.setElevation(0);
         card.setBackground(round(SURFACE, dp(24), LINE, 1));
-        card.addView(pill("Food delivery demo", GREEN, GREEN_SOFT, Color.TRANSPARENT));
+        card.addView(pill("Payment context", GREEN, GREEN_SOFT, Color.TRANSPARENT));
         addGap(card, 12);
         card.addView(text("You are paying for", 14, MUTED, true));
         addGap(card, 4);
@@ -2650,9 +3585,9 @@ public class MainActivity extends FragmentActivity {
         }
         if (intent.orderId.length() > 0) card.addView(field("Order ID", intent.orderId, true));
         if (isUseful(intent.shoppingSiteUrl)) {
-            card.addView(field("AgentFood order page", intent.shoppingSiteUrl, true));
+            card.addView(field("Order page", intent.shoppingSiteUrl, true));
             addGap(card, 8);
-            card.addView(outlineButton("Open AgentFood page", () -> openExternalUrl(intent.shoppingSiteUrl, "Open AgentFood page failed")), new LinearLayout.LayoutParams(-1, dp(48)));
+            card.addView(outlineButton("Open order page", () -> openExternalUrl(intent.shoppingSiteUrl, "Open order page failed")), new LinearLayout.LayoutParams(-1, dp(48)));
         } else if (isUseful(intent.orderUrl)) {
             card.addView(field("Order page", intent.orderUrl, true));
             addGap(card, 8);
@@ -2702,7 +3637,7 @@ public class MainActivity extends FragmentActivity {
     private void rejectIntent(PaymentIntent intent) {
         new Thread(() -> {
             try {
-                RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_REJECTED, null, null);
+                updatePaymentStatusBestEffort(intent, PaymentIntent.STATUS_REJECTED, null, null);
                 runOnUiThread(() -> {
                     renderPaymentInboxOnly();
                     toast("Payment rejected");
@@ -2725,6 +3660,7 @@ public class MainActivity extends FragmentActivity {
             return false;
         }
         if (!requireWallet()) return false;
+        if (!requireBackupVerifiedForSigning()) return false;
         try {
             if (PaymentInboxStore.hasCompletedIntent(this, intent)) {
                 error("Payment blocked", new IllegalStateException("Duplicate or completed payment request"));
@@ -2747,12 +3683,10 @@ public class MainActivity extends FragmentActivity {
         body.addView(signingFactsCard(intent, false));
         addGap(body, 12);
         body.addView(warning(signingBoundaryCopy()));
-        addGap(body, 12);
         LinearLayout actions = row();
         actions.addView(outlineButton("Cancel", () -> paymentDetailsSheet(intent)), weight());
         actions.addView(primaryButton("Continue", () -> paymentSigningAuthSheet(intent)), weightLeft());
-        body.addView(actions);
-        showSheet(body);
+        showSheetWithActions(body, actions);
     }
 
     private void paymentSigningAuthSheet(PaymentIntent intent) {
@@ -2765,7 +3699,6 @@ public class MainActivity extends FragmentActivity {
         body.addView(signingFactsCard(intent, false));
         addGap(body, 12);
         body.addView(warning("No signature is created until local authentication succeeds. " + signingBoundaryCopy()));
-        addGap(body, 12);
         LinearLayout actions = row();
         actions.addView(outlineButton("Cancel", () -> paymentSigningCancelledSheet(
                 intent,
@@ -2788,8 +3721,7 @@ public class MainActivity extends FragmentActivity {
                         "The keyring remains locked. No signature was created and the request status was not changed."
                 )
         )), weightLeft());
-        body.addView(actions);
-        showSheet(body);
+        showSheetWithActions(body, actions);
     }
 
     private void paymentSigningCancelledSheet(PaymentIntent intent, String heading, String title, String message) {
@@ -2805,12 +3737,10 @@ public class MainActivity extends FragmentActivity {
         body.addView(card);
         addGap(body, 12);
         body.addView(signingFactsCard(intent, false));
-        addGap(body, 12);
         LinearLayout actions = row();
         actions.addView(primaryButton("Review signing again", () -> paymentSigningReviewSheet(intent)), weight());
         actions.addView(outlineButton("Return to request", () -> paymentDetailsSheet(intent)), weightLeft());
-        body.addView(actions);
-        showSheet(body);
+        showSheetWithActions(body, actions);
     }
 
     private void paymentSigningFailedSheet(PaymentIntent intent, String message) {
@@ -2826,12 +3756,10 @@ public class MainActivity extends FragmentActivity {
         body.addView(card);
         addGap(body, 12);
         body.addView(signingFactsCard(intent, false));
-        addGap(body, 12);
         LinearLayout actions = row();
         actions.addView(primaryButton("Try again", () -> paymentSigningAuthSheet(intent)), weight());
         actions.addView(outlineButton("Cancel signing", () -> paymentDetailsSheet(intent)), weightLeft());
-        body.addView(actions);
-        showSheet(body);
+        showSheetWithActions(body, actions);
     }
 
     private void executePaymentAfterAuthentication(PaymentIntent intent) {
@@ -2852,24 +3780,55 @@ public class MainActivity extends FragmentActivity {
                                     : "A local signature exists. Broadcasting to the network.",
                             detail
                     ));
-                    RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_SIGNED, null, null);
+                    updatePaymentStatusBestEffort(intent, PaymentIntent.STATUS_SIGNED, null, null);
                 });
-                RelayClient.updateStatus(this, intent, PaymentIntent.STATUS_BROADCASTED, txHash, null);
+                updatePaymentStatusBestEffort(intent, PaymentIntent.STATUS_BROADCASTED, txHash, null);
                 RiskPolicy.recordSuccessfulPayment(this, intent);
+                try {
+                    TransactionHistoryStore.record(
+                            this,
+                            "payment:" + signingRequestId(intent),
+                            intent.title(),
+                            intent.asset,
+                            intent.amount,
+                            intent.network,
+                            intent.to,
+                            PaymentIntent.STATUS_BROADCASTED,
+                            txHash
+                    );
+                } catch (Exception ignored) {
+                }
                 runOnUiThread(() -> {
                     paymentSigningReceiptSheet(intent, txHash);
                     renderPaymentInboxOnly();
                     refreshBalancesAfterPayment();
                 });
             } catch (Exception e) {
-                try {
-                    String status = intent.isExpired() ? PaymentIntent.STATUS_EXPIRED : PaymentIntent.STATUS_FAILED;
-                    RelayClient.updateStatus(this, intent, status, null, e.getMessage());
-                } catch (Exception ignored) {
-                }
+                String status = intent.isExpired() ? PaymentIntent.STATUS_EXPIRED : PaymentIntent.STATUS_FAILED;
+                updatePaymentStatusBestEffort(intent, status, null, e.getMessage());
                 runOnUiThread(() -> error("Payment failed", e));
             }
         }).start();
+    }
+
+    private void updatePaymentStatusBestEffort(PaymentIntent intent, String status, String txHash, String error) {
+        try {
+            PaymentInboxStore.updateStatus(this, signingRequestId(intent), status, txHash, error);
+        } catch (Exception ignored) {
+        }
+        if (isLocalScannedPayment(intent)) return;
+        try {
+            RelayClient.updateStatus(this, intent, status, txHash, error);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private boolean isLocalScannedPayment(PaymentIntent intent) {
+        if (intent == null || intent.request == null) return false;
+        if ("qr".equalsIgnoreCase(intent.sourceType)) return true;
+        if ("scanned_qr".equalsIgnoreCase(intent.request.sourceAgentId)) return true;
+        JSONObject metadata = intent.request.metadata;
+        return metadata != null && "scanned_qr".equalsIgnoreCase(metadata.optString("source", ""));
     }
 
     private void paymentSigningReceiptSheet(PaymentIntent intent, String txHash) {
@@ -2891,12 +3850,10 @@ public class MainActivity extends FragmentActivity {
         receipt.addView(field("Amount", signingAmountLine(intent), false));
         receipt.addView(field("Created by", ENCRYPTED_LOCAL_KEYRING, false));
         body.addView(receipt);
-        addGap(body, 12);
         LinearLayout actions = row();
         actions.addView(primaryButton("View activity", this::openActivityFromSheet), weight());
         actions.addView(outlineButton("Open request", () -> openUpdatedPaymentDetails(intent)), weightLeft());
-        body.addView(actions);
-        showSheet(body);
+        showSheetWithActions(body, actions);
     }
 
     private void openUpdatedPaymentDetails(PaymentIntent intent) {
@@ -2986,6 +3943,12 @@ public class MainActivity extends FragmentActivity {
             return false;
         }
         return true;
+    }
+
+    private boolean requireBackupVerifiedForSigning() {
+        if (SecureWalletStore.isBackupVerified(this)) return true;
+        backupGateSheet();
+        return false;
     }
 
     private boolean isPayableIntent(PaymentIntent intent) {
@@ -3078,8 +4041,7 @@ public class MainActivity extends FragmentActivity {
     private void resultSheet(String heading, String result) {
         LinearLayout body = sheetBase(heading);
         body.addView(field("Transaction result", result, true));
-        body.addView(primaryButton("Done", this::closeActiveSheet));
-        showSheet(body);
+        showSheetWithActions(body, primaryButton("Done", this::closeActiveSheet));
     }
 
     private void paymentProgressSheet(String heading, String message, String detail) {
@@ -3171,22 +4133,65 @@ public class MainActivity extends FragmentActivity {
 
     private void updateStatus() {
         if (status == null) return;
-        status.setText(SecureWalletStore.hasWallet(this)
-                ? "Ready"
-                : "No wallet");
-        boolean ready = SecureWalletStore.hasWallet(this);
-        status.setTextColor(ready ? GREEN : MUTED);
-        status.setBackground(round(ready ? GREEN_SOFT : SOFT, dp(18), Color.TRANSPARENT, 0));
+        boolean hasWallet = SecureWalletStore.hasWallet(this);
+        boolean backupReady = SecureWalletStore.isBackupVerified(this);
+        status.setText(!hasWallet ? "No wallet" : (backupReady ? "Ready" : "Backup needed"));
+        status.setTextColor(!hasWallet ? MUTED : (backupReady ? GREEN : Color.rgb(132, 114, 45)));
+        status.setBackground(round(!hasWallet ? SOFT : (backupReady ? GREEN_SOFT : AMBER_SOFT), dp(18), Color.TRANSPARENT, 0));
     }
 
     private View emptyState() {
         LinearLayout card = card();
         card.addView(text("No wallet loaded", 22, INK, true));
         addGap(card, 6);
-        card.addView(text("Generate a new BIP39 wallet or restore from an existing mnemonic. Secrets are encrypted with Android Keystore.", 14, MUTED, false));
+        card.addView(text("Open Settings > Security to set up or recover a wallet. Secrets are encrypted with Android Keystore.", 14, MUTED, false));
         addGap(card, 12);
         card.addView(warning("Mainnet transfers are real. Use testnet RPC endpoints until you are confident."));
         return card;
+    }
+
+    private View mnemonicGrid(List<String> words) {
+        LinearLayout grid = vertical();
+        grid.setPadding(dp(12), dp(12), dp(12), dp(12));
+        grid.setBackground(round(SUNKEN, dp(16), LINE, 1));
+        for (int i = 0; i < words.size(); i += 2) {
+            LinearLayout row = row();
+            row.addView(mnemonicCell(i, words.get(i)), new LinearLayout.LayoutParams(0, dp(44), 1));
+            if (i + 1 < words.size()) {
+                LinearLayout.LayoutParams right = new LinearLayout.LayoutParams(0, dp(44), 1);
+                right.leftMargin = dp(8);
+                row.addView(mnemonicCell(i + 1, words.get(i + 1)), right);
+            }
+            grid.addView(row);
+            addGap(grid, 8);
+        }
+        return grid;
+    }
+
+    private View mnemonicCell(int index, String word) {
+        TextView cell = text(String.format(java.util.Locale.US, "%02d  %s", index + 1, word), 13, INK, true);
+        cell.setGravity(Gravity.CENTER_VERTICAL);
+        cell.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        cell.setPadding(dp(10), 0, dp(10), 0);
+        cell.setBackground(round(SURFACE, dp(12), LINE, 1));
+        cell.setTextIsSelectable(false);
+        return cell;
+    }
+
+    private int[] challengePositions(int wordCount) {
+        int[] preferred = {2, 6, 10, 14, 18, 22};
+        List<Integer> out = new ArrayList<>();
+        for (int position : preferred) {
+            if (position < wordCount) out.add(position);
+        }
+        while (out.size() < Math.min(4, wordCount)) {
+            int next = out.size() * 2;
+            if (!out.contains(next) && next < wordCount) out.add(next);
+            else break;
+        }
+        int[] positions = new int[out.size()];
+        for (int i = 0; i < out.size(); i++) positions[i] = out.get(i);
+        return positions;
     }
 
     private View field(String label, String value, boolean copy) {
@@ -3268,14 +4273,56 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void showSheet(View body) {
+        disableSensitiveScreen();
+        showSheet(body, false);
+    }
+
+    private void showSensitiveSheet(View body) {
+        showSheet(body, true);
+        enableSensitiveScreen();
+    }
+
+    private void showSensitiveSheetWithActions(View body, View actions) {
+        showSheet(body, actions, true);
+        enableSensitiveScreen();
+    }
+
+    private void showSheet(View body, boolean sensitive) {
+        showSheet(body, null, sensitive);
+    }
+
+    private void showSheetWithActions(View body, View actions) {
+        disableSensitiveScreen();
+        showSheet(body, actions, false);
+    }
+
+    private void showSheet(View body, View actions, boolean sensitive) {
         closeActiveSheet();
+        // Default: a newly shown sheet is not a tracked payment-request review.
+        // paymentDetailsSheet() re-sets this after the call returns.
+        openPaymentIntentId = null;
         AlertDialog dialog = new AlertDialog.Builder(this).create();
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(false);
         scroll.addView(body);
-        dialog.setView(scroll);
+        if (actions == null) {
+            dialog.setView(scroll);
+        } else {
+            LinearLayout sheet = vertical();
+            sheet.setBackground(round(BG, dp(28), 0, 0));
+            sheet.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+            sheet.addView(fixedSheetActions(actions));
+            dialog.setView(sheet);
+        }
         dialog.setOnDismissListener(d -> {
-            if (activeSheet == dialog) activeSheet = null;
+            // activeSheet is already null here when the sheet is being replaced
+            // (closeActiveSheet ran first); it still equals dialog only when the
+            // user dismissed it, in which case the tracked request is no longer open.
+            if (activeSheet == dialog) {
+                activeSheet = null;
+                openPaymentIntentId = null;
+            }
+            if (sensitive) disableSensitiveScreen();
         });
         dialog.setOnShowListener(d -> {
             Window w = dialog.getWindow();
@@ -3295,11 +4342,31 @@ public class MainActivity extends FragmentActivity {
         activeSheet = dialog;
     }
 
+    private View fixedSheetActions(View actions) {
+        LinearLayout shell = vertical();
+        shell.setPadding(dp(20), dp(12), dp(20), dp(18));
+        shell.setBackgroundColor(BG);
+        shell.addView(actions, new LinearLayout.LayoutParams(-1, -2));
+        shell.setElevation(dp(8));
+        return shell;
+    }
+
     private void closeActiveSheet() {
         if (activeSheet == null) return;
         AlertDialog dialog = activeSheet;
         activeSheet = null;
         if (dialog.isShowing()) dialog.dismiss();
+    }
+
+    private void enableSensitiveScreen() {
+        sensitiveScreenActive = true;
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+    }
+
+    private void disableSensitiveScreen() {
+        if (!sensitiveScreenActive) return;
+        sensitiveScreenActive = false;
+        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
 
     private Button primaryButton(String label, Runnable action) {
@@ -3361,6 +4428,28 @@ public class MainActivity extends FragmentActivity {
         t.setPadding(dp(11), dp(6), dp(11), dp(6));
         t.setBackground(round(bg, dp(999), border, border == Color.TRANSPARENT ? 0 : 1));
         return t;
+    }
+
+    private View walletMark() {
+        return new WalletMarkView(this);
+    }
+
+    private View circleIconButton(int mode, Runnable action) {
+        DrawnIconButton button = new DrawnIconButton(this, mode);
+        button.setOnClickListener(v -> action.run());
+        return button;
+    }
+
+    private TextView circleTextButton(String label, Runnable action) {
+        TextView button = text(label, 28, GREEN, false);
+        button.setGravity(Gravity.CENTER);
+        button.setIncludeFontPadding(false);
+        button.setBackground(round(SURFACE, dp(999), Color.rgb(195, 219, 201), 1));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            button.setElevation(dp(2));
+        }
+        button.setOnClickListener(v -> action.run());
+        return button;
     }
 
     private Button quickActionButton(String label, Runnable action) {
@@ -3509,10 +4598,27 @@ public class MainActivity extends FragmentActivity {
         return first + " / " + second;
     }
 
+    private String titleCase(String value) {
+        String clean = value == null ? "" : value.trim();
+        if (clean.length() == 0) return "";
+        StringBuilder out = new StringBuilder();
+        for (String part : clean.split("\\s+")) {
+            if (part.length() == 0) continue;
+            if (out.length() > 0) out.append(' ');
+            out.append(part.substring(0, 1).toUpperCase(java.util.Locale.US));
+            if (part.length() > 1) out.append(part.substring(1).toLowerCase(java.util.Locale.US));
+        }
+        return out.toString();
+    }
+
     private boolean isUseful(String value) {
         if (value == null) return false;
         String clean = value.trim();
         return clean.length() > 0 && !"null".equalsIgnoreCase(clean);
+    }
+
+    private boolean isDebuggableBuild() {
+        return (getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0;
     }
 
     private int statusBarHeight() {
@@ -3565,8 +4671,7 @@ public class MainActivity extends FragmentActivity {
     private void error(String heading, Exception e) {
         LinearLayout body = sheetBase(heading);
         body.addView(text(e.getClass().getSimpleName() + ": " + trimError(e.getMessage()), 13, RED, true));
-        body.addView(primaryButton("Done", this::closeActiveSheet));
-        showSheet(body);
+        showSheetWithActions(body, primaryButton("Done", this::closeActiveSheet));
     }
 
     private String trimError(String message) {
@@ -3581,6 +4686,104 @@ public class MainActivity extends FragmentActivity {
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private final class WalletMarkView extends View {
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint dot = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        WalletMarkView(Context context) {
+            super(context);
+            fill.setColor(GREEN);
+            stroke.setColor(Color.WHITE);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setStrokeWidth(dp(5));
+            dot.setColor(Color.WHITE);
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int size = dp(56);
+            setMeasuredDimension(size, size);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            float w = getWidth();
+            float h = getHeight();
+            canvas.drawRoundRect(new RectF(0, 0, w, h), dp(15), dp(15), fill);
+            RectF arc = new RectF(dp(12), dp(20), w - dp(12), h + dp(4));
+            canvas.drawArc(arc, 200, 140, false, stroke);
+            canvas.drawCircle(w / 2f, h - dp(16), dp(5), dot);
+        }
+    }
+
+    private final class DrawnIconButton extends View {
+        static final int MODE_SEARCH = 1;
+        static final int MODE_SCAN = 2;
+
+        private final int mode;
+        private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        DrawnIconButton(Context context, int mode) {
+            super(context);
+            this.mode = mode;
+            fill.setColor(SURFACE);
+            stroke.setColor(GREEN_DARK);
+            stroke.setStyle(Paint.Style.STROKE);
+            stroke.setStrokeCap(Paint.Cap.ROUND);
+            stroke.setStrokeJoin(Paint.Join.ROUND);
+            stroke.setStrokeWidth(dp(3));
+            setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+            setBackground(round(SURFACE, dp(999), Color.rgb(195, 219, 201), 1));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                setElevation(dp(2));
+            }
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int size = dp(58);
+            setMeasuredDimension(size, size);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (mode == MODE_SCAN) {
+                drawScan(canvas);
+            } else {
+                drawSearch(canvas);
+            }
+        }
+
+        private void drawSearch(Canvas canvas) {
+            float cx = getWidth() / 2f - dp(5);
+            float cy = getHeight() / 2f - dp(5);
+            canvas.drawCircle(cx, cy, dp(10), stroke);
+            canvas.drawLine(cx + dp(8), cy + dp(8), cx + dp(18), cy + dp(18), stroke);
+        }
+
+        private void drawScan(Canvas canvas) {
+            float left = dp(18);
+            float top = dp(18);
+            float right = getWidth() - dp(18);
+            float bottom = getHeight() - dp(18);
+            float len = dp(8);
+            canvas.drawLine(left, top + len, left, top, stroke);
+            canvas.drawLine(left, top, left + len, top, stroke);
+            canvas.drawLine(right - len, top, right, top, stroke);
+            canvas.drawLine(right, top, right, top + len, stroke);
+            canvas.drawLine(left, bottom - len, left, bottom, stroke);
+            canvas.drawLine(left, bottom, left + len, bottom, stroke);
+            canvas.drawLine(right - len, bottom, right, bottom, stroke);
+            canvas.drawLine(right, bottom, right, bottom - len, stroke);
+        }
     }
 
     private static final class PairingLink {
