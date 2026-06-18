@@ -791,13 +791,10 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
         let payment = object["payment"] as? [String: Any] ?? [:]
         let source = object["source"] as? [String: Any] ?? [:]
         let display = object["display"] as? [String: Any] ?? [:]
-        let metadata = object["metadata"] as? [String: Any] ?? [:]
-        let velarum = object["velarum"] as? [String: Any] ?? [:]
-        let payload = velarum["payload"] as? [String: Any] ?? [:]
-        let foodOrder = metadata["food_order"] as? [String: Any] ?? [:]
-        let order = (object["order"] as? [String: Any]) ?? (payload["order"] as? [String: Any]) ?? foodOrder
-        let restaurant = order["restaurant"] as? [String: Any] ?? [:]
-        let pricing = order["pricing"] as? [String: Any] ?? [:]
+        // L3: demo-only food_order / restaurant fields are parsed by a dedicated
+        // metadata adapter rather than inline here, keeping the core protocol model
+        // free of demo coupling (see DemoOrderMetadata).
+        let demoOrder = DemoOrderMetadata.parse(object)
         let rawData = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
         let raw = String(data: rawData, encoding: .utf8) ?? "{}"
         let now = Int64(Date().timeIntervalSince1970 * 1000)
@@ -833,11 +830,11 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
                 string(source, "agent_id")
             ),
             sourceChannel: string(source, "channel"),
-            orderId: string(order, "id", fallback: string(order, "order_id")),
-            restaurantName: string(restaurant, "name"),
-            restaurantCuisine: string(restaurant, "cuisine"),
-            itemSummary: string(order, "item_summary"),
-            orderTotalUsd: firstNonEmpty(string(pricing, "total_usd"), string(pricing, "total")),
+            orderId: demoOrder.orderId,
+            restaurantName: demoOrder.restaurantName,
+            restaurantCuisine: demoOrder.restaurantCuisine,
+            itemSummary: demoOrder.itemSummary,
+            orderTotalUsd: demoOrder.orderTotalUsd,
             rawJSONString: raw,
             protocolName: request?.protocolName,
             requestId: request?.requestId,
@@ -872,6 +869,38 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if !clean.isEmpty { return clean }
         return testnet ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org"
+    }
+}
+
+/// Adapter for OpenClaw's demo `food_order` / restaurant fields.
+///
+/// These are a demo-only convenience and are NOT part of the core Payment Request
+/// protocol, so they live here in their own metadata adapter instead of being
+/// parsed inline in `PaymentIntent.parse`. Keeping them out of the core model
+/// limits protocol drift: if the demo payload shape changes, only this adapter
+/// has to move. The parsing logic is unchanged from what `parse` did inline.
+struct DemoOrderMetadata: Equatable {
+    var orderId: String = ""
+    var restaurantName: String = ""
+    var restaurantCuisine: String = ""
+    var itemSummary: String = ""
+    var orderTotalUsd: String = ""
+
+    static func parse(_ object: [String: Any]) -> DemoOrderMetadata {
+        let metadata = object["metadata"] as? [String: Any] ?? [:]
+        let velarum = object["velarum"] as? [String: Any] ?? [:]
+        let payload = velarum["payload"] as? [String: Any] ?? [:]
+        let foodOrder = metadata["food_order"] as? [String: Any] ?? [:]
+        let order = (object["order"] as? [String: Any]) ?? (payload["order"] as? [String: Any]) ?? foodOrder
+        let restaurant = order["restaurant"] as? [String: Any] ?? [:]
+        let pricing = order["pricing"] as? [String: Any] ?? [:]
+        return DemoOrderMetadata(
+            orderId: string(order, "id", fallback: string(order, "order_id")),
+            restaurantName: string(restaurant, "name"),
+            restaurantCuisine: string(restaurant, "cuisine"),
+            itemSummary: string(order, "item_summary"),
+            orderTotalUsd: firstNonEmpty(string(pricing, "total_usd"), string(pricing, "total"))
+        )
     }
 }
 
