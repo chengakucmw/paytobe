@@ -39,10 +39,22 @@ public class WalletWebActivity extends FragmentActivity {
     private WebView webView;
     private HDWallet wallet;
 
+    // L2: a scan result can arrive while the WebView is still (re)loading — e.g. the
+    // OS destroys and recreates this Activity under memory pressure while the camera
+    // Activity is in front. We hold the latest scan payload here and only hand it to
+    // the page once its JS hook exists, and we persist it across recreation in
+    // onSaveInstanceState so it is never dropped into a torn-down DOM.
+    private static final String STATE_PENDING_SCAN = "pending_scan_payload";
+    private String pendingScanPayload;
+    private boolean webReady;
+
     @Override
     @SuppressWarnings("SetJavaScriptEnabled")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (savedInstanceState != null) {
+            pendingScanPayload = savedInstanceState.getString(STATE_PENDING_SCAN);
+        }
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -63,6 +75,16 @@ public class WalletWebActivity extends FragmentActivity {
                     }
                 }
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // The prototype's JS (and its scan hook) is loaded now. Flush any scan
+                // result that arrived while the page was still loading, or that was
+                // queued before this Activity was recreated.
+                webReady = true;
+                flushPendingScan();
             }
         });
         webView.addJavascriptInterface(new NativeBridge(), "VPNative");
@@ -88,8 +110,22 @@ public class WalletWebActivity extends FragmentActivity {
         if (requestCode == REQUEST_SCAN && resultCode == RESULT_OK && data != null) {
             String payload = data.getStringExtra(QrScannerActivity.EXTRA_PAYLOAD);
             if (payload != null && payload.trim().length() > 0) {
-                callJs("window.VelarumPrototypeScanResult(" + jsString(payload.trim()) + ")");
+                // Don't deliver straight away: if this Activity was recreated while the
+                // scanner was in front, the WebView may not have finished reloading.
+                // Queue the result and let flushPendingScan() hand it over once ready.
+                pendingScanPayload = payload.trim();
+                flushPendingScan();
             }
+        }
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        // Survive process death / recreation so a scan captured just before the OS
+        // reclaimed this Activity is re-delivered after the WebView reloads.
+        if (pendingScanPayload != null) {
+            outState.putString(STATE_PENDING_SCAN, pendingScanPayload);
         }
     }
 
@@ -107,6 +143,33 @@ public class WalletWebActivity extends FragmentActivity {
     private void callJs(String js) {
         if (webView == null) return;
         webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    // Deliver a queued scan result to the page, but only once its JS hook actually
+    // exists. If the page just reloaded, the hook may not be defined for a few more
+    // milliseconds, so we re-check a bounded number of times. The payload stays
+    // queued until delivery is confirmed, so it can never be lost into a DOM that an
+    // Activity recreation reset.
+    private void flushPendingScan() {
+        if (pendingScanPayload == null || webView == null || !webReady) return;
+        deliverScan(pendingScanPayload, 0);
+    }
+
+    private void deliverScan(final String payload, final int attempt) {
+        if (webView == null) return;
+        final String js = "(function(){try{"
+                + "if(typeof window.VelarumPrototypeScanResult==='function'){"
+                + "window.VelarumPrototypeScanResult(" + jsString(payload) + ");return '1';}"
+                + "}catch(e){}return '0';})()";
+        webView.post(() -> webView.evaluateJavascript(js, value -> {
+            if ("\"1\"".equals(value)) {
+                // Only clear if it is still the same payload we set out to deliver.
+                if (payload.equals(pendingScanPayload)) pendingScanPayload = null;
+            } else if (attempt < 20) {
+                // Hook not ready yet; retry shortly (≈ up to 3s total) without blocking.
+                webView.postDelayed(() -> deliverScan(payload, attempt + 1), 150);
+            }
+        }));
     }
 
     private static String jsString(String value) {
