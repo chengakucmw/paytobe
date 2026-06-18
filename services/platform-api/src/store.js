@@ -316,10 +316,6 @@ export class Store {
     });
   }
 
-  firstDeviceId() {
-    return Object.keys(this.state.devices)[0] || "";
-  }
-
   createPairingSession(sessionId, pairingCode, data = {}) {
     return this.mutate(() => {
       const now = new Date().toISOString();
