@@ -335,10 +335,41 @@ final class RelayClient {
             throw new IllegalStateException("Set Relay URL first.");
         }
         base = base.trim().replaceAll("/+$", "");
-        if (!base.startsWith("https://") && !base.startsWith("http://")) {
-            throw new IllegalStateException("Relay URL must start with http:// or https://");
+        if (base.startsWith("https://")) return base;
+        // M11: signed payment requests must never travel over cleartext on a hostile
+        // network. Plain http:// (and therefore the ws:// it is upgraded to) is allowed
+        // only for local development hosts, matching res/xml/network_security_config.xml;
+        // every other relay must use https:// / wss://.
+        if (base.startsWith("http://")) {
+            if (isCleartextDevHost(hostOf(base))) return base;
+            throw new IllegalStateException(
+                    "Relay URL must use https:// - cleartext http is only allowed for local development hosts.");
         }
-        return base;
+        throw new IllegalStateException("Relay URL must start with https:// (or http:// for a local development host).");
+    }
+
+    private static String hostOf(String base) {
+        int scheme = base.indexOf("://");
+        String rest = scheme >= 0 ? base.substring(scheme + 3) : base;
+        int slash = rest.indexOf('/');
+        if (slash >= 0) rest = rest.substring(0, slash);
+        int at = rest.indexOf('@');
+        if (at >= 0) rest = rest.substring(at + 1);
+        if (rest.startsWith("[")) { // IPv6 literal, keep brackets, drop any :port after
+            int close = rest.indexOf(']');
+            return close >= 0 ? rest.substring(0, close + 1) : rest;
+        }
+        int colon = rest.indexOf(':');
+        if (colon >= 0) rest = rest.substring(0, colon);
+        return rest.toLowerCase(java.util.Locale.US);
+    }
+
+    private static boolean isCleartextDevHost(String host) {
+        if (host == null || host.length() == 0) return false;
+        return host.equals("localhost")
+                || host.equals("127.0.0.1")
+                || host.equals("10.0.2.2")   // Android emulator -> host loopback
+                || host.equals("10.0.3.2");  // Genymotion emulator -> host loopback
     }
 
     private static boolean isPaymentRequestEvent(String type) {
