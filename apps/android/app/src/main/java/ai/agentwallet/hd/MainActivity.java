@@ -984,7 +984,7 @@ public class MainActivity extends FragmentActivity {
         card.addView(sectionEyebrow("Quick actions"));
         addGap(card, 12);
         LinearLayout top = row();
-        top.addView(quickActionButton("Receive", this::receiveAddressesSheet), weight());
+        top.addView(quickActionButton("Receive", this::receiveAssetPickerSheet), weight());
         top.addView(quickActionButton("Inbox", this::messageCenter), weightLeft());
         card.addView(top);
         addGap(card, 10);
@@ -1038,22 +1038,8 @@ public class MainActivity extends FragmentActivity {
         card.addView(field("Stellar", wallet.stellar.address, true));
         card.addView(text("Use this address for XLM. Stellar accounts must be funded before they are active.", 12, MUTED, false));
         addGap(card, 16);
-        card.addView(primaryButton("Open Receive Details", this::receiveAddressesSheet), new LinearLayout.LayoutParams(-1, dp(50)));
+        card.addView(primaryButton("Open Receive Details", this::receiveAssetPickerSheet), new LinearLayout.LayoutParams(-1, dp(50)));
         return card;
-    }
-
-    private void receiveAddressesSheet() {
-        if (!requireWallet()) return;
-        LinearLayout body = sheetBase("Receive");
-        body.addView(pill("Ethereum", CHAIN_ETH, SOFT, Color.TRANSPARENT));
-        addGap(body, 10);
-        body.addView(qrImage(wallet.evm.address));
-        addGap(body, 14);
-        body.addView(field("Asset", "ETH", false));
-        body.addView(field("Network", "Ethereum", false));
-        body.addView(field("Receive address", wallet.evm.address, true));
-        body.addView(warning("Use this address only for ETH on Ethereum. Wrong-network deposits can permanently lose funds."));
-        showSheetWithActions(body, primaryButton("Copy Address", () -> copy("ETH address", wallet.evm.address)));
     }
 
     private View transferLauncherCard() {

@@ -365,7 +365,24 @@ final class StellarTransfer {
     }
 
     private static long xlmToStroops(String xlm) {
-        return new BigDecimal(xlm).multiply(new BigDecimal("10000000")).toBigIntegerExact().longValueExact();
+        // Validate with clear messages instead of leaking raw NumberFormatException /
+        // ArithmeticException to the user (e.g. when the amount has more than the 7
+        // decimal places Stellar supports, is non-numeric, or overflows).
+        String raw = xlm == null ? "" : xlm.trim();
+        if (raw.isEmpty()) throw new IllegalStateException("Enter an amount of XLM to send.");
+        BigDecimal value;
+        try {
+            value = new BigDecimal(raw);
+        } catch (NumberFormatException e) {
+            throw new IllegalStateException("Enter a valid XLM amount, for example 1.5.");
+        }
+        if (value.signum() <= 0) throw new IllegalStateException("XLM amount must be greater than 0.");
+        try {
+            return value.multiply(new BigDecimal("10000000")).toBigIntegerExact().longValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalStateException(
+                    "XLM supports at most 7 decimal places (1 stroop = 0.0000001 XLM) and must be within range. Adjust the amount.");
+        }
     }
 
     private static String stroopsToXlm(long stroops) {
