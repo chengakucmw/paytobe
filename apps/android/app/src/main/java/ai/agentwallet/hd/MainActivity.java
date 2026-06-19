@@ -1049,6 +1049,8 @@ public class MainActivity extends FragmentActivity {
         card.addView(text("Real network transfer", 22, INK, true));
         addGap(card, 8);
         card.addView(text("These screens sign locally and broadcast to the RPC/Horizon endpoint you provide.", 13, MUTED, false));
+        addGap(card, 10);
+        card.addView(warning("Advanced mode: these sends bypass the daily limit, recipient whitelist, and other risk checks the main wallet applies. For advanced or testing use only."));
         addGap(card, 14);
         card.addView(primaryButton("Send EVM Native Asset", this::evmTransferSheet));
         addGap(card, 10);
@@ -1065,6 +1067,8 @@ public class MainActivity extends FragmentActivity {
     private void sendEntrySheet() {
         if (!requireWallet()) return;
         LinearLayout body = sheetBase("Send");
+        body.addView(warning("The manual options below are advanced sends that bypass the daily limit, recipient whitelist, and other risk checks. Use Scan or the main wallet for everyday transfers."));
+        addGap(body, 12);
         body.addView(primaryButton("Scan payment QR", () -> {
             closeActiveSheet();
             openScanner();
