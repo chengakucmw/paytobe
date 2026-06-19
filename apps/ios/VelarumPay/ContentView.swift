@@ -1250,6 +1250,11 @@ struct PaymentFactsCard: View {
                 }
                 if !intent.memo.isEmpty {
                     FieldRow(title: intent.memoFieldTitle, value: intent.memo, copyAction: { app.copy(intent.memo) })
+                } else if paymentExpectsMemo(intent) {
+                    // H-1: a memo-capable XLM payment with an empty memo must not be
+                    // invisible. Always show the row as "Not provided" so a missing
+                    // exchange/custodial deposit memo is obvious before signing.
+                    FieldRow(title: intent.memoFieldTitle, value: "Not provided")
                 }
                 if !intent.estimatedFeeDisplay.isEmpty {
                     FieldRow(title: "Estimated fee", value: intent.estimatedFeeDisplay)
@@ -2077,8 +2082,30 @@ func isPaymentDetailSignable(_ intent: PaymentIntent, state overrideState: Strin
     return intent.canSign && ["pending", "awaiting_signature", "needs_review", "source_review_required"].contains(state)
 }
 
+/// H-1: Stellar XLM is the only rail this build can sign, and exchange / custodial
+/// XLM deposits almost always require a memo (a numeric tag) to be credited. A
+/// payment that should carry a memo but doesn't is a silent fund-loss risk, so we
+/// treat an empty memo on such a payment as a caution the user must explicitly
+/// accept before signing. (We do not hard-block: legitimate person-to-person
+/// transfers and new-account funding genuinely need no memo.)
+func paymentExpectsMemo(_ intent: PaymentIntent) -> Bool {
+    intent.isStellarXLM
+}
+
+func paymentMemoMissing(_ intent: PaymentIntent) -> Bool {
+    guard isPaymentDetailSignable(intent), paymentExpectsMemo(intent) else { return false }
+    return intent.memo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+}
+
+let paymentMissingMemoWarningMessage =
+    "No memo / tag on this XLM payment. Exchange and custodial deposits usually require a memo — sending without one can lose the funds. Continue only if you are sure this recipient does not need a memo."
+
 func paymentRequiresWarningStepUp(_ intent: PaymentIntent) -> Bool {
     guard isPaymentDetailSignable(intent) else { return false }
+    // H-1: an XLM payment that should carry a memo but doesn't must force the
+    // second-confirmation step-up before signing, so a missing exchange /
+    // custodial deposit memo can never be skipped silently.
+    if paymentMemoMissing(intent) { return true }
     let state = paymentReviewState(intent)
     if ["needs_review", "source_review_required"].contains(state) { return true }
     if paymentRiskTone(intent) == "caution" { return true }
@@ -2202,6 +2229,9 @@ func paymentRiskMessages(_ intent: PaymentIntent) -> [String] {
         let prefix = finding.isBlocker ? "Blocked" : "Warning"
         return "\(prefix): \(valueOr(finding.message, finding.code))"
     }
+    if paymentMemoMissing(intent) {
+        messages.append("Warning: \(paymentMissingMemoWarningMessage)")
+    }
     if paymentReviewState(intent) == "missing_context", messages.isEmpty {
         messages.append("Warning: Transaction context or evidence was not received.")
     }
@@ -2209,9 +2239,12 @@ func paymentRiskMessages(_ intent: PaymentIntent) -> [String] {
 }
 
 func paymentWarningMessages(_ intent: PaymentIntent) -> [String] {
-    let warnings = (intent.riskFindings ?? [])
+    var warnings = (intent.riskFindings ?? [])
         .filter { !$0.isBlocker }
         .map { valueOr($0.message, $0.code) }
+    if paymentMemoMissing(intent) {
+        warnings.append(paymentMissingMemoWarningMessage)
+    }
     if warnings.isEmpty && paymentRequiresWarningStepUpWithoutMessages(intent) {
         return ["Some claims come from AI, observed pages, or incomplete evidence. They are not verified payment facts."]
     }
