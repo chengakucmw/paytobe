@@ -2,6 +2,58 @@ import XCTest
 @testable import VelarumPay
 
 final class PaymentRequestParsingTests: XCTestCase {
+    // MARK: - C-1: Stellar memo type encoding (MEMO_ID vs MEMO_TEXT)
+    //
+    // Numeric exchange deposit memos MUST go out as MEMO_ID (uint64). The old code
+    // encoded every non-empty memo as MEMO_TEXT, so a numeric tag silently failed
+    // to credit the user at the exchange. These tests pin the union discriminant.
+
+    func testNumericMemoEncodesAsMemoId() throws {
+        var encoded = Data()
+        try encoded.writeMemo("100200300", type: "id")
+        // MEMO_ID = union discriminant 2, then an 8-byte big-endian uint64.
+        XCTAssertEqual(Array(encoded.prefix(4)), [0, 0, 0, 2])
+        XCTAssertEqual(encoded.count, 12)
+        let value = encoded.suffix(8).reduce(UInt64(0)) { ($0 << 8) | UInt64($1) }
+        XCTAssertEqual(value, 100_200_300)
+    }
+
+    func testTextMemoStillEncodesAsMemoText() throws {
+        var encoded = Data()
+        try encoded.writeMemo("ios-qa-1", type: "text")
+        XCTAssertEqual(Array(encoded.prefix(4)), [0, 0, 0, 1]) // MEMO_TEXT
+    }
+
+    func testUntypedMemoStaysBackwardCompatibleAsText() throws {
+        var encoded = Data()
+        try encoded.writeMemo("hello")
+        XCTAssertEqual(Array(encoded.prefix(4)), [0, 0, 0, 1]) // MEMO_TEXT (unchanged)
+    }
+
+    func testEmptyMemoEncodesAsMemoNoneRegardlessOfType() throws {
+        var encoded = Data()
+        try encoded.writeMemo("", type: "id")
+        XCTAssertEqual(Array(encoded), [0, 0, 0, 0]) // MEMO_NONE
+    }
+
+    func testNonNumericIdMemoFailsClosed() {
+        var encoded = Data()
+        // Must throw rather than silently fall back to MEMO_TEXT (which would lose funds).
+        XCTAssertThrowsError(try encoded.writeMemo("not-a-number", type: "id"))
+    }
+
+    func testNumericMemoParsesWithIdTypeAndLabel() throws {
+        var payload = Self.stellarPaymentRequest()
+        var payment = payload["payment"] as! [String: Any]
+        payment["memo"] = "100200300"
+        payment["memo_type"] = "id"
+        payload["payment"] = payment
+        let intent = try PaymentIntent.parse(payload)
+        XCTAssertEqual(intent.memo, "100200300")
+        XCTAssertEqual(intent.memoType, "id")
+        XCTAssertEqual(intent.memoFieldTitle, "Memo (ID)")
+    }
+
     func testStellarXLMFixtureParsesAsSignablePendingRequest() throws {
         let intent = try PaymentIntent.parse(Self.stellarPaymentRequest())
 

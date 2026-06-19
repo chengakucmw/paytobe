@@ -1249,7 +1249,7 @@ struct PaymentFactsCard: View {
                     FieldRow(title: "Payee", value: intent.payeeDisplayName)
                 }
                 if !intent.memo.isEmpty {
-                    FieldRow(title: "Memo", value: intent.memo, copyAction: { app.copy(intent.memo) })
+                    FieldRow(title: intent.memoFieldTitle, value: intent.memo, copyAction: { app.copy(intent.memo) })
                 }
                 if !intent.estimatedFeeDisplay.isEmpty {
                     FieldRow(title: "Estimated fee", value: intent.estimatedFeeDisplay)

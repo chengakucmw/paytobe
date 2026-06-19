@@ -210,7 +210,8 @@ actor StellarService {
         testnet: Bool,
         destinationAddress: String,
         amountXLM: String,
-        memo: String = ""
+        memo: String = "",
+        memoType: String = ""
     ) async throws -> SignedStellarTransaction {
         let horizon = normalizeHorizonURL(horizonURL, testnet: testnet)
         let sourceAddress = wallet.address
@@ -233,7 +234,8 @@ actor StellarService {
             sequence: sequence,
             amount: amount,
             createAccount: createAccount,
-            memo: memo
+            memo: memo,
+            memoType: memoType
         )
         let passphrase = testnet ? testnetPassphrase : publicPassphrase
         var signatureBase = Data(SHA256.hash(data: Data(passphrase.utf8)))
@@ -291,6 +293,7 @@ actor StellarService {
         destinationAddress: String,
         amountXLM: String,
         memo: String = "",
+        memoType: String = "",
         progress: @escaping (String) async -> Void
     ) async throws -> String {
         let signed = try await signXLM(
@@ -299,7 +302,8 @@ actor StellarService {
             testnet: testnet,
             destinationAddress: destinationAddress,
             amountXLM: amountXLM,
-            memo: memo
+            memo: memo,
+            memoType: memoType
         )
         return try await broadcastXLM(signed, progress: progress)
     }
@@ -382,13 +386,13 @@ actor StellarService {
         return false
     }
 
-    private func transactionXDR(sourcePublic: Data, destinationPublic: Data, sequence: Int64, amount: Int64, createAccount: Bool, memo: String) throws -> Data {
+    private func transactionXDR(sourcePublic: Data, destinationPublic: Data, sequence: Int64, amount: Int64, createAccount: Bool, memo: String, memoType: String = "") throws -> Data {
         var out = Data()
         try out.writeAccountId(sourcePublic)
         out.appendInt32(100)
         out.appendInt64(sequence)
         out.appendInt32(0)
-        try out.writeMemo(memo)
+        try out.writeMemo(memo, type: memoType)
         out.appendInt32(1)
         out.appendBool(false)
         if createAccount {
@@ -587,6 +591,32 @@ enum Base32 {
     }
 }
 
+/// Decodes a Stellar MEMO_HASH / MEMO_RETURN value (exactly 32 bytes) from either
+/// 64 hex characters or base64. Returns nil if the result is not exactly 32 bytes.
+private func stellarMemoHash32(_ value: String) -> Data? {
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    if trimmed.count == 64, let hex = stellarHexData(trimmed), hex.count == 32 {
+        return hex
+    }
+    if let decoded = Data(base64Encoded: trimmed), decoded.count == 32 {
+        return decoded
+    }
+    return nil
+}
+
+private func stellarHexData(_ hex: String) -> Data? {
+    let chars = Array(hex)
+    guard chars.count % 2 == 0 else { return nil }
+    var data = Data(capacity: chars.count / 2)
+    var index = 0
+    while index < chars.count {
+        guard let high = chars[index].hexDigitValue, let low = chars[index + 1].hexDigitValue else { return nil }
+        data.append(UInt8(high << 4 | low))
+        index += 2
+    }
+    return data
+}
+
 extension Data {
     var hexString: String {
         map { String(format: "%02x", $0) }.joined()
@@ -602,6 +632,14 @@ extension Data {
     mutating func appendInt64(_ value: Int64) {
         for shift in stride(from: 56, through: 0, by: -8) {
             append(UInt8((value >> Int64(shift)) & 0xff))
+        }
+    }
+
+    /// XDR `uint64`, big-endian. Used by MEMO_ID (C-1): exchange deposit tags are
+    /// unsigned 64-bit integers, so they must not go through the signed Int64 path.
+    mutating func appendUInt64(_ value: UInt64) {
+        for shift in stride(from: 56, through: 0, by: -8) {
+            append(UInt8((value >> UInt64(shift)) & 0xff))
         }
     }
 
@@ -630,21 +668,49 @@ extension Data {
         }
     }
 
-    /// Writes a Stellar Memo union. An empty memo encodes MEMO_NONE, which is
-    /// byte-identical to the previous no-memo behaviour, so existing transactions
-    /// and tests are unaffected. A non-empty memo is sent as MEMO_TEXT (string<28>).
-    mutating func writeMemo(_ memo: String) throws {
+    /// Writes a Stellar Memo union, honouring the memo's declared **type**.
+    ///
+    /// C-1 fix: most centralized exchanges require a numeric `MEMO_ID` (uint64)
+    /// deposit memo. The previous code encoded every non-empty memo as
+    /// `MEMO_TEXT`, so a numeric exchange tag like "100200300" went out as the
+    /// *text* "100200300"; the exchange matches deposits on MEMO_ID and never
+    /// credited the user — a silent loss of funds. We now branch on the type and
+    /// FAIL CLOSED on a malformed id/hash rather than silently downgrading to
+    /// text. An empty memo is always MEMO_NONE (byte-identical to the old no-memo
+    /// behaviour) and an empty/"text" type keeps the original MEMO_TEXT path, so
+    /// existing transactions and tests are unaffected.
+    mutating func writeMemo(_ memo: String, type memoType: String = "") throws {
         let text = memo.trimmingCharacters(in: .whitespacesAndNewlines)
         if text.isEmpty {
             appendInt32(0) // MEMO_NONE
             return
         }
-        let bytes = Data(text.utf8)
-        guard bytes.count <= 28 else {
+        switch memoType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "", "text":
+            let bytes = Data(text.utf8)
+            guard bytes.count <= 28 else {
+                throw AppError.invalidResponse(
+                    "Stellar text memo must be 28 bytes or fewer (this one is \(bytes.count)). Shorten it, or confirm the exchange wants a numeric ID memo instead.")
+            }
+            appendInt32(1) // MEMO_TEXT
+            try writeOpaque(bytes)
+        case "id":
+            guard let memoId = UInt64(text) else {
+                throw AppError.invalidResponse(
+                    "Stellar numeric memo (MEMO_ID) must be a whole number from 0 to 18446744073709551615. Got \"\(text)\".")
+            }
+            appendInt32(2) // MEMO_ID
+            appendUInt64(memoId)
+        case "hash", "return":
+            guard let hash = stellarMemoHash32(text) else {
+                throw AppError.invalidResponse(
+                    "Stellar \(memoType.lowercased()) memo must be exactly 32 bytes, encoded as 64 hex characters or base64.")
+            }
+            appendInt32(memoType.lowercased() == "hash" ? 3 : 4) // MEMO_HASH / MEMO_RETURN
+            append(hash) // Hash is a fixed opaque[32]; 32 is already 4-byte aligned.
+        default:
             throw AppError.invalidResponse(
-                "Stellar text memo must be 28 bytes or fewer (this one is \(bytes.count)). Shorten it, or confirm the exchange wants a numeric ID memo instead.")
+                "Unsupported Stellar memo type \"\(memoType)\". Use \"text\", \"id\", \"hash\", or \"return\".")
         }
-        appendInt32(1) // MEMO_TEXT
-        try writeOpaque(bytes)
     }
 }

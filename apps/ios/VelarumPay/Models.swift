@@ -434,6 +434,7 @@ struct PaymentFacts: Codable, Equatable {
     var amount: String
     var to: String
     var memo: String
+    var memoType: String?
     var estimatedFee: String
     var total: String
     var rpcUrl: String
@@ -472,6 +473,7 @@ struct PaymentFacts: Codable, Equatable {
             amount: amount,
             to: firstNonEmpty(string(payment, "to"), string(projection, "recipient")),
             memo: string(payment, "memo"),
+            memoType: firstNonEmpty(string(payment, "memo_type"), string(payment, "memoType"), string(projection, "memo_type")),
             estimatedFee: estimatedFee,
             total: firstNonEmpty(string(payment, "total"), string(projection, "total"), amount),
             rpcUrl: string(payment, "rpc_url"),
@@ -729,6 +731,7 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
     var amount: String
     var to: String
     var memo: String
+    var memoType: String?
     var rpcUrl: String
     var horizonUrl: String
     var stellarTestnet: Bool
@@ -813,6 +816,17 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
         displayButton.isEmpty ? "Pay" : displayButton
     }
 
+    /// Review-screen label for the memo row, so the user can see whether this is a
+    /// numeric exchange MEMO_ID vs a free-text memo (C-1). Empty/text → "Memo".
+    var memoFieldTitle: String {
+        switch (memoType ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "id": return "Memo (ID)"
+        case "hash": return "Memo (Hash)"
+        case "return": return "Memo (Return)"
+        default: return "Memo"
+        }
+    }
+
     static func parse(_ object: [String: Any]) throws -> PaymentIntent {
         let isStandardRequest = string(object, "protocol") == paymentRequestProtocol || !string(object, "request_id").isEmpty
         let request = isStandardRequest ? try PaymentRequest.parse(object) : nil
@@ -843,6 +857,7 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
             amount: facts.amount,
             to: facts.to,
             memo: facts.memo,
+            memoType: facts.memoType,
             rpcUrl: facts.rpcUrl,
             horizonUrl: stellarHorizonUrl(facts.horizonUrl, testnet: stellarTestnet),
             stellarTestnet: stellarTestnet,

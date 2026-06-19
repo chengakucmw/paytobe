@@ -369,7 +369,8 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                     testnet: intent.stellarTestnet,
                     destinationAddress: intent.to,
                     amountXLM: intent.amount,
-                    memo: intent.memo
+                    memo: intent.memo,
+                    memoType: intent.memoType ?? ""
                 )
                 try await relay.updateStatus(config: config, intent: intent, status: PaymentStatus.signed.rawValue)
                 localStore.upsertIntent(intent.updating(status: PaymentStatus.signed.rawValue))
