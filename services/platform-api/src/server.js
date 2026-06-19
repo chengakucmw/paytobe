@@ -23,7 +23,7 @@ import {
   normalizePaymentRequestV1,
   normalizeTransactionContextV1
 } from "./velarum.js";
-import { canTransition, evaluateIntent, evaluatePaymentRequest, shouldRecordSpent } from "./risk.js";
+import { canTransition, evaluateIntent, evaluatePaymentRequest, shouldRecordSpent, stellarConfirmationResult } from "./risk.js";
 import { createObservability } from "./observability.js";
 
 loadDotEnv();
@@ -524,7 +524,9 @@ app.post("/v1/payment-requests", (req, res) => {
   }
 
   const context = buildTransactionContextProjection(normalized.value);
-  const risk = evaluatePaymentRequest(normalized.value, context);
+  // M-1: pass the store + env so daily-limit and whitelist gates are enforced
+  // on this (main) path, not only on the legacy payment-intent path.
+  const risk = evaluatePaymentRequest(normalized.value, context, store, process.env);
   const warnings = [...(normalized.warnings || []), ...context.warnings, ...risk.warnings];
   const request = store.putPaymentRequest({
     ...normalized.value,
@@ -1584,7 +1586,8 @@ async function waitForConfirmation(intent, txHash) {
     }
     if (payment.rail === "stellar_xlm") {
       const stellar = await stellarTransaction(payment.horizon_url, txHash);
-      if (stellar) return { ok: true };
+      const result = stellarConfirmationResult(stellar);
+      if (result) return result;
     }
     await sleep(4000);
   }

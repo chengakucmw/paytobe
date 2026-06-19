@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreImage // M-5: QR code generation for the receive address (CIQRCodeGenerator).
 
 #if canImport(UIKit)
 import UIKit
@@ -110,7 +111,7 @@ struct EmptyWalletCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("No wallet yet")
                     .font(.title2.bold())
-                Text("Set up or recover a wallet from Settings > Security. Home will show balances and receive addresses after a wallet is loaded.")
+                Text("Set up or recover a wallet from Settings > Security. Home will show your Stellar receive address and a scannable QR code after a wallet is loaded.")
                     .foregroundStyle(.secondary)
                 Button {
                     app.openSecuritySettings()
@@ -1242,6 +1243,15 @@ struct PaymentFactsCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 SectionHeader(title: "Payment Facts", note: "hard fields")
                 FieldRow(title: "Network", value: valueOr(intent.network, "Unknown network"))
+                if intent.isStellarXLM {
+                    // M-3: show the network resolved from the actual Horizon host —
+                    // not just the requester's label — and the host itself, so a
+                    // human can confirm real-money mainnet vs testnet before signing.
+                    FieldRow(title: "Stellar network", value: intent.stellarTestnet ? "Testnet · test coins" : "Mainnet · real funds")
+                    if let host = URL(string: intent.horizonUrl)?.host, !host.isEmpty {
+                        FieldRow(title: "Horizon endpoint", value: host)
+                    }
+                }
                 FieldRow(title: "Asset", value: valueOr(intent.asset, "Unknown asset"))
                 FieldRow(title: "Amount", value: "\(valueOr(intent.amount, "0")) \(valueOr(intent.asset, ""))")
                 FieldRow(title: "Recipient", value: valueOr(intent.to, "Missing recipient"), copyAction: intent.to.isEmpty ? nil : { app.copy(intent.to) })
@@ -1672,6 +1682,15 @@ struct AddressCard: View {
                     Button("Copy") { app.copy(address) }
                         .buttonStyle(.bordered)
                 }
+                // M-5: a scannable QR code so the recipient never has to hand-copy a
+                // 56-character address (a single wrong character sends funds nowhere).
+                if !address.isEmpty {
+                    HStack {
+                        Spacer()
+                        QRCodeImage(payload: address)
+                        Spacer()
+                    }
+                }
                 Text(address)
                     .font(.system(.body, design: .monospaced))
                     .textSelection(.enabled)
@@ -1682,6 +1701,36 @@ struct AddressCard: View {
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+/// M-5: renders a QR code for a receive address. Black modules on a white tile so
+/// it scans in both light and dark mode; `.interpolation(.none)` keeps the modules
+/// crisp when scaled. Falls back to nothing if generation fails (the copyable text
+/// address below it is always available).
+struct QRCodeImage: View {
+    let payload: String
+
+    var body: some View {
+        if let cgImage = Self.make(from: payload) {
+            Image(decorative: cgImage, scale: 1)
+                .interpolation(.none)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 180, height: 180)
+                .padding(12)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+                .accessibilityLabel("QR code for the receive address")
+        }
+    }
+
+    private static func make(from string: String) -> CGImage? {
+        guard let filter = CIFilter(name: "CIQRCodeGenerator") else { return nil }
+        filter.setValue(Data(string.utf8), forKey: "inputMessage")
+        filter.setValue("M", forKey: "inputCorrectionLevel")
+        guard let output = filter.outputImage else { return nil }
+        let scaled = output.transformed(by: CGAffineTransform(scaleX: 10, y: 10))
+        return CIContext().createCGImage(scaled, from: scaled.extent)
     }
 }
 

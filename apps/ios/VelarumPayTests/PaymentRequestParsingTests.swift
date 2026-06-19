@@ -90,6 +90,45 @@ final class PaymentRequestParsingTests: XCTestCase {
         XCTAssertThrowsError(try StellarStrKey.decodePublicKey(muxedAddress))
     }
 
+    // MARK: - M-3: network is resolved from the Horizon host, not the caller's claim
+    //
+    // The signing passphrase decides real funds (mainnet) vs test funds (testnet),
+    // so it must follow the endpoint the transaction is actually broadcast to —
+    // never a requester-controlled flag or a "network name contains test" guess.
+    func testStellarNetworkResolvesFromHorizonHostNotDeclaredFlag() {
+        // Caller claims mainnet, but the Horizon endpoint is testnet -> testnet wins.
+        let claimedMainnet = PaymentIntent.stellarNetwork(declaredTestnet: false, horizonURL: "https://horizon-testnet.stellar.org")
+        XCTAssertTrue(claimedMainnet.testnet)
+
+        // Caller claims testnet, but the endpoint is mainnet -> mainnet wins.
+        let claimedTestnet = PaymentIntent.stellarNetwork(declaredTestnet: true, horizonURL: "https://horizon.stellar.org")
+        XCTAssertFalse(claimedTestnet.testnet)
+
+        // No explicit horizon -> default follows the declared flag and stays consistent.
+        let defaulted = PaymentIntent.stellarNetwork(declaredTestnet: true, horizonURL: "")
+        XCTAssertTrue(defaulted.testnet)
+        XCTAssertEqual(defaulted.horizon, "https://horizon-testnet.stellar.org")
+
+        // An unrecognized custom host can't be classified -> falls back to the flag.
+        let custom = PaymentIntent.stellarNetwork(declaredTestnet: false, horizonURL: "https://my-horizon.example.com")
+        XCTAssertFalse(custom.testnet)
+        XCTAssertEqual(custom.horizon, "https://my-horizon.example.com")
+    }
+
+    func testParseBindsStellarNetworkToHorizonHost() throws {
+        var payload = Self.stellarPaymentRequest()
+        var payment = payload["payment"] as! [String: Any]
+        payment["network"] = "stellar_public"
+        payment["stellar_testnet"] = false
+        payment["horizon_url"] = "https://horizon-testnet.stellar.org"
+        payload["payment"] = payment
+
+        let intent = try PaymentIntent.parse(payload)
+
+        XCTAssertTrue(intent.stellarTestnet, "network must be resolved from the Horizon host, not the declared name")
+        XCTAssertEqual(URL(string: intent.horizonUrl)?.host, "horizon-testnet.stellar.org")
+    }
+
     func testStellarXLMFixtureParsesAsSignablePendingRequest() throws {
         let intent = try PaymentIntent.parse(Self.stellarPaymentRequest())
 

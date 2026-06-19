@@ -972,7 +972,10 @@ public class MainActivity extends FragmentActivity {
     }
 
     private String receiveWarning(String symbol, String network) {
-        if ("Stellar".equalsIgnoreCase(network)) return "Use this address for XLM on Stellar. Stellar accounts must be funded before they are active.";
+        // M-4: the web receive page warns that XLM deposits need a memo (P1-3); this
+        // native receive sheet only mentioned activation. Match the web wording so a
+        // memo-less exchange deposit — which can be lost — is flagged on every entry.
+        if ("Stellar".equalsIgnoreCase(network)) return "Use this address for XLM on Stellar. Stellar accounts must be funded before they are active. If you deposit from an exchange or any service that shares one address across users, you MUST include the memo / ID it gives you — an XLM deposit without the required memo can be lost or delayed.";
         if ("Solana".equalsIgnoreCase(network)) return "Use this address for SOL and SPL tokens only.";
         if ("Base".equalsIgnoreCase(network)) return "Use the Base network for Base assets. Do not send the same token over another network unless it is supported.";
         if ("Polygon".equalsIgnoreCase(network)) return "Use the Polygon network for Polygon assets only.";

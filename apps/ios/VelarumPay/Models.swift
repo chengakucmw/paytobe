@@ -842,7 +842,13 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         let facts = request?.payment ?? PaymentFacts.parse(payment)
         let network = facts.network
-        let stellarTestnet = bool(payment, "stellar_testnet") || network.lowercased().contains("test")
+        // M-3: the caller's `stellar_testnet` flag and a "network name contains
+        // test" guess are both untrusted hints. Resolve the real network from the
+        // Horizon host we will actually broadcast to, so the signing passphrase
+        // (real money vs test money) is bound to the endpoint, not to a field the
+        // requester controls. See stellarNetwork(declaredTestnet:horizonURL:).
+        let declaredTestnet = bool(payment, "stellar_testnet") || network.lowercased().contains("test")
+        let resolvedNetwork = stellarNetwork(declaredTestnet: declaredTestnet, horizonURL: facts.horizonUrl)
         return PaymentIntent(
             id: firstNonEmpty(request?.requestId ?? "", string(object, "intent_id"), string(object, "id")),
             status: normalizeStatus(request?.status ?? string(object, "status", fallback: PaymentStatus.pending.rawValue)),
@@ -859,8 +865,8 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
             memo: facts.memo,
             memoType: facts.memoType,
             rpcUrl: facts.rpcUrl,
-            horizonUrl: stellarHorizonUrl(facts.horizonUrl, testnet: stellarTestnet),
-            stellarTestnet: stellarTestnet,
+            horizonUrl: resolvedNetwork.horizon,
+            stellarTestnet: resolvedNetwork.testnet,
             txHash: string(object, "tx_hash"),
             error: string(object, "error"),
             displayTitle: firstNonEmpty(request?.display.title ?? "", string(display, "title")),
@@ -912,6 +918,22 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if !clean.isEmpty { return clean }
         return testnet ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org"
+    }
+
+    /// M-3: resolve mainnet vs testnet from the *verifiable* signal — the Horizon
+    /// host we will submit to — rather than the requester-controlled flag. When an
+    /// explicit `horizon_url` names a recognized Stellar host, that host decides
+    /// the network (and therefore the signing passphrase). Only an unrecognized,
+    /// custom host falls back to the declared flag, because there is nothing else
+    /// to go on; the resolved host still travels to the review screen so a human
+    /// can confirm both. Returns the resolved testnet flag together with the
+    /// concrete Horizon URL, kept consistent with each other.
+    static func stellarNetwork(declaredTestnet: Bool, horizonURL: String) -> (testnet: Bool, horizon: String) {
+        let horizon = stellarHorizonUrl(horizonURL, testnet: declaredTestnet)
+        let host = (URL(string: horizon)?.host ?? horizon).lowercased()
+        if host.contains("testnet") { return (true, horizon) }
+        if host == "horizon.stellar.org" || host.hasSuffix(".horizon.stellar.org") { return (false, horizon) }
+        return (declaredTestnet, horizon)
     }
 }
 

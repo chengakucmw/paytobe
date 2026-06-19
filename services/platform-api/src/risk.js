@@ -92,7 +92,7 @@ function evaluateRegisteredTransferAsset(payment, store, env, errors, warnings) 
   checkDailyLimit(store, asset.symbol, payment.amount, env[`DAILY_LIMIT_${asset.symbol}`] || "1000", errors);
 }
 
-export function evaluatePaymentRequest(request, contextResult = {}) {
+export function evaluatePaymentRequest(request, contextResult = {}, store = null, env = process.env) {
   const errors = [];
   const warnings = [];
   const payment = request.payment || {};
@@ -119,6 +119,15 @@ export function evaluatePaymentRequest(request, contextResult = {}) {
   compareContextCosts(payment, reviewContext.costs, errors, warnings);
   compareTruthFields(request, truthFields, errors, warnings);
   importContextRiskFindings(riskFindings, errors, warnings);
+  // M-1: the daily spend cap and the recipient whitelist used to be enforced
+  // ONLY on the legacy evaluateIntent path. The main Payment Request path
+  // scored the transaction context but never consulted either gate — even
+  // though confirmed spend is still ADDED to the daily ledger downstream. So
+  // the ledger was kept but never read: the cap was installed yet never closed.
+  // Wire both gates in here, on the path real traffic uses, so the cap is
+  // actually enforced and a configured whitelist actually blocks off-list
+  // recipients.
+  enforcePolicyLimits(payment, store, env, errors, warnings);
 
   return summarizePaymentRequestRisk(errors, warnings, { contextMissing });
 }
@@ -142,6 +151,10 @@ function checkWhitelist(raw, address, label, errors, warnings) {
 }
 
 function checkDailyLimit(store, asset, amount, limit, errors) {
+  if (dailyLimitExceeded(store, asset, amount, limit)) errors.push(`Daily ${asset} limit exceeded`);
+}
+
+function dailyLimitExceeded(store, asset, amount, limit) {
   // Compare the running total against the cap in EXACT decimal arithmetic.
   // The old code coerced everything to float64, so accumulated rounding
   // error could leave a payment that truly exceeds the cap comparing as
@@ -150,12 +163,52 @@ function checkDailyLimit(store, asset, amount, limit, errors) {
   // (the old `next > NaN` quietly evaluated to false → allowed).
   const amountStr = normalizeDecimalString(amount);
   const limitStr = normalizeDecimalString(limit);
-  if (amountStr === null || limitStr === null) {
-    errors.push(`Daily ${asset} limit exceeded`);
-    return;
-  }
+  if (amountStr === null || limitStr === null) return true;
   const next = addDecimalStrings(store.dailySpent(asset), amountStr);
-  if (compareDecimalStrings(next, limitStr) > 0) errors.push(`Daily ${asset} limit exceeded`);
+  return compareDecimalStrings(next, limitStr) > 0;
+}
+
+// M-1: enforce the daily cap and recipient whitelist on the main Payment
+// Request path, emitting riskItem-shaped BLOCKERS (so review_status becomes
+// "blocked" and signing_allowed becomes false — the device honors that). This
+// mirrors the legacy evaluateIntent gates but speaks the structured risk format
+// the Payment Request projection expects. No store means no policy context
+// available (e.g. unit-testing the pure context logic), so we skip silently.
+function enforcePolicyLimits(payment, store, env, errors, warnings) {
+  if (!store) return;
+  const safeEnv = env || {};
+  const asset = String(payment.asset || "").toUpperCase();
+  if (asset) {
+    const limit = safeEnv[`DAILY_LIMIT_${asset}`] || "1000";
+    if (dailyLimitExceeded(store, asset, payment.amount, limit)) {
+      errors.push(riskItem(
+        "daily_limit_exceeded",
+        `Daily ${asset} limit exceeded.`,
+        "payment.amount",
+        "blocker",
+        { asset, amount: payment.amount ?? null, limit }
+      ));
+    }
+  }
+  // Whitelist only the address families the legacy path guarded (Stellar +
+  // EVM). Enforce ONLY when a list is actually configured: an unset whitelist
+  // means "not in use", and must not flip every request to needs-review.
+  const rail = String(payment.rail || "");
+  const whitelistRaw = rail === "stellar_xlm"
+    ? safeEnv.ADDRESS_WHITELIST_STELLAR
+    : (rail === "evm_erc20" || rail === "base_usdc")
+      ? safeEnv.ADDRESS_WHITELIST_EVM
+      : null;
+  const whitelist = splitList(whitelistRaw);
+  if (whitelist.length && !whitelist.some((item) => sameAddress(item, payment.to))) {
+    errors.push(riskItem(
+      "recipient_not_whitelisted",
+      "Recipient address is not in the configured whitelist.",
+      "payment.to",
+      "blocker",
+      { recipient: payment.to ?? null }
+    ));
+  }
 }
 
 function splitList(value) {
@@ -478,5 +531,23 @@ function sameToken(left, right) {
 // decimalAbsDiff, addDecimalParts) now live in ./decimal.js and are shared
 // with store.js so the daily spend cap and these context-cost comparisons
 // use one consistent BigInt implementation. See decimal.js for the H3 fix.
+
+// M-2: a Stellar transaction that merely APPEARS in Horizon is not necessarily
+// a success — Stellar still includes failed transactions in the ledger (and
+// charges their fee), and Horizon marks them with `successful: false`. The old
+// confirmation code returned success the moment the transaction was found, so a
+// failed transfer was reported as "confirmed" and even counted against the
+// daily ledger. Treat ONLY successful === true as confirmed; surface the
+// on-chain reason otherwise. A null `stellar` means "not found yet" → keep
+// polling. (Lives here, beside the other pure evaluation helpers, so it can be
+// unit-tested without importing the HTTP server.)
+export function stellarConfirmationResult(stellar) {
+  if (!stellar) return null;
+  if (stellar.successful === true) return { ok: true };
+  const reason = stellar.result_xdr
+    ? `Stellar transaction failed (result ${stellar.result_xdr})`
+    : "Stellar transaction failed on-chain";
+  return { ok: false, error: reason };
+}
 
 export { BASE_USDC_CONTRACT };

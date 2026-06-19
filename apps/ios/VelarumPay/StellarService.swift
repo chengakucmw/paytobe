@@ -214,6 +214,12 @@ actor StellarService {
         memoType: String = ""
     ) async throws -> SignedStellarTransaction {
         let horizon = normalizeHorizonURL(horizonURL, testnet: testnet)
+        // M-3: defense in depth at the signing boundary. The passphrase below
+        // decides real money vs test money, so it MUST agree with the Horizon
+        // host we are about to broadcast to. Refuse to sign if a recognized host
+        // contradicts the testnet flag rather than emit a valid mainnet signature
+        // for a transaction the caller labeled testnet (or vice versa).
+        try assertNetworkConsistency(horizon: horizon, testnet: testnet)
         let sourceAddress = wallet.address
         let sequence = try await fetchSequence(horizonURL: horizon, accountId: sourceAddress) + 1
         let destinationPublic = try StellarStrKey.decodePublicKey(destinationAddress)
@@ -424,6 +430,24 @@ actor StellarService {
         let clean = value.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if let url = URL(string: clean), !clean.isEmpty { return url }
         return URL(string: testnet ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org")!
+    }
+
+    /// M-3: the signing passphrase (mainnet = real funds, testnet = test funds)
+    /// must match the Horizon host the signed envelope will be broadcast to. If a
+    /// *recognized* Stellar host contradicts the requested network, refuse to sign
+    /// — that contradiction means the request misdeclared its network and signing
+    /// would mint a valid signature on the wrong chain. Unrecognized custom hosts
+    /// cannot be classified, so they are allowed through on the declared flag.
+    private func assertNetworkConsistency(horizon: URL, testnet: Bool) throws {
+        let host = (horizon.host ?? "").lowercased()
+        let hostIsTestnet = host.contains("testnet")
+        let hostIsMainnet = host == "horizon.stellar.org" || host.hasSuffix(".horizon.stellar.org")
+        if hostIsTestnet && !testnet {
+            throw AppError.invalidResponse("Network mismatch: this request is labeled Stellar mainnet, but its Horizon endpoint is testnet (\(host)). Refusing to sign.")
+        }
+        if hostIsMainnet && testnet {
+            throw AppError.invalidResponse("Network mismatch: this request is labeled Stellar testnet, but its Horizon endpoint is mainnet (\(host)). Refusing to sign.")
+        }
     }
 
     private func stellarErrorMessage(httpCode: Int, data: Data) -> String {
