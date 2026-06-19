@@ -497,6 +497,15 @@ actor StellarService {
 enum StellarStrKey {
     private static let publicVersion: UInt8 = 6 << 3
     private static let seedVersion: UInt8 = 18 << 3
+    /// Strkey version byte for a muxed account (`M…`), per SEP-23: 12 << 3.
+    private static let muxedVersion: UInt8 = 12 << 3
+
+    /// Shown when a recipient hands over a muxed (`M…`) address (H-3). Muxed
+    /// addresses are valid Stellar destinations, but this build cannot yet encode
+    /// the `KEY_TYPE_MUXED_ED25519` payment body, so we say so plainly instead of
+    /// claiming the address is malformed.
+    static let muxedUnsupportedMessage =
+        "This is a muxed Stellar address (it starts with \"M\"). VelarumPay does not support muxed addresses yet — ask the recipient for their standard \"G...\" address (plus a memo / ID if this is an exchange or custodial deposit)."
 
     static func encodePublicKey(_ data: Data) throws -> String {
         try encode(version: publicVersion, payload: data)
@@ -507,7 +516,21 @@ enum StellarStrKey {
     }
 
     static func decodePublicKey(_ value: String) throws -> Data {
+        // H-3: a muxed address (`M…`, SEP-23) is a *valid* Stellar destination, but
+        // this build does not yet encode the KEY_TYPE_MUXED_ED25519 payment body.
+        // Detect it explicitly and fail with a clear, actionable message rather than
+        // the generic "Invalid Stellar public address", which wrongly implied the
+        // address was malformed and left the user stuck. The fast prefix check
+        // catches it even when the checksum is off; the decoded version byte is the
+        // authoritative confirmation.
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.uppercased().hasPrefix("M") {
+            throw AppError.invalidResponse(muxedUnsupportedMessage)
+        }
         let decoded = try decode(value)
+        if decoded.version == muxedVersion {
+            throw AppError.invalidResponse(muxedUnsupportedMessage)
+        }
         guard decoded.version == publicVersion, decoded.payload.count == 32 else {
             throw AppError.invalidResponse("Invalid Stellar public address.")
         }
@@ -653,9 +676,20 @@ extension Data {
         append(publicKey)
     }
 
+    /// Writes the XDR `MuxedAccount` union for a payment destination.
+    ///
+    /// H-3: this deliberately emits only the `KEY_TYPE_ED25519` arm (discriminant
+    /// `0` + 32-byte ed25519 key), which is the correct encoding for a standard
+    /// `G…` address. It does NOT produce a true muxed account
+    /// (`KEY_TYPE_MUXED_ED25519`, discriminant `0x100` + 8-byte id + key): `M…`
+    /// destinations are rejected upstream in `StellarStrKey.decodePublicKey`, so by
+    /// the time we reach here the key is always a plain 32-byte ed25519 public key.
+    /// The name previously implied muxed support that did not exist; this contract
+    /// is now explicit, so real muxed support can be added deliberately (decode
+    /// `M…`, emit discriminant `0x100`) and verified on testnet before use.
     mutating func writeMuxedAccount(_ publicKey: Data) throws {
         guard publicKey.count == 32 else { throw AppError.invalidResponse("Invalid Stellar account public key.") }
-        appendInt32(0)
+        appendInt32(0) // CryptoKeyType.KEY_TYPE_ED25519
         append(publicKey)
     }
 
