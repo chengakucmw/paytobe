@@ -54,6 +54,42 @@ final class PaymentRequestParsingTests: XCTestCase {
         XCTAssertEqual(intent.memoFieldTitle, "Memo (ID)")
     }
 
+    // MARK: - H-1: a missing memo on a memo-capable XLM payment forces step-up
+    //
+    // Exchange / custodial XLM deposits almost always require a memo. An empty memo
+    // must not be silently signable: it is surfaced on the review screen and the
+    // user must clear the warning step-up before signing. (A memo that IS present
+    // must NOT trip the step-up — see testStellarXLMFixtureParsesAsSignablePendingRequest.)
+    func testMissingMemoOnXLMForcesWarningStepUp() throws {
+        var payload = Self.stellarPaymentRequest()
+        var payment = payload["payment"] as! [String: Any]
+        payment["memo"] = ""
+        payload["payment"] = payment
+
+        let intent = try PaymentIntent.parse(payload)
+
+        XCTAssertTrue(intent.memo.isEmpty)
+        XCTAssertTrue(intent.canSign)
+        XCTAssertTrue(paymentMemoMissing(intent))
+        XCTAssertTrue(paymentRequiresWarningStepUp(intent))
+        XCTAssertTrue(paymentWarningMessages(intent).contains { $0.lowercased().contains("memo") })
+        XCTAssertTrue(paymentRiskMessages(intent).contains { $0.lowercased().contains("memo") })
+    }
+
+    // MARK: - H-3: muxed (M...) addresses are rejected; standard G... still decodes
+    func testMuxedAddressRejectedAndGAddressAccepted() throws {
+        // A standard G... address still round-trips through decode unchanged.
+        let key = Data(repeating: 7, count: 32)
+        let gAddress = try StellarStrKey.encodePublicKey(key)
+        XCTAssertTrue(gAddress.hasPrefix("G"))
+        XCTAssertEqual(try StellarStrKey.decodePublicKey(gAddress), key)
+
+        // The matching muxed M... address (SEP-23, version 12<<3) wraps the same key
+        // but must be rejected rather than mis-encoded as a plain ed25519 account.
+        let muxedAddress = "MAAAAAAAAAAAAAAHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA4DQOBYHA5DY4"
+        XCTAssertThrowsError(try StellarStrKey.decodePublicKey(muxedAddress))
+    }
+
     func testStellarXLMFixtureParsesAsSignablePendingRequest() throws {
         let intent = try PaymentIntent.parse(Self.stellarPaymentRequest())
 
