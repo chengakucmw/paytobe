@@ -1189,10 +1189,14 @@ public class MainActivity extends FragmentActivity {
     }
 
     private void sendDraftSheet(SendAsset asset) {
-        sendDraftSheet(asset, "", "");
+        sendDraftSheet(asset, "", "", "");
     }
 
     private void sendDraftSheet(SendAsset asset, String prefillTo, String prefillAmount) {
+        sendDraftSheet(asset, prefillTo, prefillAmount, "");
+    }
+
+    private void sendDraftSheet(SendAsset asset, String prefillTo, String prefillAmount, String prefillMemo) {
         if (!requireWallet()) return;
         if (!requireBackupVerifiedForSigning()) return;
         LinearLayout body = sheetBase("Send " + asset.symbol);
@@ -1209,16 +1213,28 @@ public class MainActivity extends FragmentActivity {
         EditText amount = input("Amount in " + asset.symbol + ", e.g. 0.01");
         setIfPresent(amount, prefillAmount);
         body.addView(amount);
+        // H-2: Stellar exchange / custodial deposits need a memo (a tag) to be
+        // credited. Give the native send flow its own memo field — the WebView flow
+        // already had one — so memos are no longer silently dropped on this path.
+        final boolean stellarMemo = "stellar".equals(asset.family);
+        final EditText memo = stellarMemo
+                ? input("Memo / tag — required by most exchanges, leave blank for personal wallets")
+                : null;
+        if (stellarMemo) {
+            setIfPresent(memo, prefillMemo);
+            body.addView(memo);
+        }
         body.addView(warning("Send only on " + asset.network + ". Wrong-network or TRON / TRX / TRC20 transfers are not supported and can permanently lose funds."));
         Button review = primaryButton("Review transfer", () -> {
             String toValue = to.getText().toString().trim();
             String amountValue = amount.getText().toString().trim();
+            String memoValue = stellarMemo ? memo.getText().toString().trim() : "";
             String issue = validateSend(asset, toValue, amountValue, balance);
             if (issue.length() > 0) {
                 toast(issue);
                 return;
             }
-            sendReviewSheet(asset, toValue, amountValue);
+            sendReviewSheet(asset, toValue, amountValue, memoValue);
         });
         showSheetWithActions(body, review);
     }
@@ -1243,7 +1259,7 @@ public class MainActivity extends FragmentActivity {
         return "";
     }
 
-    private void sendReviewSheet(SendAsset asset, String to, String amount) {
+    private void sendReviewSheet(SendAsset asset, String to, String amount, String memo) {
         LinearLayout body = sheetBase("Review transfer");
         LinearLayout amountBox = vertical();
         amountBox.setGravity(Gravity.CENTER_HORIZONTAL);
@@ -1256,20 +1272,25 @@ public class MainActivity extends FragmentActivity {
         body.addView(field("Network fee", asset.feeText, false));
         body.addView(field("From", sendAssetAddress(asset), true));
         if (asset.tokenContract.length() > 0) body.addView(field("Token contract", asset.tokenContract, true));
+        // H-2: surface the memo on the review screen so a missing memo on a Stellar
+        // deposit is visible before signing instead of being silently dropped.
+        if ("stellar".equals(asset.family)) {
+            body.addView(field("Memo / tag", memo != null && memo.length() > 0 ? memo : "None — exchange deposits can be lost without it", true));
+        }
         addGap(body, 8);
         body.addView(warning("Signing happens locally on this device, then the signed transaction is broadcast to " + asset.network + " mainnet. This cannot be undone."));
         Button sign = primaryButton("Sign & Broadcast", () -> authenticate(
                 "Send " + asset.symbol,
                 "Confirm local signing and mainnet broadcast.",
-                () -> executeSend(asset, to, amount)));
+                () -> executeSend(asset, to, amount, memo)));
         LinearLayout actions = vertical();
         actions.addView(sign, new LinearLayout.LayoutParams(-1, dp(50)));
         addGap(actions, 10);
-        actions.addView(outlineButton("Back to edit", () -> sendDraftSheet(asset, to, amount)), new LinearLayout.LayoutParams(-1, dp(46)));
+        actions.addView(outlineButton("Back to edit", () -> sendDraftSheet(asset, to, amount, memo)), new LinearLayout.LayoutParams(-1, dp(46)));
         showSheetWithActions(body, actions);
     }
 
-    private void executeSend(SendAsset asset, String to, String amount) {
+    private void executeSend(SendAsset asset, String to, String amount, String memo) {
         closeActiveSheet();
         // P2-3: route this native send through the SAME validate -> sign -> broadcast
         // pipeline as the WebView and inbox flows, instead of broadcasting directly.
@@ -1278,7 +1299,7 @@ public class MainActivity extends FragmentActivity {
         // daily ledger. This closes the risk-bypass the direct broadcast had.
         final PaymentIntent intent;
         try {
-            intent = buildSendAssetIntent(asset, to, amount);
+            intent = buildSendAssetIntent(asset, to, amount, memo);
         } catch (Exception e) {
             toast("Could not prepare this transfer.");
             return;
@@ -1292,7 +1313,7 @@ public class MainActivity extends FragmentActivity {
 
     // Builds the same PaymentIntent shape WalletWebActivity.buildLocalSendIntent uses,
     // so MainActivity's native send and the WebView send share one proven pipeline.
-    private PaymentIntent buildSendAssetIntent(SendAsset asset, String to, String amount) throws Exception {
+    private PaymentIntent buildSendAssetIntent(SendAsset asset, String to, String amount, String memo) throws Exception {
         org.json.JSONObject payment = new org.json.JSONObject();
         payment.put("amount", amount);
         payment.put("to", to);
@@ -1301,6 +1322,11 @@ public class MainActivity extends FragmentActivity {
             payment.put("network", "stellar");
             payment.put("asset", "XLM");
             payment.put("horizon_url", SEND_STELLAR_HORIZON);
+            // H-2: carry the Stellar memo through the native send path too. Without
+            // this the native picker silently dropped the memo, so exchange /
+            // custodial XLM deposits from this entry point could be lost. Mirrors
+            // WalletWebActivity.buildLocalSendIntent.
+            if (memo != null && memo.trim().length() > 0) payment.put("memo", memo.trim());
         } else if ("solana".equals(asset.family)) {
             payment.put("rail", "solana_sol");
             payment.put("network", "solana_mainnet");
@@ -1656,6 +1682,7 @@ public class MainActivity extends FragmentActivity {
         EditText network = input("Network: testnet or public");
         EditText to = input("Recipient Stellar G... address");
         EditText amount = input("Amount in XLM, e.g. 1.5");
+        EditText memo = input("Memo / tag — required by most exchanges; leave blank for personal wallets");
         setIfPresent(horizon, horizonValue);
         setIfPresent(network, networkValue);
         setIfPresent(to, toValue);
@@ -1664,15 +1691,20 @@ public class MainActivity extends FragmentActivity {
         body.addView(network);
         body.addView(to);
         body.addView(amount);
+        body.addView(memo);
         body.addView(warning("The app checks the recipient before broadcasting. If the recipient is not activated, eligible XLM sends use Stellar Create Account."));
         Button sign = primaryButton("Sign and Broadcast", () -> authenticate("Send XLM", "Confirm local signing and Horizon submission.", () -> {
+            // H-2: pass the memo to the 8-arg sendXlm overload so the legacy native
+            // "Send XLM" entry point no longer drops it (exchange deposits need it).
             runAsync("Stellar transfer", "XLM", network.getText().toString().trim().toLowerCase().contains("test") ? "stellar_testnet" : "stellar_public", amount.getText().toString().trim(), to.getText().toString().trim(), () -> StellarTransfer.sendXlm(
                     horizon.getText().toString().trim(),
                     network.getText().toString().trim().toLowerCase().contains("test"),
                     wallet.stellar.privateSeed,
                     wallet.stellar.publicKey,
                     to.getText().toString().trim(),
-                    amount.getText().toString().trim()
+                    amount.getText().toString().trim(),
+                    null,
+                    memo.getText().toString().trim()
             ));
         }));
         showSheetWithActions(body, sign);
