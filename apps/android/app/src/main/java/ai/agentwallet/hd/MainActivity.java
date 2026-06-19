@@ -1083,9 +1083,6 @@ public class MainActivity extends FragmentActivity {
     // ===== Prototype-faithful per-asset Send flow (real mainnet broadcast) =====
     // Endpoints and the Base USDC contract mirror BalanceFetcher so balances and
     // sends always target the same mainnet networks.
-    private static final String SEND_ETHEREUM_RPC = "https://ethereum-rpc.publicnode.com";
-    private static final String SEND_BASE_RPC = "https://mainnet.base.org";
-    private static final String SEND_POLYGON_RPC = "https://polygon-bor-rpc.publicnode.com";
     private static final String SEND_SOLANA_RPC = "https://api.mainnet-beta.solana.com";
     private static final String SEND_STELLAR_HORIZON = "https://horizon.stellar.org";
     private static final String SEND_BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -1270,45 +1267,60 @@ public class MainActivity extends FragmentActivity {
 
     private void executeSend(SendAsset asset, String to, String amount) {
         closeActiveSheet();
+        // P2-3: route this native send through the SAME validate -> sign -> broadcast
+        // pipeline as the WebView and inbox flows, instead of broadcasting directly.
+        // PaymentExecutor.execute re-runs RiskPolicy (daily limit, recipient whitelist,
+        // expiry) and throws if blocked; on success we record the spend against the
+        // daily ledger. This closes the risk-bypass the direct broadcast had.
+        final PaymentIntent intent;
+        try {
+            intent = buildSendAssetIntent(asset, to, amount);
+        } catch (Exception e) {
+            toast("Could not prepare this transfer.");
+            return;
+        }
+        runAsync("Send " + asset.symbol, asset.symbol, asset.network, amount, to, () -> {
+            String tx = PaymentExecutor.execute(this, wallet, intent);
+            RiskPolicy.recordSuccessfulPayment(this, intent);
+            return tx;
+        });
+    }
+
+    // Builds the same PaymentIntent shape WalletWebActivity.buildLocalSendIntent uses,
+    // so MainActivity's native send and the WebView send share one proven pipeline.
+    private PaymentIntent buildSendAssetIntent(SendAsset asset, String to, String amount) throws Exception {
+        org.json.JSONObject payment = new org.json.JSONObject();
+        payment.put("amount", amount);
+        payment.put("to", to);
         if ("stellar".equals(asset.family)) {
-            runAsync("Send XLM", asset.symbol, "stellar_public", amount, to, () -> StellarTransfer.sendXlm(
-                    SEND_STELLAR_HORIZON,
-                    false,
-                    wallet.stellar.privateSeed,
-                    wallet.stellar.publicKey,
-                    to,
-                    amount));
-            return;
-        }
-        if ("solana".equals(asset.family)) {
-            runAsync("Send SOL", asset.symbol, "Solana", amount, to, () -> SolanaTransfer.sendSol(
-                    SEND_SOLANA_RPC,
-                    wallet.solana.privateSeed,
-                    wallet.solana.publicKey,
-                    to,
-                    amount));
-            return;
-        }
-        final String rpc = asset.chainId == 8453L ? SEND_BASE_RPC
-                : asset.chainId == 137L ? SEND_POLYGON_RPC
-                : SEND_ETHEREUM_RPC;
-        if (asset.tokenContract.length() > 0) {
-            runAsync("Send " + asset.symbol, asset.symbol, asset.network, amount, to, () -> EvmTransfer.sendErc20(
-                    rpc,
-                    asset.chainId,
-                    wallet.evm.privateKey,
-                    asset.tokenContract,
-                    to,
-                    amount,
-                    asset.decimals));
+            payment.put("rail", "stellar_xlm");
+            payment.put("network", "stellar");
+            payment.put("asset", "XLM");
+            payment.put("horizon_url", SEND_STELLAR_HORIZON);
+        } else if ("solana".equals(asset.family)) {
+            payment.put("rail", "solana_sol");
+            payment.put("network", "solana_mainnet");
+            payment.put("asset", "SOL");
+            payment.put("decimals", 9);
+            payment.put("rpc_url", SEND_SOLANA_RPC);
+        } else if (asset.tokenContract.length() > 0) {
+            payment.put("rail", "base_usdc");
+            payment.put("network", "base_mainnet");
+            payment.put("asset", asset.symbol);
+            payment.put("chain_id", asset.chainId);
+            payment.put("token_contract", asset.tokenContract);
+            payment.put("decimals", asset.decimals);
         } else {
-            runAsync("Send " + asset.symbol, asset.symbol, asset.network, amount, to, () -> EvmTransfer.sendNative(
-                    rpc,
-                    asset.chainId,
-                    wallet.evm.privateKey,
-                    to,
-                    amount));
+            payment.put("rail", "evm_native");
+            payment.put("network", asset.chainId == 8453L ? "base_mainnet" : asset.chainId == 137L ? "polygon" : "ethereum");
+            payment.put("asset", asset.symbol);
+            payment.put("chain_id", asset.chainId);
         }
+        org.json.JSONObject root = new org.json.JSONObject();
+        root.put("request_id", "local-send-" + System.currentTimeMillis());
+        root.put("status", PaymentIntent.STATUS_PENDING);
+        root.put("payment", payment);
+        return PaymentIntent.parse(root);
     }
 
     private void receiveAssetPickerSheet() {
