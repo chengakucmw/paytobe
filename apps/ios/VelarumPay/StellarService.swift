@@ -2,6 +2,17 @@ import CryptoKit
 import Foundation
 import Security
 
+/// A locally built, signed Stellar transaction envelope that has **not** yet been
+/// broadcast. Produced by `StellarService.signXLM` and consumed by
+/// `StellarService.broadcastXLM`, so the `signed` lifecycle state can be reported
+/// to the relay as its own ordered step before submission (bug M13).
+struct SignedStellarTransaction {
+    let envelopeBase64: String
+    let txHash: String
+    let horizonURL: URL
+    let createAccount: Bool
+}
+
 actor StellarService {
     private let testnetPassphrase = "Test SDF Network ; September 2015"
     private let publicPassphrase = "Public Global Stellar Network ; September 2015"
@@ -187,14 +198,20 @@ actor StellarService {
         return words
     }
 
-    func sendXLM(
+    /// Builds and signs a Stellar transaction locally **without broadcasting it**,
+    /// returning the signed envelope and its hash.
+    ///
+    /// Split out from `sendXLM` for bug M13 so the caller can report the `signed`
+    /// lifecycle state to the relay as its own ordered step — right after the
+    /// envelope exists and *before* it is submitted to Horizon.
+    func signXLM(
         wallet: StellarWallet,
         horizonURL: String,
         testnet: Bool,
         destinationAddress: String,
         amountXLM: String,
-        progress: @escaping (String) async -> Void
-    ) async throws -> String {
+        memo: String = ""
+    ) async throws -> SignedStellarTransaction {
         let horizon = normalizeHorizonURL(horizonURL, testnet: testnet)
         let sourceAddress = wallet.address
         let sequence = try await fetchSequence(horizonURL: horizon, accountId: sourceAddress) + 1
@@ -215,7 +232,8 @@ actor StellarService {
             destinationPublic: destinationPublic,
             sequence: sequence,
             amount: amount,
-            createAccount: createAccount
+            createAccount: createAccount,
+            memo: memo
         )
         let passphrase = testnet ? testnetPassphrase : publicPassphrase
         var signatureBase = Data(SHA256.hash(data: Data(passphrase.utf8)))
@@ -226,10 +244,23 @@ actor StellarService {
         let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: wallet.seed)
         let signature = try privateKey.signature(for: txHashData)
         let envelope = try envelopeXDR(tx: tx, sourcePublic: wallet.publicKey, signature: signature)
-        let envelope64 = envelope.base64EncodedString()
-        await progress(createAccount ? "Signed Stellar Create Account transaction" : "Signed Stellar payment transaction")
-        let body = "tx=\(formEscape(envelope64))"
-        var request = URLRequest(url: horizon.appendingPathComponent("transactions"))
+        return SignedStellarTransaction(
+            envelopeBase64: envelope.base64EncodedString(),
+            txHash: txHash,
+            horizonURL: horizon,
+            createAccount: createAccount
+        )
+    }
+
+    /// Broadcasts a previously signed Stellar transaction to Horizon and returns
+    /// the network transaction hash.
+    func broadcastXLM(
+        _ signed: SignedStellarTransaction,
+        progress: @escaping (String) async -> Void
+    ) async throws -> String {
+        await progress(signed.createAccount ? "Signed Stellar Create Account transaction" : "Signed Stellar payment transaction")
+        let body = "tx=\(formEscape(signed.envelopeBase64))"
+        var request = URLRequest(url: signed.horizonURL.appendingPathComponent("transactions"))
         request.httpMethod = "POST"
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = Data(body.utf8)
@@ -240,15 +271,37 @@ actor StellarService {
                 throw AppError.invalidResponse(stellarErrorMessage(httpCode: http.statusCode, data: data))
             }
             let object = try jsonObject(data)
-            return string(object, "hash", fallback: txHash)
+            return string(object, "hash", fallback: signed.txHash)
         } catch is CancellationError {
             throw AppError.invalidResponse("Stellar submission was cancelled.")
         } catch {
-            if try await waitForTransaction(horizonURL: horizon, txHash: txHash) {
-                return txHash
+            if try await waitForTransaction(horizonURL: signed.horizonURL, txHash: signed.txHash) {
+                return signed.txHash
             }
             throw error
         }
+    }
+
+    /// Convenience wrapper preserving the original sign-then-broadcast behavior
+    /// for callers that do not need the intermediate `signed` checkpoint.
+    func sendXLM(
+        wallet: StellarWallet,
+        horizonURL: String,
+        testnet: Bool,
+        destinationAddress: String,
+        amountXLM: String,
+        memo: String = "",
+        progress: @escaping (String) async -> Void
+    ) async throws -> String {
+        let signed = try await signXLM(
+            wallet: wallet,
+            horizonURL: horizonURL,
+            testnet: testnet,
+            destinationAddress: destinationAddress,
+            amountXLM: amountXLM,
+            memo: memo
+        )
+        return try await broadcastXLM(signed, progress: progress)
     }
 
     func canReceiveAsset(horizonURL: String, testnet: Bool, destinationAddress: String, assetCode: String, assetIssuer: String) async throws {
@@ -329,13 +382,13 @@ actor StellarService {
         return false
     }
 
-    private func transactionXDR(sourcePublic: Data, destinationPublic: Data, sequence: Int64, amount: Int64, createAccount: Bool) throws -> Data {
+    private func transactionXDR(sourcePublic: Data, destinationPublic: Data, sequence: Int64, amount: Int64, createAccount: Bool, memo: String) throws -> Data {
         var out = Data()
         try out.writeAccountId(sourcePublic)
         out.appendInt32(100)
         out.appendInt64(sequence)
         out.appendInt32(0)
-        out.appendInt32(0)
+        try out.writeMemo(memo)
         out.appendInt32(1)
         out.appendBool(false)
         if createAccount {
@@ -575,5 +628,23 @@ extension Data {
         if padding > 0 {
             append(contentsOf: Array(repeating: UInt8(0), count: padding))
         }
+    }
+
+    /// Writes a Stellar Memo union. An empty memo encodes MEMO_NONE, which is
+    /// byte-identical to the previous no-memo behaviour, so existing transactions
+    /// and tests are unaffected. A non-empty memo is sent as MEMO_TEXT (string<28>).
+    mutating func writeMemo(_ memo: String) throws {
+        let text = memo.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            appendInt32(0) // MEMO_NONE
+            return
+        }
+        let bytes = Data(text.utf8)
+        guard bytes.count <= 28 else {
+            throw AppError.invalidResponse(
+                "Stellar text memo must be 28 bytes or fewer (this one is \(bytes.count)). Shorten it, or confirm the exchange wants a numeric ID memo instead.")
+        }
+        appendInt32(1) // MEMO_TEXT
+        try writeOpaque(bytes)
     }
 }

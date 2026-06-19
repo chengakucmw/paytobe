@@ -133,7 +133,24 @@ final class LocalStore {
     func upsertIntent(_ intent: PaymentIntent) {
         var items = loadInbox()
         if let index = items.firstIndex(where: { $0.id == intent.id }) {
-            items[index] = intent
+            let existing = items[index]
+            var merged = intent
+
+            // H12 fix: never let a stale relay snapshot downgrade a locally-advanced
+            // status.  E.g. local `broadcasted` must not revert to a relay-lagging
+            // `pending`, which would make the payment appear actionable again and risk
+            // a duplicate payment.
+            if PaymentStatus.lifecycleRank(existing.status) > PaymentStatus.lifecycleRank(intent.status) {
+                merged.status = existing.status
+            }
+
+            // Preserve a non-empty txHash even when the relay hasn't caught up yet,
+            // so the local transaction record is never lost.
+            if !existing.txHash.isEmpty && merged.txHash.isEmpty {
+                merged.txHash = existing.txHash
+            }
+
+            items[index] = merged
         } else {
             items.append(intent)
         }

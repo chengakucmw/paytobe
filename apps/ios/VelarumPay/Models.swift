@@ -36,6 +36,25 @@ enum PaymentStatus: String, Codable {
     case failed
     case expired
     case rejected
+
+    /// Lifecycle rank used to prevent stale relay data from downgrading a
+    /// locally-advanced state.  Higher rank = further along the payment lifecycle.
+    ///
+    /// Rule: when merging an incoming (server) intent with the local copy,
+    /// keep whichever status has the higher rank.  This means a local
+    /// `broadcasted` will never be clobbered back to a relay-lagging `pending`.
+    static func lifecycleRank(_ rawValue: String) -> Int {
+        switch PaymentStatus(rawValue: rawValue) {
+        case .pending:     return 0
+        case .signed:      return 1
+        case .broadcasted: return 2
+        case .confirmed:   return 3
+        case .failed:      return 4
+        case .rejected:    return 5
+        case .expired:     return 6
+        case .none:        return 0
+        }
+    }
 }
 
 struct StellarWallet: Codable, Equatable {
@@ -763,6 +782,15 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
 
     var canSign: Bool {
         isPending && (signingAllowed ?? !(riskFindings ?? []).contains { $0.isBlocker })
+    }
+
+    /// Bug M14: the protocol's `policy.requires_user_approval`, surfaced so it is
+    /// actually read rather than parsed and dropped. Defaults to `true` when the
+    /// flag (or the underlying payment request) is absent. `AppState.pay()` treats
+    /// this defensively — a non-custodial wallet never auto-signs, so the flag may
+    /// only ever require approval, never waive it.
+    var policyRequiresUserApproval: Bool {
+        paymentRequest?.policy.requiresUserApproval ?? true
     }
 
     var isAmountHistory: Bool {

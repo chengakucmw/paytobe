@@ -327,6 +327,18 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                     }
                     throw AppError.unsupportedPayment("iOS v1 supports Stellar XLM payment requests. \(intent.asset) / \(intent.network) is review-only for now.")
                 }
+
+                // M14 fix: honor the protocol's policy.requires_user_approval flag.
+                // This wallet has a single signing entry point (this function),
+                // reached only by an explicit user action, so user approval is
+                // always present here. The flag is read defensively: an absent or
+                // even an explicit `false` value is treated as "approval required",
+                // so a server can raise the approval bar but never waive it, and no
+                // auto-sign path exists. (Previously the flag was parsed and never
+                // read, so a server instruction to require approval was silently void.)
+                if intent.policyRequiresUserApproval == false {
+                    statusText = "Server asked to skip approval; ignoring — explicit approval is always required before signing."
+                }
                 selectedIntent = nil
                 // L4: dismiss the detail sheet, then present the progress sheet on the
                 // NEXT runloop tick. Both are .sheet(item:) on the same view (see
@@ -342,13 +354,35 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                     canDismiss: false
                 )
                 let config = relayConfig
-                let relayClient = relay
-                let txHash = try await stellar.sendXLM(
+
+                // M13 fix: sign locally first, then report `signed` as its own
+                // ordered step *before* broadcasting. Previously the only `signed`
+                // report was buried inside the broadcast progress callback and
+                // swallowed by `try?`, so a dropped report made the relay timeline
+                // skip straight from `pending` to `broadcasted` (or arrive out of
+                // order). Reporting it here, in order and un-swallowed, keeps the
+                // relay timeline faithful; because nothing has been broadcast yet,
+                // a failure at this point safely aborts with no funds moved.
+                let signedTx = try await stellar.signXLM(
                     wallet: wallet,
                     horizonURL: intent.horizonUrl,
                     testnet: intent.stellarTestnet,
                     destinationAddress: intent.to,
                     amountXLM: intent.amount,
+                    memo: intent.memo
+                )
+                try await relay.updateStatus(config: config, intent: intent, status: PaymentStatus.signed.rawValue)
+                localStore.upsertIntent(intent.updating(status: PaymentStatus.signed.rawValue))
+                inbox = localStore.loadInbox()
+
+                progress = PaymentProgress(
+                    title: "The transaction has been generated",
+                    message: "Broadcasting to \(intent.network.isEmpty ? "Stellar" : intent.network).",
+                    detail: nil,
+                    canDismiss: false
+                )
+                let txHash = try await stellar.broadcastXLM(
+                    signedTx,
                     progress: { detail in
                         await MainActor.run {
                             self.progress = PaymentProgress(
@@ -358,7 +392,6 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                                 canDismiss: false
                             )
                         }
-                        try? await relayClient.updateStatus(config: config, intent: intent, status: PaymentStatus.signed.rawValue)
                     }
                 )
                 try await relay.updateStatus(config: relayConfig, intent: intent, status: PaymentStatus.broadcasted.rawValue, txHash: txHash)
@@ -398,6 +431,9 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     func reject(_ intent: PaymentIntent) {
         Task {
             do {
+                guard intent.isPending else {
+                    throw AppError.invalidResponse("Cannot reject: payment request is already \(intent.status).")
+                }
                 try await relay.updateStatus(config: relayConfig, intent: intent, status: PaymentStatus.rejected.rawValue)
                 localStore.updateIntent(id: intent.id, status: PaymentStatus.rejected.rawValue, txHash: nil, error: nil)
                 inbox = localStore.loadInbox()
