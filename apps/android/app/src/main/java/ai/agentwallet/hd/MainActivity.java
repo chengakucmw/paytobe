@@ -21,6 +21,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -1213,7 +1214,7 @@ public class MainActivity extends FragmentActivity {
         EditText to = input("Recipient " + asset.symbol + " address on " + asset.network);
         setIfPresent(to, prefillTo);
         body.addView(to);
-        EditText amount = input("Amount in " + asset.symbol + ", e.g. 0.01");
+        EditText amount = input("Amount in " + asset.symbol + ", e.g. 0.01", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         setIfPresent(amount, prefillAmount);
         body.addView(amount);
         // H-2: Stellar exchange / custodial deposits need a memo (a tag) to be
@@ -1539,7 +1540,7 @@ public class MainActivity extends FragmentActivity {
         EditText rpc = input("RPC URL, e.g. https://sepolia.infura.io/v3/...");
         EditText chain = input("Chain ID, e.g. 11155111, 8453, 137");
         EditText to = input("Recipient 0x address");
-        EditText amount = input("Amount in native unit, e.g. 0.001");
+        EditText amount = input("Amount in native unit, e.g. 0.001", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         setIfPresent(rpc, rpcValue);
         setIfPresent(chain, chainValue);
         setIfPresent(to, toValue);
@@ -1573,7 +1574,7 @@ public class MainActivity extends FragmentActivity {
         EditText chain = input("Chain ID, e.g. 11155111, 8453, 137");
         EditText token = input("ERC-20 contract 0x address");
         EditText to = input("Recipient 0x address");
-        EditText amount = input("Token amount, e.g. 12.5");
+        EditText amount = input("Token amount, e.g. 12.5", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         EditText decimals = input("Token decimals, e.g. 6 or 18");
         setIfPresent(rpc, rpcValue);
         setIfPresent(chain, chainValue);
@@ -1612,7 +1613,7 @@ public class MainActivity extends FragmentActivity {
         LinearLayout body = sheetBase("Send SOL");
         EditText rpc = input("RPC URL, e.g. https://api.devnet.solana.com");
         EditText to = input("Recipient Solana address");
-        EditText amount = input("Amount in SOL, e.g. 0.001");
+        EditText amount = input("Amount in SOL, e.g. 0.001", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         setIfPresent(rpc, rpcValue);
         setIfPresent(to, toValue);
         setIfPresent(amount, amountValue);
@@ -1643,7 +1644,7 @@ public class MainActivity extends FragmentActivity {
         EditText rpc = input("RPC URL, e.g. https://api.devnet.solana.com");
         EditText mint = input("SPL token mint address");
         EditText to = input("Recipient Solana wallet address");
-        EditText amount = input("Token amount, e.g. 3.25");
+        EditText amount = input("Token amount, e.g. 3.25", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         EditText decimals = input("Token decimals, e.g. 6 or 9");
         CheckBox createAta = checkbox("Create recipient associated token account if needed", true);
         setIfPresent(rpc, rpcValue);
@@ -1684,7 +1685,7 @@ public class MainActivity extends FragmentActivity {
         EditText horizon = input("Horizon URL, e.g. https://horizon-testnet.stellar.org");
         EditText network = input("Network: testnet or public");
         EditText to = input("Recipient Stellar G... address");
-        EditText amount = input("Amount in XLM, e.g. 1.5");
+        EditText amount = input("Amount in XLM, e.g. 1.5", InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         EditText memo = input("Memo / tag — required by most exchanges; leave blank for personal wallets");
         setIfPresent(horizon, horizonValue);
         setIfPresent(network, networkValue);
@@ -4257,7 +4258,16 @@ public class MainActivity extends FragmentActivity {
     }
 
     private EditText input(String hint) {
+        // L-3: default to plain text with no autocorrect/suggestions, which previously
+        // mangled pasted addresses, hashes and recovery words on the soft keyboard.
+        return input(hint, InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+    }
+
+    // L-3: lets a caller request a specific soft keyboard (e.g. a decimal number pad
+    // for amount fields, an integer pad for chain id / token decimals).
+    private EditText input(String hint, int inputType) {
         EditText input = new EditText(this);
+        input.setInputType(inputType);
         input.setSingleLine(true);
         input.setHint(hint);
         input.setHintTextColor(MUTED);

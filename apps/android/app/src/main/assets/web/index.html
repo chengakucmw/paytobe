@@ -2669,7 +2669,9 @@
     screen: 'home',
     detail: '',
     agent: '',
-    asset: 'eth-ethereum',
+    // L-2: default to the first home asset (XLM) so a fresh Receive screen never
+    // silently shows the wrong chain's address; 'eth-ethereum' used to be the default.
+    asset: 'xlm-stellar',
     assetQuery: '',
     filter: 'pending',
     signed: false,
@@ -2958,9 +2960,26 @@
     time.textContent = now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0');
   }
 
-  function parseManualAmount(value) {
+  // L-1: how many decimal places the on-chain asset actually supports. The amount
+  // string is forwarded to native verbatim (no precision is lost here); this only
+  // governs how strict the front-end validation is. XLM=7, SOL=9, BTC=8, USDC=6,
+  // EVM-native (ETH/BNB) and anything else = full 18-dp precision.
+  function assetMaxDecimals(asset) {
+    const sym = String((asset && asset.symbol) || '').toUpperCase();
+    const family = String((asset && asset.family) || '').toLowerCase();
+    const chain = String((asset && asset.chain) || '').toLowerCase();
+    if (sym === 'XLM' || family === 'stellar' || chain.indexOf('stellar') > -1) return 7;
+    if (sym === 'SOL' || family === 'solana' || chain.indexOf('solana') > -1) return 9;
+    if (sym === 'BTC' || family === 'bitcoin' || chain.indexOf('bitcoin') > -1) return 8;
+    if (sym === 'USDC') return 6;
+    return 18;
+  }
+
+  function parseManualAmount(value, maxDecimals) {
     const normalized = String(value || '').replace(/,/g, '').trim();
-    if (!/^\d+(?:\.\d{0,6})?$/.test(normalized)) return NaN;
+    const places = Number.isInteger(maxDecimals) && maxDecimals >= 0 ? maxDecimals : 18;
+    const pattern = new RegExp('^\\d+(?:\\.\\d{0,' + places + '})?$');
+    if (!pattern.test(normalized)) return NaN;
     return Number(normalized);
   }
 
@@ -3053,7 +3072,7 @@
     const draft = state.manualDraft;
     const asset = getAsset(draft.assetKey);
     const recipient = String(draft.recipient || '').trim();
-    const amount = parseManualAmount(draft.amount);
+    const amount = parseManualAmount(draft.amount, assetMaxDecimals(asset));
     const fee = Number(asset.fee || draft.fee || 0.01);
     const feeSharesToken = asset.feeSymbol === asset.symbol;
     const total = Number.isFinite(amount) && feeSharesToken ? amount + fee : amount;

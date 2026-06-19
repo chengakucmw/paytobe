@@ -368,7 +368,9 @@ struct PaymentRequest: Identifiable, Codable, Equatable {
             connectionId: string(object, "connection_id"),
             transactionId: string(object, "transaction_id"),
             createdAtMs: timeMs(object, "created_at", fallback: int64(object, "created_at_ms", fallback: now)),
-            expiresAtMs: timeMs(object, "expires_at", fallback: int64(object, "expires_at_ms", fallback: now + 300_000)),
+            // L-5: no expiry provided → 0 ("never expires"), matching Android instead
+            // of silently expiring the request 5 minutes after it was parsed.
+            expiresAtMs: timeMs(object, "expires_at", fallback: int64(object, "expires_at_ms", fallback: 0)),
             idempotencyKey: string(object, "idempotency_key"),
             status: normalizePaymentStatus(string(object, "status", fallback: PaymentStatus.pending.rawValue)),
             source: source,
@@ -768,7 +770,13 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
     }
 
     var isExpired: Bool {
-        Date().timeIntervalSince1970 * 1000 > Double(expiresAtMs)
+        // L-5: expiresAtMs <= 0 is the "no expiry" sentinel (matches Android's
+        // PaymentIntent NO_EXPIRY) — the request stays valid until cancelled.
+        expiresAtMs > 0 && Date().timeIntervalSince1970 * 1000 > Double(expiresAtMs)
+    }
+
+    var hasExpiry: Bool {
+        expiresAtMs > 0
     }
 
     var isStellarXLM: Bool {
@@ -853,7 +861,8 @@ struct PaymentIntent: Identifiable, Codable, Equatable {
             id: firstNonEmpty(request?.requestId ?? "", string(object, "intent_id"), string(object, "id")),
             status: normalizeStatus(request?.status ?? string(object, "status", fallback: PaymentStatus.pending.rawValue)),
             createdAtMs: request?.createdAtMs ?? timeMs(object, "created_at", fallback: int64(object, "created_at_ms", fallback: now)),
-            expiresAtMs: request?.expiresAtMs ?? timeMs(object, "expires_at", fallback: int64(object, "expires_at_ms", fallback: now + 300_000)),
+            // L-5: no expiry provided → 0 ("never expires"), matching Android.
+            expiresAtMs: request?.expiresAtMs ?? timeMs(object, "expires_at", fallback: int64(object, "expires_at_ms", fallback: 0)),
             rail: facts.rail,
             network: network,
             chainId: facts.chainId,

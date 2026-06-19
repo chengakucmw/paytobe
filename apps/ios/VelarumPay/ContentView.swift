@@ -2329,6 +2329,8 @@ func paymentContextLabel(_ intent: PaymentIntent, state: String) -> String {
 func paymentWindowText(_ intent: PaymentIntent, state: String) -> String {
     if state == "expired" { return "Expired" }
     if isFinalReviewState(state) { return "Final" }
+    // L-5: a request with no server expiry never auto-expires (matches Android).
+    if !intent.hasExpiry { return "No expiry" }
     if intent.expiresAtMs > Int64(Date().timeIntervalSince1970 * 1000) {
         return "Expires \(dateText(intent.expiresAtMs))"
     }

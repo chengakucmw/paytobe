@@ -100,6 +100,9 @@ final class LocalStore {
     private let relayURLKey = "VelarumPay.ios.relay-url"
     private let deviceIdKey = "VelarumPay.ios.device-id"
     private let deviceTokenKey = "VelarumPay.ios.device-token"
+    // L-4: Keychain service holding bearer credentials (device + connection tokens),
+    // so they are no longer persisted as plaintext in UserDefaults.
+    private let secretService = "com.velarum.wallet.ios.secrets"
 
     var relayURL: String {
         get { defaults.string(forKey: relayURLKey) ?? "" }
@@ -113,11 +116,45 @@ final class LocalStore {
         return generated
     }
 
+    // L-4: the device/connection bearer token now lives in the Keychain. Any legacy
+    // plaintext copy in UserDefaults is migrated once and then removed.
     var deviceToken: String {
-        if let existing = defaults.string(forKey: deviceTokenKey), !existing.isEmpty { return existing }
+        if let data = keychainData(deviceTokenKey), let token = String(data: data, encoding: .utf8), !token.isEmpty {
+            return token
+        }
+        if let legacy = defaults.string(forKey: deviceTokenKey), !legacy.isEmpty {
+            if setKeychainData(Data(legacy.utf8), account: deviceTokenKey) {
+                defaults.removeObject(forKey: deviceTokenKey)
+            }
+            return legacy
+        }
         let generated = "awt_\(UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())"
-        defaults.set(generated, forKey: deviceTokenKey)
+        setKeychainData(Data(generated.utf8), account: deviceTokenKey)
         return generated
+    }
+
+    private func keychainData(_ account: String) -> Data? {
+        try? KeychainStore.shared.load(service: secretService, account: account)
+    }
+
+    @discardableResult
+    private func setKeychainData(_ data: Data, account: String) -> Bool {
+        do {
+            try KeychainStore.shared.save(data, service: secretService, account: account)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    // Returns the Keychain copy, migrating a legacy plaintext UserDefaults blob on first use.
+    private func secretData(account: String, legacyKey: String) -> Data? {
+        if let data = keychainData(account) { return data }
+        guard let legacy = defaults.data(forKey: legacyKey) else { return nil }
+        if setKeychainData(legacy, account: account) {
+            defaults.removeObject(forKey: legacyKey)
+        }
+        return legacy
     }
 
     func loadInbox() -> [PaymentIntent] {
@@ -180,14 +217,16 @@ final class LocalStore {
         defaults.set(data, forKey: historyKey)
     }
 
+    // L-4: agent-connection tokens are bearer credentials, so the connections blob is
+    // stored in the Keychain (with a one-time migration from legacy UserDefaults).
     func loadConnections() -> [AgentConnection] {
-        guard let data = defaults.data(forKey: connectionsKey) else { return [] }
+        guard let data = secretData(account: connectionsKey, legacyKey: connectionsKey) else { return [] }
         return (try? JSONDecoder().decode([AgentConnection].self, from: data)) ?? []
     }
 
     func saveConnections(_ items: [AgentConnection]) {
         guard let data = try? JSONEncoder().encode(items.sorted { $0.updatedAtMs > $1.updatedAtMs }) else { return }
-        defaults.set(data, forKey: connectionsKey)
+        setKeychainData(data, account: connectionsKey)
     }
 
     func upsertConnection(_ connection: AgentConnection) {
