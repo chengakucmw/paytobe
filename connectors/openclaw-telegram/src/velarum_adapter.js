@@ -9,8 +9,10 @@ const DEFAULT_TTL_MS = 5 * 60 * 1000;
 // OpenClaw Telegram skill is intentionally self-contained (no workspace dependency
 // on the protocol package), so we keep a local copy here — update both together if
 // the protocol enum changes. Used to guarantee metadata.type is always a legal
-// enum value (bug M15).
-const VALID_CONTEXT_TYPES = new Set([
+// enum value (bug M15). Exported so a contract test can assert this local mirror
+// stays in sync with the protocol package's TRANSACTION_CONTEXT_TYPES (the
+// connector stays self-contained at runtime; the test only runs in CI).
+export const VALID_CONTEXT_TYPES = new Set([
   "purchase",
   "online_purchase",
   "food_order",
