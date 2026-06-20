@@ -35,7 +35,9 @@ const LEGACY_SCOPE_NAMES = [
 ];
 
 const CONSUMERS = [
-  "services/platform-api/src/server.js",
+  // platform-api's pairing scope vocabulary lives in domain/scopes.js (the
+  // ALLOWED_PAIRING_SCOPES / DEFAULT_PAIRING_SCOPES constants server.js imports).
+  "services/platform-api/src/domain/scopes.js",
   "connectors/mcp-server/src/tools.js",
   "connectors/hermes/src/index.js"
 ];

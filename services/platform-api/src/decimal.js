@@ -48,6 +48,16 @@ export function addDecimalStrings(a, b) {
   return decimalUnitsToString(decimalUnits(left, scale) + decimalUnits(right, scale), scale);
 }
 
+// Best-effort sum for display projections: returns the exact decimal sum when
+// BOTH inputs are already canonical decimal strings, or "" otherwise. Unlike
+// addDecimalStrings this never throws, so it is safe on partially-populated
+// payment facts. (Moved here from server.js so all money math lives in one
+// module — it was a thin guard around addDecimalStrings, not a second impl.)
+export function addDecimalStringsOrEmpty(left, right) {
+  if (!decimalString(left) || !decimalString(right)) return "";
+  return addDecimalStrings(left, right);
+}
+
 // -1 / 0 / 1 for left < / === / > right, compared exactly.
 export function compareDecimalStrings(left, right) {
   const [leftUnits, rightUnits] = scaledDecimalPair(left, right);

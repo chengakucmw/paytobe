@@ -68,7 +68,7 @@ export const RISK_SEVERITIES = Object.freeze([
 
 // Canonical pairing scopes, dot-namespaced. THIS is the single source of truth for
 // the pairing/authorization vocabulary. The runtime consumers MUST match this list:
-//   - services/platform-api/src/server.js  (ALLOWED_PAIRING_SCOPES)
+//   - services/platform-api/src/domain/scopes.js  (ALLOWED_PAIRING_SCOPES)
 //   - connectors/mcp-server/src/tools.js   (DEFAULT_SCOPES)
 //   - connectors/hermes/src/index.js       (HERMES_DEFAULT_SCOPES)
 // Consistency is enforced by tests/protocol/scope-contract.test.mjs.
