@@ -52,6 +52,9 @@ export function loadRuntimeConfig(env = process.env) {
     },
     audit: {
       enabled: parseBool(env.AUDIT_LOG_ENABLED, true)
+    },
+    observability: {
+      metrics_token: String(env.METRICS_TOKEN || env.OBSERVABILITY_TOKEN || "").trim()
     }
   };
 }
@@ -87,6 +90,9 @@ export function validateRuntimeConfig(config) {
       errors.push("RELAY_STORE_PATH must be configured in production.");
     } else if (!path.isAbsolute(config.storage.path)) {
       errors.push("RELAY_STORE_PATH must be an absolute durable path in production.");
+    }
+    if (!config.observability.metrics_token) {
+      errors.push("METRICS_TOKEN or OBSERVABILITY_TOKEN must be set in production so the /metrics endpoint is not publicly readable.");
     }
   }
 

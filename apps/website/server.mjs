@@ -5,7 +5,12 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, "public");
-const apkPath = "/Users/yang/code/agentwallet/VelarumPay-payment-progress-debug.apk";
+// Configurable APK source. Defaults to a repo-local downloads dir; the /download/android
+// route already 404s gracefully when the file is absent. (Previously hardcoded to an
+// external workspace path that does not exist in this repo.)
+const apkPath = process.env.VELARUMPAY_APK_PATH
+  ? path.resolve(process.env.VELARUMPAY_APK_PATH)
+  : path.join(publicDir, "downloads", "VelarumPay-android-demo.apk");
 const port = Number(process.env.PORT || 8091);
 
 const mime = {

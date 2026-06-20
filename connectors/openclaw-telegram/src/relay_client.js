@@ -1,6 +1,10 @@
 import crypto from "crypto";
 
 export async function submitPaymentIntent(intent) {
+  const deviceId = process.env.OPENCLAW_DEVICE_ID || "";
+  if (!deviceId) {
+    throw new Error("OPENCLAW_DEVICE_ID must be set before submitting an OpenClaw intent to the relay (no demo device fallback).");
+  }
   const relayUrl = (process.env.VELARUMPAY_API_BASE_URL || process.env.AGENTWALLET_RELAY_URL || process.env.BASE_URL || "http://localhost:8787").replace(/\/+$/, "");
   const body = JSON.stringify(intent);
   const secret = process.env.OPENCLAW_DEVICE_SECRET || "";
@@ -11,7 +15,7 @@ export async function submitPaymentIntent(intent) {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-openclaw-device-id": process.env.OPENCLAW_DEVICE_ID || "mac-openclaw-01",
+      "x-openclaw-device-id": deviceId,
       "x-idempotency-key": intent.idempotency_key || "",
       "x-signature": signature
     },

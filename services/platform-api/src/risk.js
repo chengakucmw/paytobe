@@ -98,7 +98,10 @@ export function evaluatePaymentRequest(request, contextResult = {}, store = null
   const payment = request.payment || {};
   const ref = contextResult.ref || request.transaction_context_ref || {};
   const context = contextResult.context || null;
-  const snapshot = contextResult.snapshot || request.transaction_context_snapshot || null;
+  // M7: trust ONLY the server-built snapshot passed in via contextResult. The
+  // request's own `transaction_context_snapshot` is client-supplied and could be
+  // forged to look "safe", so it must never feed risk scoring.
+  const snapshot = contextResult.snapshot || null;
   const reviewContext = context || snapshot || {};
   const truthFields = Array.isArray(reviewContext.truth_fields) ? reviewContext.truth_fields : [];
   const riskFindings = Array.isArray(reviewContext.risk_findings) ? reviewContext.risk_findings : [];

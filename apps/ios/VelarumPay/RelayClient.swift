@@ -6,9 +6,24 @@ final class RelayClient {
         var deviceId: String
         var token: String
 
+        // B9: match Android RelayClient's cleartext policy. Plain http/ws is allowed only to
+        // local development hosts; every other host must use https/wss, so device tokens and
+        // payment traffic are never sent in the clear at the app layer (ATS is a second line
+        // of defence, not the only one).
+        private static let cleartextDevHosts: Set<String> = [
+            "localhost", "127.0.0.1", "::1", "0.0.0.0", "10.0.2.2", "10.0.3.2"
+        ]
+
+        private static func cleartextAllowed(_ urlString: String) -> Bool {
+            guard let host = URLComponents(string: urlString)?.host?.lowercased() else { return false }
+            if cleartextDevHosts.contains(host) { return true }
+            return host.hasSuffix(".local")
+        }
+
         var baseURL: URL? {
             let clean = relayURL.trimmingCharacters(in: .whitespacesAndNewlines).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard !clean.isEmpty else { return nil }
+            if clean.lowercased().hasPrefix("http://"), !Config.cleartextAllowed(clean) { return nil }
             return URL(string: clean)
         }
 
@@ -18,6 +33,7 @@ final class RelayClient {
             if value.hasPrefix("https://") {
                 value = "wss://" + value.dropFirst("https://".count)
             } else if value.hasPrefix("http://") {
+                guard Config.cleartextAllowed(value) else { return nil }
                 value = "ws://" + value.dropFirst("http://".count)
             } else {
                 return nil

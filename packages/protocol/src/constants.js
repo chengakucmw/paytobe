@@ -66,14 +66,38 @@ export const RISK_SEVERITIES = Object.freeze([
   "info"
 ]);
 
+// Canonical pairing scopes, dot-namespaced. THIS is the single source of truth for
+// the pairing/authorization vocabulary. The runtime consumers MUST match this list:
+//   - services/platform-api/src/server.js  (ALLOWED_PAIRING_SCOPES)
+//   - connectors/mcp-server/src/tools.js   (DEFAULT_SCOPES)
+//   - connectors/hermes/src/index.js       (HERMES_DEFAULT_SCOPES)
+// Consistency is enforced by tests/protocol/scope-contract.test.mjs.
 export const PAIRING_SCOPES = Object.freeze([
-  "request_payments",
-  "create_transaction_contexts",
-  "view_balances",
-  "read_payment_status",
-  "save_merchants",
-  "manage_connections"
+  "payment.requests.create",
+  "payment.requests.read",
+  "transaction_contexts.create",
+  "transaction_contexts.read",
+  "wallet.addresses.read"
 ]);
+
+// The default subset a connector requests at pairing time (no wallet.addresses.read).
+// Matches connectors/mcp-server DEFAULT_SCOPES and connectors/hermes HERMES_DEFAULT_SCOPES.
+export const DEFAULT_PAIRING_SCOPES = Object.freeze([
+  "payment.requests.create",
+  "payment.requests.read",
+  "transaction_contexts.create",
+  "transaction_contexts.read"
+]);
+
+// Pre-1.0 scope names, retained ONLY to translate legacy pairing payloads during
+// migration. These are never enforced; new code must use the dotted names above.
+// (save_merchants / manage_connections were dropped in v1 and have no successor.)
+export const DEPRECATED_PAIRING_SCOPE_ALIASES = Object.freeze({
+  request_payments: "payment.requests.create",
+  read_payment_status: "payment.requests.read",
+  create_transaction_contexts: "transaction_contexts.create",
+  view_balances: "wallet.addresses.read"
+});
 
 export const TRANSACTION_CONTEXT_TYPES = Object.freeze([
   "purchase",

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MCP for agents · VelarumPay Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <nav class="nav">
+        <a href="/">Overview</a>
+        <a href="/quickstart.html">Quickstart</a>
+        <a href="/api.html">REST API</a>
+        <a href="/protocol.html">Protocol</a>
+        <a href="/mcp.html">MCP for agents</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <span class="pill">MCP server</span>
+    <h1>Plug VelarumPay into an AI agent</h1>
+    <p class="lead">The <code>@velarumpay/mcp-server</code> is a local MCP stdio server. It exposes VelarumPay as a small set of tools any MCP-capable agent (Claude and others) can call. It never holds private keys, signs, or approves payments.</p>
+
+    <h2>Tools</h2>
+    <table>
+      <tr><th>Tool</th><th>What it does</th></tr>
+      <tr><td><code>create_pairing_session</code></td><td>Start pairing so the user can approve in their wallet.</td></tr>
+      <tr><td><code>create_transaction_context</code></td><td>Create the human-readable review context.</td></tr>
+      <tr><td><code>create_payment_request</code></td><td>Propose a payment for the user to sign.</td></tr>
+      <tr><td><code>get_payment_status</code></td><td>Read the current status of a request.</td></tr>
+    </table>
+    <div class="note">Only these v0.1 scopes are available: <code>payment.requests.create</code>, <code>payment.requests.read</code>, <code>transaction_contexts.create</code>, <code>transaction_contexts.read</code>. No signing, key, seed, or auto-approval scope is ever exposed.</div>
+
+    <h2>Run it</h2>
+    <pre><code>export VELARUMPAY_API_BASE_URL=http://127.0.0.1:8787
+export VELARUMPAY_CONNECTION_TOKEN=conn_tok_...
+npx velarumpay-mcp-server</code></pre>
+    <p>Tool inputs may also pass <code>base_url</code> and <code>connection_token</code> per call. If a payload includes <code>connection_id</code>, it must match the connection the token belongs to. For local agents, omit <code>connection_id</code> and the Platform API derives it from the token.</p>
+
+    <h2>Example tool call</h2>
+    <pre><code>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "create_pairing_session",
+    "arguments": {
+      "agent": {
+        "agent_id": "agt_mcp_local",
+        "agent_name": "VelarumPay MCP Local Agent",
+        "runtime": "mcp",
+        "device_label": "local developer machine"
+      }
+    }
+  }
+}</code></pre>
+
+    <h2>Safety model</h2>
+    <p>The MCP server is a thin client. The Platform API still enforces connection-token checks, scope checks, and risk policy (allowlists, daily limits, idempotency) on every call. The user's wallet is always the place where real payments get approved and signed.</p>
+  </main>
+
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

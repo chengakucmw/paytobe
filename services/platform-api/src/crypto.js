@@ -18,6 +18,15 @@ export function id(prefix) {
   return `${prefix}_${crypto.randomBytes(16).toString("hex")}`;
 }
 
+// Uniformly-distributed numeric code (e.g. a 6-digit pairing code). Uses
+// crypto.randomInt, which rejection-samples internally, so unlike
+// `parseInt(hex,16) % 10**digits` there is NO modulo bias and the value is
+// cryptographically unpredictable.
+export function randomNumericCode(digits = 6) {
+  const max = 10 ** digits;
+  return String(crypto.randomInt(0, max)).padStart(digits, "0");
+}
+
 export function sha256Hex(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }

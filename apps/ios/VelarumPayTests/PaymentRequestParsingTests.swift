@@ -96,20 +96,20 @@ final class PaymentRequestParsingTests: XCTestCase {
     // so it must follow the endpoint the transaction is actually broadcast to —
     // never a requester-controlled flag or a "network name contains test" guess.
     func testStellarNetworkResolvesFromHorizonHostNotDeclaredFlag() {
-        // Caller claims mainnet, but the Horizon endpoint is testnet -> testnet wins.
+        // Caller claims mainnet, but the Horizon endpoint is testnet → testnet wins.
         let claimedMainnet = PaymentIntent.stellarNetwork(declaredTestnet: false, horizonURL: "https://horizon-testnet.stellar.org")
         XCTAssertTrue(claimedMainnet.testnet)
 
-        // Caller claims testnet, but the endpoint is mainnet -> mainnet wins.
+        // Caller claims testnet, but the endpoint is mainnet → mainnet wins.
         let claimedTestnet = PaymentIntent.stellarNetwork(declaredTestnet: true, horizonURL: "https://horizon.stellar.org")
         XCTAssertFalse(claimedTestnet.testnet)
 
-        // No explicit horizon -> default follows the declared flag and stays consistent.
+        // No explicit horizon → default follows the declared flag and stays consistent.
         let defaulted = PaymentIntent.stellarNetwork(declaredTestnet: true, horizonURL: "")
         XCTAssertTrue(defaulted.testnet)
         XCTAssertEqual(defaulted.horizon, "https://horizon-testnet.stellar.org")
 
-        // An unrecognized custom host can't be classified -> falls back to the flag.
+        // An unrecognized custom host can't be classified → falls back to the flag.
         let custom = PaymentIntent.stellarNetwork(declaredTestnet: false, horizonURL: "https://my-horizon.example.com")
         XCTAssertFalse(custom.testnet)
         XCTAssertEqual(custom.horizon, "https://my-horizon.example.com")
@@ -118,9 +118,9 @@ final class PaymentRequestParsingTests: XCTestCase {
     func testParseBindsStellarNetworkToHorizonHost() throws {
         var payload = Self.stellarPaymentRequest()
         var payment = payload["payment"] as! [String: Any]
-        payment["network"] = "stellar_public"
+        payment["network"] = "stellar_public"                       // looks like mainnet…
         payment["stellar_testnet"] = false
-        payment["horizon_url"] = "https://horizon-testnet.stellar.org"
+        payment["horizon_url"] = "https://horizon-testnet.stellar.org" // …but the endpoint is testnet
         payload["payment"] = payment
 
         let intent = try PaymentIntent.parse(payload)

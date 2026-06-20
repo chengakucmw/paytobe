@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quickstart · VelarumPay Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <nav class="nav">
+        <a href="/">Overview</a>
+        <a href="/quickstart.html">Quickstart</a>
+        <a href="/api.html">REST API</a>
+        <a href="/protocol.html">Protocol</a>
+        <a href="/mcp.html">MCP for agents</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <span class="pill">Quickstart</span>
+    <h1>Connect an agent in 5 steps</h1>
+    <p class="lead">This walks through the JavaScript SDK. The same flow works over the <a href="/api.html">REST API</a> or the <a href="/mcp.html">MCP server</a>.</p>
+
+    <div class="note">You need: the Platform API running (locally <code>http://127.0.0.1:8787</code>, or your deployed URL), and the VelarumPay wallet app to approve pairing.</div>
+
+    <h2>1. Install the SDK</h2>
+    <pre><code>npm install @velarumpay/sdk-js</code></pre>
+
+    <h2>2. Create a client and start pairing</h2>
+    <p>Your agent introduces itself and asks for scopes. The response includes a short code and a pairing URI you can render as a QR for the user to scan.</p>
+    <pre><code>import { createVelarumPayClient, validatePaymentRequest } from "@velarumpay/sdk-js";
+
+const client = createVelarumPayClient({
+  baseUrl: "http://127.0.0.1:8787"   // or your deployed API URL
+});
+
+const pairing = await client.createPairingSession({
+  agent: {
+    agent_id: "agt_local_123",
+    agent_name: "Hermes on Alice MacBook",
+    runtime: "hermes",
+    device_label: "Alice MacBook"
+  },
+  requested_scopes: [
+    "payment.requests.create",
+    "payment.requests.read",
+    "transaction_contexts.create",
+    "transaction_contexts.read"
+  ],
+  expires_in_seconds: 300
+});
+
+// Show pairing.pairing_session.pairing_uri as a QR, or the short code to type.</code></pre>
+
+    <h2>3. The user approves in their wallet</h2>
+    <p>The person scans the code in the VelarumPay app and approves the scopes. The wallet returns a <strong>connection token</strong> to your agent. Inject it into the client:</p>
+    <pre><code>client.setConnectionToken("conn_tok_...");</code></pre>
+    <div class="note">The connection token is the only credential your agent needs after pairing. Store it securely; treat it like a password scoped to this one user and these scopes.</div>
+
+    <h2>4. Create a transaction context, then a payment request</h2>
+    <p>The transaction context is the human-readable explanation the user sees before signing. The payment request carries the exact on-chain facts.</p>
+    <pre><code>await client.createTransactionContext(transactionContextPayload);
+
+const validation = validatePaymentRequest(paymentRequestPayload);
+if (!validation.ok) console.error(validation.error);
+
+const created = await client.createPaymentRequest(paymentRequestPayload, {
+  idempotencyKey: paymentRequestPayload.idempotency_key
+});</code></pre>
+
+    <h2>5. Read status / poll events</h2>
+    <pre><code>const detail = await client.getPaymentRequest(created.payment_request.request_id);
+const events = await client.pollEvents({ since: 0 });</code></pre>
+    <p>Status moves through <code>pending → signed → broadcasted → confirmed</code> (or <code>failed</code>, <code>expired</code>, <code>rejected</code>). Your agent never signs — it only proposes and reads.</p>
+
+    <h2>Amounts: a rule that prevents bugs</h2>
+    <div class="note">Always send amounts as <strong>exact decimal strings</strong> (for example <code>"42.00"</code>), never as floating-point numbers. This avoids rounding errors in money math. See the <a href="/protocol.html">Protocol</a> page for the full field rules.</div>
+
+    <h2>Next steps</h2>
+    <p>See the full field-by-field <a href="/protocol.html">Protocol reference</a>, the <a href="/api.html">REST endpoints</a>, or wire it into an AI agent with the <a href="/mcp.html">MCP server</a>.</p>
+  </main>
+
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

@@ -2798,6 +2798,13 @@ public class MainActivity extends FragmentActivity {
                 || "source_review_required".equals(value);
     }
 
+    // B13: localNetworkResolved() may ONLY override the server's `network_disabled`
+    // projection (see localNetworkResolved below) — i.e. re-enable signing when the user
+    // has locally enabled that exact network. It is deliberately ANDed with the full gate
+    // that follows: the state must still be pending/awaiting_signature, the intent payable,
+    // and the local RiskPolicy result present + allowed + error-free. So a local network
+    // toggle can never bypass a risk blocker, missing transaction context, or the separate
+    // user approval/biometric step — it only relaxes the network-availability signal.
     private boolean isPaymentDetailSignable(PaymentIntent intent, String state, RiskPolicy.Result risk) {
         String value = PaymentInboxFilter.normalizeState(state);
         boolean signingAllowed = intent.request.signingAllowed || localNetworkResolved(intent);
@@ -2809,6 +2816,9 @@ public class MainActivity extends FragmentActivity {
                 && risk.errors.isEmpty();
     }
 
+    // B13: returns true ONLY when the server marked the request `network_disabled` AND the
+    // user has locally enabled that same network+chain. It intentionally inspects nothing
+    // else, so it can never resolve any other review state (missing context, blockers, etc.).
     private boolean localNetworkResolved(PaymentIntent intent) {
         String reviewState = PaymentInboxFilter.normalizeState(intent.request.reviewState);
         String riskStatus = PaymentInboxFilter.normalizeState(intent.request.riskReviewStatus);

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VelarumPay Developer Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <nav class="nav">
+        <a href="/">Overview</a>
+        <a href="/quickstart.html">Quickstart</a>
+        <a href="/api.html">REST API</a>
+        <a href="/protocol.html">Protocol</a>
+        <a href="/mcp.html">MCP for agents</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <span class="pill">Platform API v0.1</span>
+    <h1>Let your AI agent request payments — the user always signs.</h1>
+    <p class="lead">VelarumPay is a non-custodial wallet and payment-request platform. Your agent asks for a payment; the person reviews and signs it in their own wallet. The server never holds private keys.</p>
+
+    <div class="note">New here? The fastest path is the <a href="/quickstart.html">Quickstart</a>: pair once, then create payment requests with a connection token.</div>
+
+    <h2>How it works in one picture</h2>
+    <div class="card">
+      <ol class="steps">
+        <li><strong>Pair.</strong> Your agent opens a pairing session and shows a short code or QR. The user scans it inside the VelarumPay wallet.</li>
+        <li><strong>Approve.</strong> The user approves the requested scopes. The wallet hands back a <code>connection token</code> — that token <em>is</em> the authorization. There is no developer API key.</li>
+        <li><strong>Request.</strong> Your agent uses the token to create payment requests. Each one is delivered to the wallet over WebSocket.</li>
+        <li><strong>Sign.</strong> The user reviews the human-readable context and signs locally. Status flows back: <code>pending → signed → broadcasted → confirmed</code>.</li>
+      </ol>
+    </div>
+
+    <h2>Why there is no API key</h2>
+    <p>Most payment APIs give developers a secret key that can move money. VelarumPay is different on purpose: authority comes from the <strong>user approving a pairing</strong> in their wallet, not from a key you hold. You get a scoped, revocable connection token instead. The user can pause or revoke it at any time.</p>
+
+    <h2>Pick your integration</h2>
+    <div class="grid2">
+      <div class="card">
+        <h3>JavaScript SDK</h3>
+        <p>Use <code>@velarumpay/sdk-js</code> for pairing, transaction contexts, payment requests, and event polling.</p>
+        <p><a href="/quickstart.html">Go to Quickstart →</a></p>
+      </div>
+      <div class="card">
+        <h3>MCP server</h3>
+        <p>Plug VelarumPay into any MCP-capable AI agent (Claude and others) as a set of tools.</p>
+        <p><a href="/mcp.html">Set up MCP →</a></p>
+      </div>
+      <div class="card">
+        <h3>REST API</h3>
+        <p>Call the endpoints directly from any language. Pairing, connections, payment requests, status.</p>
+        <p><a href="/api.html">REST reference →</a></p>
+      </div>
+      <div class="card">
+        <h3>Protocol</h3>
+        <p>The open <code>velarum.payment_request.v1</code> and <code>velarum.transaction_context.v1</code> formats.</p>
+        <p><a href="/protocol.html">Read the protocol →</a></p>
+      </div>
+    </div>
+
+    <h2>Core principles</h2>
+    <table>
+      <tr><th>Principle</th><th>What it means for you</th></tr>
+      <tr><td>Non-custodial</td><td>Keys live in the user's wallet. The server and your agent never see them.</td></tr>
+      <tr><td>User approval by default</td><td>Real payments require the user to sign. Your agent proposes; it cannot self-approve.</td></tr>
+      <tr><td>Scoped &amp; revocable</td><td>Connection tokens carry only the scopes the user approved, and can be revoked anytime.</td></tr>
+      <tr><td>Open protocol</td><td>Payment facts are carried in a documented, validated format — no hidden fields.</td></tr>
+    </table>
+  </main>
+
+  <footer class="footer">
+    VelarumPay Developer Docs · Platform API v0.1 · This site contains no sample balances, merchants, or transaction data.
+  </footer>
+</body>
+</html>

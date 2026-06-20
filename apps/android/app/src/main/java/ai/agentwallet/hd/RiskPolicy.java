@@ -17,6 +17,10 @@ final class RiskPolicy {
     private static final String KEY_STELLAR_WHITELIST = "stellar_whitelist";
     private static final BigDecimal DAILY_USDC_LIMIT = new BigDecimal("1000");
     private static final BigDecimal DAILY_XLM_LIMIT = new BigDecimal("1000");
+    // B7: SOL has its own daily cap. Exact BigDecimal, never floating point. The SOL
+    // branch previously reused DAILY_USDC_LIMIT; the values coincide today but must be
+    // able to move independently when per-asset limits are tuned.
+    private static final BigDecimal DAILY_SOL_LIMIT = new BigDecimal("1000");
     // M10: when no recipient whitelist is configured, a payment above these per-asset
     // caps to an unverified recipient is blocked (fail closed) instead of merely
     // warned about, so the advertised whitelist control actually protects users.
@@ -71,7 +75,7 @@ final class RiskPolicy {
         } else if (intent.isSolanaSol()) {
             result.errors.addAll(TransferAssetRegistry.validateIntent(intent));
             if (intent.rpcUrl.length() == 0) result.errors.add("Solana RPC URL is required");
-            checkDailyLimit(context, "SOL", intent.amount, DAILY_USDC_LIMIT, result);
+            checkDailyLimit(context, "SOL", intent.amount, DAILY_SOL_LIMIT, result);
         } else if (enabledEvmNetwork(context, intent) != null) {
             checkEnabledEvmPayment(context, intent, result);
         } else {

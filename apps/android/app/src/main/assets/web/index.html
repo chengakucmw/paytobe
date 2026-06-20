@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
 <title>VelarumPay Mobile Wallet Main Flow Overview</title>
 <link rel="stylesheet" href="./design-system/VelarumPay-DS-Core/styles.css" />
 <link rel="stylesheet" href="./shared/accessibility-i18n.css" />
@@ -5141,6 +5141,23 @@
     state.assetQuery = event.target.value;
     const results = document.getElementById('assetSearchResults');
     if (results) results.innerHTML = renderAssetSearchResults();
+  });
+
+  // Real-device fix: on a phone the soft keyboard covers the lower half of the screen.
+  // When a field (memo / amount / recipient) gains focus, scroll it into the still-
+  // visible area so the user can see what they type. We wait briefly for the keyboard
+  // to open and the WebView to resize first, then center the field (the bottom "Review"
+  // button is fixed, so bottom-aligning would tuck the field under it).
+  document.addEventListener('focusin', event => {
+    const field = event.target.closest('input, textarea');
+    if (!field) return;
+    window.setTimeout(() => {
+      try {
+        field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch (e) {
+        field.scrollIntoView();
+      }
+    }, 250);
   });
 
   document.addEventListener('click', event => {

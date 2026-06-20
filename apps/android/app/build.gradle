@@ -1,5 +1,7 @@
 plugins {
     id "com.android.application"
+    id "org.jetbrains.kotlin.android"
+    id "org.jetbrains.kotlin.plugin.compose"
 }
 
 android {
@@ -19,6 +21,14 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
         coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        compose true
     }
 
     packaging {
@@ -58,6 +68,23 @@ dependencies {
     }
     implementation "org.web3j:core:4.12.3"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
+
+    // --- Jetpack Compose（UI 原生重写，Phase 0 接入）---
+    // BOM 统一管理 Compose 各库版本；2025.01.01 与 compileSdk 35 兼容，不强制升 36。
+    def composeBom = platform("androidx.compose:compose-bom:2025.01.01")
+    implementation composeBom
+    androidTestImplementation composeBom
+    implementation "androidx.compose.ui:ui"
+    implementation "androidx.compose.ui:ui-graphics"
+    implementation "androidx.compose.ui:ui-tooling-preview"
+    implementation "androidx.compose.material3:material3"
+    implementation "androidx.compose.material:material-icons-extended"
+    implementation "androidx.activity:activity-compose:1.9.3"
+    implementation "androidx.navigation:navigation-compose:2.8.5"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7"
+    implementation "androidx.lifecycle:lifecycle-runtime-compose:2.8.7"
+    debugImplementation "androidx.compose.ui:ui-tooling"
+
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.json:json:20250517"
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"

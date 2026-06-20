@@ -49,19 +49,37 @@ public class WalletWebActivity extends FragmentActivity {
 
     @Override
     @SuppressWarnings("SetJavaScriptEnabled")
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (savedInstanceState != null) {
             pendingScanPayload = savedInstanceState.getString(STATE_PENDING_SCAN);
         }
         webView = new WebView(this);
-        // Without a WebChromeClient and explicit touch focus, HTML <input> fields in this
-        // WebView never acquire focus and the soft keyboard never opens, so the Send form
-        // could not be typed into. A plain WebChromeClient plus touch focusability is the
-        // standard configuration required for HTML form input + IME to work.
+        // Real-device fix (Send form: memo/amount untypeable, no keyboard, page jumps up).
+        // Getting an HTML <input> to focus + raise the soft keyboard inside a WebView needs
+        // THREE things together; any one alone is not enough on real hardware:
+        //   1. a WebChromeClient (the IME show path checks one is set),
+        //   2. the WebView being focusable in touch mode, and
+        //   3. an OnTouchListener that calls requestFocus() on the touch-down.
+        // With only (1)+(2), tapping a field makes the WebView *container* take focus -
+        // which also scroll-jumps the page to the top (the reported "page pulls itself
+        // up") - while the tapped DOM node never receives focus, so the keyboard never
+        // opens. Requesting focus on ACTION_DOWN/UP hands focus to the WebView *before* it
+        // routes the tap to the input, so the field focuses, the IME opens, and the page
+        // stops lurching. We return false so the touch is still delivered to the page.
         webView.setWebChromeClient(new android.webkit.WebChromeClient());
         webView.setFocusable(true);
         webView.setFocusableInTouchMode(true);
+        webView.setOnTouchListener((v, event) -> {
+            int action = event.getActionMasked();
+            if ((action == android.view.MotionEvent.ACTION_DOWN
+                    || action == android.view.MotionEvent.ACTION_UP)
+                    && !v.hasFocus()) {
+                v.requestFocus();
+            }
+            return false;
+        });
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);

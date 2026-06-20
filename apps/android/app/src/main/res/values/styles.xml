@@ -5,5 +5,25 @@
         <item name="android:statusBarColor">#F6F8F6</item>
         <item name="android:navigationBarColor">#FFFFFF</item>
         <item name="android:windowNoTitle">true</item>
+        <!--
+            Real-device fix: the app targets SDK 35 (Android 15), which enforces
+            edge-to-edge. Under that enforcement the window no longer shrinks for the
+            soft keyboard, so windowSoftInputMode="adjustResize" stops lifting the Send
+            form above the keyboard and the focused field gets covered / the page lurches.
+            The whole WebView layout is built around adjustResize + 100dvh, so we opt back
+            into the classic resize behavior. (Ignored on Android 14 and below.)
+        -->
+        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
+    </style>
+
+    <!--
+        新原生 (Compose) 宿主主题。与 AppTheme 的关键区别：**不** opt-out edge-to-edge，
+        让 Android 15 的边到边强制生效，改由 Compose 用 WindowInsets / imePadding 正确处理
+        软键盘与系统栏 —— 这正是原生重写要彻底解决的痛点（旧 WebView 是关掉它来绕开）。
+        Compose 自己绘制全部内容，所以平台主题只需是无标题栏的浅色 Material 主题即可。
+    -->
+    <style name="Theme.Velarum.Compose" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
 </resources>

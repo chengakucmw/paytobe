@@ -30,6 +30,8 @@ export const SOURCE_TYPES: readonly string[];
 export const VERIFICATION_STATUSES: readonly string[];
 export const RISK_SEVERITIES: readonly string[];
 export const PAIRING_SCOPES: readonly string[];
+export const DEFAULT_PAIRING_SCOPES: readonly string[];
+export const DEPRECATED_PAIRING_SCOPE_ALIASES: Readonly<Record<string, string>>;
 export const TRANSACTION_CONTEXT_TYPES: readonly string[];
 export const TRANSACTION_CONTEXT_STATUSES: readonly string[];
 export const SUPPORTED_NETWORKS: readonly string[];
@@ -67,8 +69,17 @@ export function detectUnsupportedTransferTarget(input?: Record<string, unknown> 
 };
 export function transferAssetAdapterWarning(asset?: TransferAsset): ValidationIssue | null;
 
-export function protocolError(code: string, message: string, details?: Record<string, unknown>): ValidationResult<never>;
+export function protocolError(code: string, message: string, details?: Record<string, unknown>): ValidationIssue;
 export function normalizePaymentRequestV1(payload: Record<string, unknown>, options?: Record<string, unknown>): ValidationResult<Record<string, unknown>>;
 export function normalizeTransactionContextV1(payload: Record<string, unknown>, options?: Record<string, unknown>): ValidationResult<Record<string, unknown>>;
-export function createTransactionContextSnapshot(context: Record<string, unknown>, options?: Record<string, unknown>): Record<string, unknown>;
-export function assertEnumCoverage(): void;
+export function createTransactionContextSnapshot(context: Record<string, unknown>, options?: Record<string, unknown>): ValidationResult<Record<string, unknown>>;
+export function assertEnumCoverage(): {
+  rails: string[];
+  canonical_rails: string[];
+  statuses: string[];
+  source_types: string[];
+  verification_statuses: string[];
+  risk_severities: string[];
+  scopes: string[];
+  networks: string[];
+};

@@ -265,6 +265,12 @@ export class Store {
 
   registerDevice(deviceId, token) {
     return this.mutate(() => {
+      // M6: first-create-only. Re-registering an existing device_id must NOT
+      // silently overwrite its token_hash — that let anyone who knew or guessed
+      // a device_id take the device over (and, with C1, hijack its inbox). The
+      // existence check runs INSIDE the write lock so two concurrent registers
+      // can't both win. Callers treat `null` as "already exists" → HTTP 409.
+      if (this.state.devices[deviceId]) return null;
       const now = new Date().toISOString();
       const device = {
         device_id: deviceId,

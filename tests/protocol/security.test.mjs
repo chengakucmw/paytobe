@@ -28,6 +28,8 @@ test("runtime config rejects unsafe production deployment settings", () => {
   assert(validation.errors.some((error) => error.includes("development placeholder")));
   assert(validation.errors.some((error) => error.includes("CORS_ALLOWED_ORIGINS")));
   assert(validation.errors.some((error) => error.includes("absolute durable path")));
+  // B8: production must require a metrics token so /metrics is not publicly readable.
+  assert(validation.errors.some((error) => error.includes("METRICS_TOKEN")));
 });
 
 test("CORS origin checks allow explicit and localhost origins only by default", () => {

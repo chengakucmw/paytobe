@@ -42,8 +42,12 @@ test("protocol enums cover v0.1 shared contracts", () => {
     assert.ok(VERIFICATION_STATUSES.includes(status));
   }
   for (const severity of ["blocker", "warning", "review_required"]) assert.ok(RISK_SEVERITIES.includes(severity));
-  for (const scope of ["request_payments", "create_transaction_contexts", "view_balances"]) {
+  for (const scope of ["payment.requests.create", "payment.requests.read", "transaction_contexts.create", "transaction_contexts.read", "wallet.addresses.read"]) {
     assert.ok(PAIRING_SCOPES.includes(scope));
+  }
+  // Regression guard for B1: the pre-1.0 underscore scope names must be gone.
+  for (const legacyScope of ["request_payments", "create_transaction_contexts", "view_balances", "read_payment_status"]) {
+    assert.equal(PAIRING_SCOPES.includes(legacyScope), false);
   }
 });
 

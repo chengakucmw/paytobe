@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Protocol · VelarumPay Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <nav class="nav">
+        <a href="/">Overview</a>
+        <a href="/quickstart.html">Quickstart</a>
+        <a href="/api.html">REST API</a>
+        <a href="/protocol.html">Protocol</a>
+        <a href="/mcp.html">MCP for agents</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <span class="pill">Protocol v1</span>
+    <h1>The VelarumPay protocol</h1>
+    <p class="lead">Two small, validated formats carry everything: <code>velarum.payment_request.v1</code> (the exact on-chain facts) and <code>velarum.transaction_context.v1</code> (the human-readable explanation the user reviews).</p>
+
+    <div class="note">Golden rule: payment facts come from the <code>payment</code> object only — never from <code>display</code> or <code>metadata</code>. What the user signs is exactly what is in <code>payment</code>.</div>
+
+    <h2>Payment Request v1</h2>
+    <p>The <code>payment</code> object describes the money movement. Fields:</p>
+    <table>
+      <tr><th>Field</th><th>Meaning</th></tr>
+      <tr><td><code>rail</code></td><td>Payment rail: <code>base_usdc</code> or <code>stellar_xlm</code>.</td></tr>
+      <tr><td><code>network</code></td><td><code>base_mainnet</code> for Base USDC; <code>stellar_public</code> / <code>stellar_testnet</code> for XLM.</td></tr>
+      <tr><td><code>asset</code></td><td>Asset symbol, e.g. <code>USDC</code> or <code>XLM</code>.</td></tr>
+      <tr><td><code>amount</code></td><td><strong>Exact decimal string</strong>, e.g. <code>"42.00"</code>. Never a float.</td></tr>
+      <tr><td><code>to</code></td><td>Recipient address (EVM <code>0x...</code> or Stellar <code>G...</code>).</td></tr>
+      <tr><td><code>token_contract</code></td><td>Token contract (Base USDC: the canonical USDC contract).</td></tr>
+      <tr><td><code>chain_id</code></td><td>EVM chain id (Base mainnet = <code>8453</code>).</td></tr>
+      <tr><td><code>decimals</code></td><td>Token decimals (USDC = <code>6</code>).</td></tr>
+    </table>
+    <p>Plus <code>payee</code> (name, verified flag) and <code>policy</code> (e.g. <code>requires_user_approval: true</code>).</p>
+
+    <h3>Supported rails</h3>
+    <table>
+      <tr><th>Rail</th><th>Network</th><th>Address</th><th>Notes</th></tr>
+      <tr><td><code>base_usdc</code></td><td><code>base_mainnet</code></td><td><code>0x...</code></td><td>chain id 8453, canonical USDC contract, decimals 6.</td></tr>
+      <tr><td><code>stellar_xlm</code></td><td><code>stellar_public</code> / <code>stellar_testnet</code></td><td><code>G...</code></td><td>Stellar public key.</td></tr>
+    </table>
+    <p><code>evm_erc20</code> is accepted only as a migration alias and normalizes to <code>base_usdc</code>.</p>
+
+    <h2>Transaction Context v1</h2>
+    <p>This is what the user actually reads before signing. It explains <em>why</em> this payment, in plain language.</p>
+    <pre><code>{
+  "protocol": "velarum.transaction_context.v1",
+  "transaction_id": "txn_demo_1",
+  "type": "developer_test",
+  "title": "Developer test checkout",
+  "summary": "A local developer test context for wallet review.",
+  "costs": { "total": "42.00", "currency": "USDC" },
+  "truth_fields": [],
+  "evidence": []
+}</code></pre>
+    <table>
+      <tr><th>Field</th><th>Meaning</th></tr>
+      <tr><td><code>title</code> / <code>summary</code></td><td>Short, human-readable description shown in the wallet.</td></tr>
+      <tr><td><code>costs</code></td><td>Total and currency, as decimal strings.</td></tr>
+      <tr><td><code>truth_fields</code></td><td>Verifiable facts (e.g. an order id) the user can trust.</td></tr>
+      <tr><td><code>evidence</code></td><td>Optional supporting references.</td></tr>
+    </table>
+
+    <h2>Validation</h2>
+    <p>The <code>@velarumpay/protocol</code> package exports validators you can run before sending:</p>
+    <pre><code>import { normalizePaymentRequestV1, normalizeTransactionContextV1 } from "@velarumpay/protocol";
+
+const result = normalizePaymentRequestV1(payload);
+if (!result.ok) console.error(result.errors);</code></pre>
+    <p>The validators never sign, never store keys, and never create an automatic payment path. They only check and normalize.</p>
+  </main>
+
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

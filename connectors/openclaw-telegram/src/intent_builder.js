@@ -21,7 +21,7 @@ export function buildPaymentIntent(payment, source = {}) {
     target_app_device_id: process.env.TARGET_APP_DEVICE_ID || "",
     source: {
       type: "openclaw",
-      device_id: process.env.OPENCLAW_DEVICE_ID || "mac-openclaw-01",
+      device_id: paymentRequest.source.device_id,
       channel: "telegram",
       agent_id: paymentRequest.source.agent_id,
       agent_name: paymentRequest.source.agent_name,

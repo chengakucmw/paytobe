@@ -5,6 +5,49 @@ export const BASE_USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 const DEFAULT_TTL_MS = 5 * 60 * 1000;
 
+// Mirror of TRANSACTION_CONTEXT_TYPES in packages/protocol/src/constants.js. The
+// OpenClaw Telegram skill is intentionally self-contained (no workspace dependency
+// on the protocol package), so we keep a local copy here — update both together if
+// the protocol enum changes. Used to guarantee metadata.type is always a legal
+// enum value (bug M15).
+const VALID_CONTEXT_TYPES = new Set([
+  "purchase",
+  "online_purchase",
+  "food_order",
+  "api_paid_call",
+  "subscription",
+  "virtual_goods",
+  "service_booking",
+  "travel_booking",
+  "transfer_request",
+  "invoice_payment",
+  "donation",
+  "developer_test",
+  "generic",
+  "generic_task"
+]);
+const DEFAULT_CONTEXT_TYPE = "generic";
+
+// B15: a production connector must carry a real connection + device identity. The
+// connector no longer falls back to the old demo values ("conn_openclaw_telegram_demo"
+// / "mac-openclaw-01"); callers must pass them via `source` or the documented env vars,
+// or we fail loudly instead of shipping a payment request under a fake identity.
+function resolveConnectionId(source = {}) {
+  const id = source.connection_id || process.env.VELARUMPAY_CONNECTION_ID || process.env.OPENCLAW_CONNECTION_ID || "";
+  if (!id) {
+    throw new Error("OpenClaw connection_id is required: pass source.connection_id or set VELARUMPAY_CONNECTION_ID / OPENCLAW_CONNECTION_ID.");
+  }
+  return id;
+}
+
+function resolveDeviceId(source = {}) {
+  const id = source.device_id || process.env.OPENCLAW_DEVICE_ID || "";
+  if (!id) {
+    throw new Error("OpenClaw device_id is required: pass source.device_id or set OPENCLAW_DEVICE_ID.");
+  }
+  return id;
+}
+
 export function buildPaymentRequestPayload(payment, source = {}, options = {}) {
   const normalizedPayment = normalizePayment(payment);
   const now = options.now ? new Date(options.now) : new Date();
@@ -16,7 +59,7 @@ export function buildPaymentRequestPayload(payment, source = {}, options = {}) {
   const request = {
     protocol: PAYMENT_REQUEST_PROTOCOL,
     request_id: requestId,
-    connection_id: source.connection_id || process.env.VELARUMPAY_CONNECTION_ID || process.env.OPENCLAW_CONNECTION_ID || "conn_openclaw_telegram_demo",
+    connection_id: resolveConnectionId(source),
     transaction_id: transactionId,
     created_at: source.created_at || now.toISOString(),
     expires_at: expiresAt,
@@ -148,7 +191,7 @@ function buildSource(source) {
     agent_name: source.agent_name || process.env.OPENCLAW_AGENT_NAME || "OpenClaw Telegram",
     runtime: source.runtime || "openclaw",
     channel: source.channel || "telegram",
-    device_id: process.env.OPENCLAW_DEVICE_ID || "mac-openclaw-01",
+    device_id: resolveDeviceId(source),
     telegram_chat_id_hash: source.telegram_chat_id_hash || ""
   });
 }
@@ -176,15 +219,30 @@ function buildDisplay(payment, source) {
 function buildMetadata(source) {
   const metadata = { ...(source.metadata || {}) };
   if (source.food_order) {
+    // `food_order` is a valid protocol context type.
     metadata.type = metadata.type || "food_order";
     metadata.food_order = source.food_order;
   }
   if (source.telegram_update_id || source.telegram_chat_id_hash) {
+    // M15: record Telegram provenance under metadata.openclaw ONLY. Do not invent
+    // a metadata.type such as "openclaw_telegram" — it is not in the protocol's
+    // TRANSACTION_CONTEXT_TYPES, so any downstream consumer that switches on the
+    // context type would misclassify or reject an ordinary Telegram payment. A
+    // plain Telegram payment simply leaves metadata.type unset.
     metadata.openclaw = compact({
       telegram_update_id: source.telegram_update_id || "",
       telegram_chat_id_hash: source.telegram_chat_id_hash || ""
     });
-    metadata.type = metadata.type || "openclaw_telegram";
+  }
+  // M15 (defensive): never emit a metadata.type outside the protocol enum. If a
+  // caller supplied a non-enum type, preserve the original value as provenance and
+  // fall back to a legal default so the generic relay path always sees a valid enum.
+  if (metadata.type && !VALID_CONTEXT_TYPES.has(metadata.type)) {
+    metadata.openclaw = compact({
+      ...(metadata.openclaw || {}),
+      source_type: metadata.type
+    });
+    metadata.type = DEFAULT_CONTEXT_TYPE;
   }
   return metadata;
 }

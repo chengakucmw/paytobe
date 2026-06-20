@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>REST API · VelarumPay Docs</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="inner">
+      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <nav class="nav">
+        <a href="/">Overview</a>
+        <a href="/quickstart.html">Quickstart</a>
+        <a href="/api.html">REST API</a>
+        <a href="/protocol.html">Protocol</a>
+        <a href="/mcp.html">MCP for agents</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <span class="pill">REST API v1</span>
+    <h1>REST API reference</h1>
+    <p class="lead">Base URL is your Platform API host, e.g. <code>http://127.0.0.1:8787</code> locally or <code>https://api.your-domain.com</code> in production. All paths below are prefixed with <code>/v1</code>.</p>
+
+    <h2>Authentication</h2>
+    <p>There are two credentials, used by two different callers:</p>
+    <table>
+      <tr><th>Caller</th><th>Credential</th><th>How to send</th></tr>
+      <tr><td>Agent (after pairing)</td><td>Connection token</td><td><code>Authorization: Bearer conn_tok_...</code> &nbsp;(or <code>X-Connection-Token</code> header, or <code>connection_token</code> in body)</td></tr>
+      <tr><td>Wallet app</td><td>App device token</td><td><code>device_id</code> + <code>token</code> in the body (or query for GET)</td></tr>
+    </table>
+    <div class="note">Idempotency: send <code>X-Idempotency-Key</code> (or <code>idempotency_key</code> in the body) when creating payment requests so retries never double-charge.</div>
+
+    <h2>Pairing &amp; connections</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Who</th><th>Purpose</th></tr>
+      <tr><td>POST</td><td><code>/v1/pairing/sessions</code></td><td>Agent</td><td>Start a pairing session; returns a short code + <code>velarumpay://pair?...</code> URI.</td></tr>
+      <tr><td>GET</td><td><code>/v1/pairing/sessions/:id</code></td><td>Agent</td><td>Check pairing status (pass <code>?code=</code>).</td></tr>
+      <tr><td>POST</td><td><code>/v1/pairing/sessions/:id/approve</code></td><td>Wallet</td><td>Approve scopes; returns the <code>connection token</code>.</td></tr>
+      <tr><td>POST</td><td><code>/v1/pairing/sessions/:id/reject</code></td><td>Wallet</td><td>Reject the pairing request.</td></tr>
+      <tr><td>GET</td><td><code>/v1/connections</code></td><td>Wallet</td><td>List connections for a device.</td></tr>
+      <tr><td>PATCH</td><td><code>/v1/connections/:id</code></td><td>Wallet</td><td>Pause or re-activate a connection.</td></tr>
+      <tr><td>DELETE</td><td><code>/v1/connections/:id</code></td><td>Wallet</td><td>Revoke a connection.</td></tr>
+      <tr><td>POST</td><td><code>/v1/connections/:id/rotate-token</code></td><td>Wallet</td><td>Rotate the connection token.</td></tr>
+    </table>
+
+    <h2>Payments &amp; context</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Who</th><th>Purpose</th></tr>
+      <tr><td>POST</td><td><code>/v1/transaction-contexts</code></td><td>Agent</td><td>Create the human-readable review context. Scope: <code>transaction_contexts.create</code>.</td></tr>
+      <tr><td>GET</td><td><code>/v1/transaction-contexts/:transaction_id</code></td><td>Agent</td><td>Read the latest context. Scope: <code>transaction_contexts.read</code>.</td></tr>
+      <tr><td>POST</td><td><code>/v1/payment-requests</code></td><td>Agent</td><td>Create a payment request. Scope: <code>payment.requests.create</code>.</td></tr>
+      <tr><td>GET</td><td><code>/v1/payment-requests/:id</code></td><td>Agent</td><td>Read one payment request. Scope: <code>payment.requests.read</code>.</td></tr>
+      <tr><td>GET</td><td><code>/v1/payment-requests/events</code></td><td>Agent</td><td>Poll status events (pass <code>?since=</code>).</td></tr>
+      <tr><td>POST</td><td><code>/v1/payment-requests/:id/status</code></td><td>Wallet</td><td>Report a status transition.</td></tr>
+    </table>
+
+    <h2>Operations</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+      <tr><td>GET</td><td><code>/health</code></td><td>Liveness check (used by Docker / load balancer).</td></tr>
+      <tr><td>GET</td><td><code>/metrics</code></td><td>Prometheus metrics (token-protected if configured).</td></tr>
+    </table>
+
+    <h2>Example: create a payment request</h2>
+    <pre><code>curl -X POST https://api.your-domain.com/v1/payment-requests \
+  -H "Authorization: Bearer conn_tok_..." \
+  -H "X-Idempotency-Key: demo-payment-1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "protocol": "velarum.payment_request.v1",
+    "transaction_id": "txn_demo_1",
+    "payment": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "amount": "42.00",
+      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
+      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "chain_id": 8453,
+      "decimals": 6
+    },
+    "payee": { "name": "VelarumPay Developer Test", "verified": false },
+    "policy": { "requires_user_approval": true }
+  }'</code></pre>
+
+    <h2>Errors</h2>
+    <p>Failures return <code>ok: false</code> with a structured <code>error</code> object (<code>code</code>, a human message, and a <code>field</code> when relevant). Risk and validation problems list every issue so you can fix them in one pass.</p>
+  </main>
+
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

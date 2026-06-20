@@ -548,6 +548,7 @@ function buildOpenClawRequestFromFixture(materialized) {
     agent_name: "OpenClaw Cross Smoke",
     runtime: "openclaw",
     channel: "telegram",
+    device_id: "device_openclaw_cross_smoke",
     payee: request.payee,
     display: request.display,
     metadata: request.metadata,

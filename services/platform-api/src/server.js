@@ -2,7 +2,7 @@ import cors from "cors";
 import express from "express";
 import http from "http";
 import { WebSocketServer } from "ws";
-import { id } from "./crypto.js";
+import { id, randomNumericCode } from "./crypto.js";
 import { loadDotEnv } from "./env.js";
 import { Store } from "./store.js";
 import { resolveTargetDevice } from "./routing.js";
@@ -49,6 +49,22 @@ const TERMINAL_PAYMENT_REQUEST_STATUSES = new Set([
   "expired",
   "rejected"
 ]);
+// M5: explicit, ordered state machine for device-reported Payment Request
+// status. Each key lists the ONLY statuses it may move to; anything else is a
+// 409. This blocks pending→confirmed (skipping the signature step), reviving a
+// failed request (failed→confirmed), and any mutation of a terminal status —
+// all of which used to slip through the old "terminal is immutable" check and
+// could poison the daily-spend ledger. `confirmed` is reachable only after
+// `broadcasted`, and `failed` is irreversible.
+const PAYMENT_REQUEST_STATUS_TRANSITIONS = {
+  pending: new Set(["signed", "broadcasted", "failed", "expired", "rejected"]),
+  signed: new Set(["broadcasted", "failed", "expired", "rejected"]),
+  broadcasted: new Set(["confirmed", "failed"]),
+  confirmed: new Set(),
+  failed: new Set(),
+  expired: new Set(),
+  rejected: new Set()
+};
 const FINAL_PAYMENT_REQUEST_REVIEW_STATES = new Set([
   "confirmed",
   "expired",
@@ -152,7 +168,18 @@ app.post("/v1/devices/app", (req, res) => {
   if (!device_id || !token) {
     return sendApiError(res, 400, "invalid_app_device_registration", "device_id and token are required");
   }
+  // M6: first-create-only. This endpoint used to UNCONDITIONALLY overwrite the
+  // token_hash of an existing device, so anyone who knew or guessed a device_id
+  // could re-register it with their own token and take the device over (and,
+  // combined with C1, hijack its inbox). registerDevice now returns null for an
+  // id that already exists; we surface that as 409 and never overwrite. A
+  // legitimate token refresh must use the authenticated rotate-token endpoint.
   const device = store.registerDevice(device_id, token);
+  if (!device) {
+    return sendApiError(res, 409, "app_device_exists", "App device already registered", {
+      details: { device_id }
+    });
+  }
   observability.recordAuditEvent("app_device.registered", "success", {
     actor: { type: "wallet_device", id: device.device_id },
     resource: { type: "app_device", id: device.device_id }
@@ -249,7 +276,14 @@ app.post("/v1/pairing/sessions", (req, res) => {
   }
 
   const pairingSessionId = id("pair");
-  const pairingCode = uniquePairingCode();
+  let pairingCode;
+  try {
+    pairingCode = uniquePairingCode();
+  } catch {
+    // M4: every retry collided with a live session — fail loudly rather than
+    // hand back a code we know is already in use.
+    return sendApiError(res, 503, "pairing_code_unavailable", "Could not allocate a unique pairing code, please retry");
+  }
   const expiresAt = new Date(Date.now() + ttl.seconds * 1000).toISOString();
   const pairingUri = `velarumpay://pair?session=${encodeURIComponent(pairingSessionId)}&code=${encodeURIComponent(pairingCode)}`;
   const session = store.createPairingSession(pairingSessionId, pairingCode, {
@@ -532,7 +566,7 @@ app.post("/v1/payment-requests", (req, res) => {
     ...normalized.value,
     target_app_device_id: target,
     transaction_context_ref: context.ref,
-    transaction_context_snapshot: context.snapshot || normalized.value.transaction_context_snapshot,
+    transaction_context_snapshot: context.snapshot || null,
     risk,
     warnings
   });
@@ -650,7 +684,7 @@ app.post("/v1/payment-requests/:id/status", (req, res) => {
     tx_hash: req.body.tx_hash || null,
     error: req.body.error || null
   });
-  notifyOpenClaw(updated.connection_id || updated.source?.device_id || "default", message);
+  notifyOpenClaw(updated.connection_id || updated.source?.device_id, message);
   notifyApp(updated.target_app_device_id, {
     type: "payment_request",
     request_id: updated.request_id,
@@ -759,7 +793,7 @@ app.post("/v1/payment-intents/:id/status", (req, res) => {
     error: req.body.error || null
   });
   if (shouldRecordSpent(status)) store.addDailySpent(intent.payment.asset, intent.payment.amount);
-  notifyOpenClaw(intent.source?.device_id || "default", {
+  notifyOpenClaw(intent.source?.device_id, {
     type: "payment_status",
     intent_id: intent.intent_id,
     status,
@@ -767,7 +801,11 @@ app.post("/v1/payment-intents/:id/status", (req, res) => {
     error: req.body.error || null
   });
   if (status === "broadcasted" && req.body.tx_hash) {
-    confirmLater(updated, req.body.tx_hash);
+    // M3: fire-and-forget, but a rejection must never bubble up as an unhandled
+    // process-level rejection — attach a catch that logs and moves on.
+    confirmLater(updated, req.body.tx_hash).catch((error) => {
+      console.error(`confirmLater failed for ${updated.intent_id}:`, error?.message || error);
+    });
   }
   res.json({ ok: true, intent: updated });
 });
@@ -845,7 +883,10 @@ wss.on("connection", (ws, _req, url) => {
       });
       return;
     }
-    const deviceId = url.searchParams.get("device_id") || "default";
+    // M1: isolate an anonymous legacy socket under its own unguessable key
+    // instead of the shared "default" bucket, so it can never be handed another
+    // connection's status messages.
+    const deviceId = url.searchParams.get("device_id") || id("legacy");
     addSocket(openclawSockets, deviceId, ws);
     ws.send(JSON.stringify({ type: "hello", role: "openclaw", device_id: deviceId }));
     ws.on("close", () => removeSocket(openclawSockets, deviceId, ws));
@@ -853,9 +894,30 @@ wss.on("connection", (ws, _req, url) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`AgentWallet Relay listening on http://0.0.0.0:${PORT}`);
-});
+// Production (`node src/server.js`) leaves VP_NO_AUTO_LISTEN unset and binds the
+// port normally. Tests import this module to exercise the handlers/helpers
+// directly and set VP_NO_AUTO_LISTEN=1 so importing doesn't occupy a socket.
+if (process.env.VP_NO_AUTO_LISTEN !== "1") {
+  server.listen(PORT, () => {
+    console.log(`AgentWallet Relay listening on http://0.0.0.0:${PORT}`);
+  });
+}
+
+// Exported for regression tests (see tests/backend/medium-fixes.test.mjs).
+// These are internal helpers; the public surface is the HTTP/WS API above.
+export {
+  app,
+  server,
+  store,
+  addSocket,
+  removeSocket,
+  notifyOpenClaw,
+  appSockets,
+  openclawSockets,
+  confirmLater,
+  validatePaymentRequestStatusUpdate,
+  PAYMENT_REQUEST_STATUS_TRANSITIONS
+};
 
 function sendApiError(res, status, code, message, options = {}) {
   const error = {
@@ -1005,16 +1067,16 @@ function normalizePairingTtl(value) {
 }
 
 function uniquePairingCode() {
+  // M4: crypto.randomInt is uniform and unpredictable (no modulo bias, not a
+  // seedable PRNG), so 6-digit codes neither cluster nor can be guessed. If
+  // every retry collides with a live session we FAIL instead of returning a
+  // known-colliding code — the old fallback returned a duplicate anyway, which
+  // could clobber another session's code index.
   for (let attempt = 0; attempt < 10; attempt++) {
-    const code = pairingCodeFromRandomId();
+    const code = randomNumericCode(6);
     if (!store.pairingSessionByCode(code)) return code;
   }
-  return pairingCodeFromRandomId();
-}
-
-function pairingCodeFromRandomId() {
-  const randomHex = id("paircode").replace(/^paircode_/, "").slice(0, 12);
-  return String(Number.parseInt(randomHex, 16) % 1000000).padStart(6, "0");
+  throw new Error("pairing_code_unavailable");
 }
 
 function resolvePairingSession(idOrCode, body = {}) {
@@ -1187,11 +1249,17 @@ function inferPayee(payload) {
 }
 
 function buildTransactionContextProjection(request) {
-  const suppliedSnapshot = request.transaction_context_snapshot || null;
+  // M7: the transaction context snapshot is security-sensitive evidence
+  // (merchant identity, costs, payee binding) that risk scoring trusts. It must
+  // be derived ONLY from a server-stored context that belongs to THIS request's
+  // connection. We never fall back to the request's own client-supplied
+  // snapshot — a malicious agent could forge a "safe-looking" one. When we can't
+  // build it from server data we return snapshot:null and mark the context
+  // missing, so risk treats it as unverified rather than believing the caller.
   if (!request.transaction_id) {
     return {
       ref: { status: "missing" },
-      snapshot: suppliedSnapshot,
+      snapshot: null,
       context: null,
       warnings: [apiWarning("context_missing", "Payment Request has no transaction_id", { field: "transaction_id" })]
     };
@@ -1201,7 +1269,7 @@ function buildTransactionContextProjection(request) {
   if (!context || context.connection_id !== request.connection_id) {
     return {
       ref: { transaction_id: request.transaction_id, status: "missing" },
-      snapshot: suppliedSnapshot,
+      snapshot: null,
       context: null,
       warnings: [apiWarning("context_missing", "Transaction Context is not available for this connection", {
         field: "transaction_id"
@@ -1212,8 +1280,8 @@ function buildTransactionContextProjection(request) {
   const snapshot = createTransactionContextSnapshot(context);
   if (!snapshot.ok) {
     return {
-      ref: { transaction_id: request.transaction_id, status: "ready" },
-      snapshot: suppliedSnapshot,
+      ref: { transaction_id: request.transaction_id, status: "missing" },
+      snapshot: null,
       context,
       warnings: snapshot.errors || [snapshot.error]
     };
@@ -1292,19 +1360,49 @@ function paymentRequestEventProjection(event) {
 
 function validatePaymentRequestStatusUpdate(request, nextStatus) {
   const currentStatus = request.status || "pending";
-  if (TERMINAL_PAYMENT_REQUEST_STATUSES.has(currentStatus) && currentStatus !== nextStatus) {
+
+  if (currentStatus === nextStatus) {
+    // Re-reporting a terminal status (e.g. a retried "confirmed") must be
+    // rejected so its side effects — like recording daily spend — never run
+    // twice. Re-reporting a non-terminal status is an idempotent no-op.
+    if (TERMINAL_PAYMENT_REQUEST_STATUSES.has(currentStatus)) {
+      return terminalPaymentRequestConflict(currentStatus, nextStatus);
+    }
+    return { ok: true };
+  }
+
+  if (TERMINAL_PAYMENT_REQUEST_STATUSES.has(currentStatus)) {
+    return terminalPaymentRequestConflict(currentStatus, nextStatus);
+  }
+
+  const allowed = PAYMENT_REQUEST_STATUS_TRANSITIONS[currentStatus] || new Set();
+  if (!allowed.has(nextStatus)) {
     return {
       ok: false,
       status: 409,
-      code: "terminal_payment_request",
-      message: "Terminal Payment Request status cannot be changed",
+      code: "invalid_status_transition",
+      message: `Payment Request cannot move from ${currentStatus} to ${nextStatus}`,
       details: {
         current_status: currentStatus,
-        requested_status: nextStatus
+        requested_status: nextStatus,
+        allowed_transitions: Array.from(allowed)
       }
     };
   }
   return { ok: true };
+}
+
+function terminalPaymentRequestConflict(currentStatus, nextStatus) {
+  return {
+    ok: false,
+    status: 409,
+    code: "terminal_payment_request",
+    message: "Terminal Payment Request status cannot be changed",
+    details: {
+      current_status: currentStatus,
+      requested_status: nextStatus
+    }
+  };
 }
 
 function paymentRequestStatusMessage(request, patch = {}) {
@@ -1505,9 +1603,14 @@ function notifyApp(deviceId, message) {
   sendSet(appSockets.get(deviceId), message);
 }
 
-function notifyOpenClaw(deviceId, message) {
-  sendSet(openclawSockets.get(deviceId), message);
-  sendSet(openclawSockets.get("default"), message);
+function notifyOpenClaw(key, message) {
+  // M1: deliver to exactly one bucket — the connection_id (modern agents) or a
+  // device_id (legacy). The old code ALSO fanned every message out to a shared
+  // "default" bucket that collected every anonymous legacy socket, leaking one
+  // connection's request_id/tx_hash to all of them and double-delivering. A
+  // falsy key means "no route" and is dropped, never broadcast.
+  if (!key) return;
+  sendSet(openclawSockets.get(key), message);
 }
 
 function sendSet(set, message) {
@@ -1542,35 +1645,43 @@ async function confirmLater(intent, txHash) {
       error: confirmed.error || null
     });
     if (status === "confirmed") store.addDailySpent(intent.payment.asset, intent.payment.amount);
-    notifyOpenClaw(intent.source?.device_id || "default", {
+    notifyOpenClaw(intent.source?.device_id, {
       type: "payment_status",
       intent_id: intent.intent_id,
       status,
       tx_hash: txHash,
       error: confirmed.error || null
     });
-    notifyApp(intent.target_app_device_id, {
-      type: "payment_intent",
-      intent_id: updated.intent_id,
-      status: updated.status
-    });
+    // M3: `updated` is null when the intent no longer exists (it expired and was
+    // pruned while we awaited confirmation). Dereferencing it here used to throw
+    // inside this detached async task — an unhandled rejection that took down the
+    // process and meant the final status update was never delivered.
+    if (updated) {
+      notifyApp(updated.target_app_device_id, {
+        type: "payment_intent",
+        intent_id: updated.intent_id,
+        status: updated.status
+      });
+    }
   } catch (error) {
     const updated = store.updateStatus(intent.intent_id, "failed", {
       tx_hash: txHash,
       error: error.message
     });
-    notifyOpenClaw(intent.source?.device_id || "default", {
+    notifyOpenClaw(intent.source?.device_id, {
       type: "payment_status",
       intent_id: intent.intent_id,
       status: "failed",
       tx_hash: txHash,
       error: error.message
     });
-    notifyApp(intent.target_app_device_id, {
-      type: "payment_intent",
-      intent_id: updated.intent_id,
-      status: updated.status
-    });
+    if (updated) {
+      notifyApp(updated.target_app_device_id, {
+        type: "payment_intent",
+        intent_id: updated.intent_id,
+        status: updated.status
+      });
+    }
   }
 }
 

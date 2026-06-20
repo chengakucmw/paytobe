@@ -24,17 +24,6 @@
             android:foregroundServiceType="dataSync" />
 
         <activity
-            android:name=".WalletWebActivity"
-            android:exported="true"
-            android:windowSoftInputMode="adjustResize"
-            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
@@ -69,6 +58,23 @@
                 <data
                     android:scheme="velarumpay"
                     android:host="pair" />
+            </intent-filter>
+        </activity>
+
+        <!--
+            新原生 (Compose) 宿主。Phase 2 起为 LAUNCHER（点图标进这里）。
+            它先处理开通流程；钱包就绪后临时 hand-off 到 WalletWebActivity（主应用仍在 WebView，
+            将随后续阶段逐屏迁移到原生）。
+        -->
+        <activity
+            android:name=".MainComposeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Velarum.Compose"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 

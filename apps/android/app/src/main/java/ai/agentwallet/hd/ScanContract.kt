@@ -1,0 +1,76 @@
+package ai.agentwallet.hd
+
+import android.content.Context
+import android.content.Intent
+import java.util.Locale
+
+/** 扫码结果的分类。 */
+sealed class ScanOutcome {
+    /** 配对链接/码 → 去配对页。 */
+    data class Pairing(val code: String) : ScanOutcome()
+
+    /** 可发送的转账（地址 + 可选金额/备注）→ 预填 Send。symbol 为空表示未能识别资产，让用户在 Send 选。 */
+    data class Transfer(val symbol: String, val network: String, val recipient: String, val amount: String, val memo: String) : ScanOutcome()
+
+    /** 无法识别。 */
+    data object Unknown : ScanOutcome()
+}
+
+/**
+ * Compose 与现有 QrScannerActivity（CameraX + MLKit）之间的契约：构造启动 Intent、读取返回的
+ * payload，并用现有的 ScannedPaymentRequestParser 分类（逻辑复用，不改）。本文件须在
+ * package ai.agentwallet.hd，才能访问 QrScannerActivity.EXTRA_PAYLOAD 与解析器。
+ */
+object ScanContract {
+
+    fun intent(context: Context): Intent = Intent(context, QrScannerActivity::class.java)
+
+    fun payloadOf(data: Intent?): String? = data?.getStringExtra(QrScannerActivity.EXTRA_PAYLOAD)
+
+    private val SENDABLE = setOf("XLM", "SOL", "ETH", "USDC")
+
+    fun classify(raw: String?): ScanOutcome {
+        val s = raw?.trim().orEmpty()
+        if (s.isEmpty()) return ScanOutcome.Unknown
+        val lower = s.lowercase(Locale.US)
+        if (lower.startsWith("velarumpay://pair") || lower.startsWith("velarumpay:pair")) {
+            return ScanOutcome.Pairing(extractPairingCode(s))
+        }
+        val draft = try { ScannedPaymentRequestParser.parseDraft(s) } catch (e: Exception) { null }
+        if (draft != null && !draft.to.isNullOrBlank()) {
+            val symbol = (draft.asset ?: "").trim().uppercase(Locale.US)
+            val known = if (symbol in SENDABLE) symbol else ""
+            return ScanOutcome.Transfer(
+                symbol = known,
+                network = networkFor(known),
+                recipient = draft.to.trim(),
+                amount = (draft.amount ?: "").trim(),
+                memo = (draft.memo ?: "").trim(),
+            )
+        }
+        if (looksLikeAddress(s)) return ScanOutcome.Transfer("", "", s, "", "")
+        return ScanOutcome.Unknown
+    }
+
+    private fun networkFor(symbol: String): String = when (symbol) {
+        "XLM" -> "Stellar"
+        "SOL" -> "Solana"
+        "ETH" -> "Ethereum"
+        "USDC" -> "Base"
+        else -> ""
+    }
+
+    private fun extractPairingCode(raw: String): String {
+        val afterScheme = raw.substringAfter("pair", "")
+        val q = raw.substringAfter("code=", "")
+        if (q.isNotBlank()) return q.substringBefore('&').trim()
+        return afterScheme.trim('/', ':', '?').trim()
+    }
+
+    private fun looksLikeAddress(s: String): Boolean {
+        if (s.matches(Regex("^0x[0-9a-fA-F]{40}$"))) return true
+        if (s.startsWith("G") && s.length == 56) return true
+        if (s.matches(Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$"))) return true
+        return false
+    }
+}

@@ -10,7 +10,7 @@
     "check": "node --check src/server.js && node --check src/store.js && node --check src/risk.js && node --check src/velarum.js && node --check src/crypto.js && node --check src/env.js && node --check src/security.js && node --check src/observability.js && node --check src/routing.js && node --check scripts/check-runtime-config.mjs && node --check scripts/backup-store.mjs",
     "check:runtime-config": "node scripts/check-runtime-config.mjs",
     "backup": "node scripts/backup-store.mjs",
-    "test": "node --test ../../tests/protocol/*.test.mjs && node --test ../../tests/backend/*.test.mjs"
+    "test": "node --test ../../tests/protocol/*.test.mjs && node --test ../../tests/backend/*.test.mjs && node --test ../../tests/connectors/*.test.mjs"
   },
   "dependencies": {
     "cors": "^2.8.5",
