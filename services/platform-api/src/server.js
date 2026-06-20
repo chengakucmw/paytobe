@@ -17,6 +17,7 @@ import { loadDotEnv } from "./env.js";
 import { Store } from "./store.js";
 import {
   assertRuntimeConfig,
+  validateRuntimeConfig,
   createCorsOptions,
   createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
@@ -51,7 +52,14 @@ import { createOpenClawRouter } from "./routes/openclaw.js";
 loadDotEnv();
 
 const runtimeConfig = loadRuntimeConfig();
-const runtimeValidation = assertRuntimeConfig(runtimeConfig);
+// Validate the runtime config, but only HARD-FAIL when we are actually going to
+// serve. Under the test hook (VP_NO_AUTO_LISTEN) server.js is imported for its
+// exported internals — not deployed — so a non-production-ready config (e.g. a
+// dev machine that exports NODE_ENV=production in its shell) must not block the
+// import. Real startup and `npm run start:production` still assert.
+const runtimeValidation = process.env.VP_NO_AUTO_LISTEN
+  ? validateRuntimeConfig(runtimeConfig)
+  : assertRuntimeConfig(runtimeConfig);
 const PORT = Number(process.env.PORT || 8787);
 
 // ---------------------------------------------------------------------------
