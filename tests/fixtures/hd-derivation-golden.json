@@ -1,0 +1,13 @@
+{
+  "description": "Authoritative HD key-derivation golden vectors. SINGLE SOURCE OF TRUTH that BOTH wallets must match: Android (ai.agentwallet.hd.HDWallet) and iOS (StellarService). The Stellar address is SLIP-10 ed25519 at m/44'/148'/0' derived from the BIP39 seed with an EMPTY passphrase. Values were computed independently with the SEP-0005 reference library 'stellar-hd-wallet' (not from either app), so a mismatch on either platform is a real bug. Drift here means the two apps would compute DIFFERENT wallet addresses from the same secret phrase = funds sent to the wrong/uncontrolled address. Enforced by tests/protocol/hd-derivation-contract.test.mjs (pins both platform tests to these values), apps/ios/VelarumPayTests/HDDerivationGoldenTests.swift, and apps/android/.../HDDerivationGoldenTest.java.",
+  "spec": "SEP-0005",
+  "vectors": [
+    {
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+      "word_count": 12,
+      "bip39_passphrase": "",
+      "derivation_path": "m/44'/148'/0'",
+      "stellar_address": "GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX"
+    }
+  ]
+}
