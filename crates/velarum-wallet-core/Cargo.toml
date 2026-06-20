@@ -8,10 +8,10 @@ publish = false
 
 [lib]
 name = "velarum_wallet_core"
-# Phase 1 milestone 1 builds a plain Rust library so `cargo test` proves the
-# derivation against the cross-platform golden vector. UniFFI crate-types
-# ("cdylib", "staticlib") are added in the bindings milestone.
-crate-type = ["lib"]
+# "lib" keeps the rlib for `cargo test` and the bindgen bin; "cdylib" is the
+# shared library the apps load (.so on Android, linked into the iOS framework);
+# "staticlib" supports static linking on iOS.
+crate-type = ["lib", "cdylib", "staticlib"]
 
 [dependencies]
 # Mature, widely-audited crypto building blocks. The whole point of a Rust core
@@ -23,6 +23,17 @@ sha2 = "0.10"
 stellar-strkey = "0.0.18" # Strkey encode/decode (G.../S..., muxed M... detection)
 stellar-xdr = { version = "27", features = ["base64"] }  # canonical Stellar XDR (tx envelope build/parse)
 base64 = "0.22"          # MEMO_HASH / MEMO_RETURN base64 decoding (C-1)
+uniffi = "0.31"          # generates the Kotlin (Android) + Swift (iOS) bindings
 
 [dev-dependencies]
 serde_json = "1"         # read the shared golden-vector fixture in integration tests
+
+# The `cli` feature is only enabled when building the binding generator, so the
+# shipped cdylib does not pull in clap and other CLI-only dependencies.
+[features]
+cli = ["uniffi/cli"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]

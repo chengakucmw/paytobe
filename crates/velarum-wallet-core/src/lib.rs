@@ -39,6 +39,9 @@ use stellar_xdr::{
     TransactionSignaturePayloadTaggedTransaction, TransactionV1Envelope, Uint256, WriteXdr,
 };
 
+// Wires up the UniFFI scaffolding for every `#[uniffi::export]` item below.
+uniffi::setup_scaffolding!();
+
 type HmacSha512 = Hmac<Sha512>;
 
 /// BIP-39 mnemonic word counts accepted on import (matches both apps).
@@ -460,6 +463,118 @@ pub fn sign_stellar_payment(
         tx_hash_hex: to_hex(&tx_hash),
         create_account,
     })
+}
+
+// ---------------------------------------------------------------------------
+// UniFFI layer — exactly what Kotlin (Android) and Swift (iOS) call. Kept as a
+// thin wrapper of FFI-friendly types (Vec<u8>, String) so the pure core API
+// above stays clean and independently testable.
+// ---------------------------------------------------------------------------
+
+/// FFI mirror of [`StellarKeys`] (fixed-size arrays become byte vectors).
+#[derive(Debug, uniffi::Record)]
+pub struct FfiStellarKeys {
+    pub address: String,
+    pub public_key: Vec<u8>,
+    pub secret_seed: Vec<u8>,
+    pub derivation_path: String,
+}
+
+/// FFI mirror of [`SignedStellarTransaction`].
+#[derive(Debug, uniffi::Record)]
+pub struct FfiSignedStellarTransaction {
+    pub envelope_base64: String,
+    pub tx_hash_hex: String,
+    pub create_account: bool,
+}
+
+/// Flat error carried across the FFI boundary. The platform adapters surface
+/// `message` to the user — it is the same English text the apps already show.
+#[derive(Debug, uniffi::Error)]
+pub enum FfiWalletError {
+    Message(String),
+}
+
+impl std::fmt::Display for FfiWalletError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FfiWalletError::Message(m) => write!(f, "{m}"),
+        }
+    }
+}
+
+impl From<WalletError> for FfiWalletError {
+    fn from(e: WalletError) -> Self {
+        FfiWalletError::Message(e.to_string())
+    }
+}
+
+/// Derive the Stellar account at `m/44'/148'/account'` from a mnemonic.
+#[uniffi::export]
+pub fn stellar_derive(
+    mnemonic: String,
+    passphrase: String,
+    account: u32,
+) -> Result<FfiStellarKeys, FfiWalletError> {
+    let k = derive_stellar(&mnemonic, &passphrase, account)?;
+    Ok(FfiStellarKeys {
+        address: k.address,
+        public_key: k.public_key.to_vec(),
+        secret_seed: k.secret_seed.to_vec(),
+        derivation_path: k.derivation_path,
+    })
+}
+
+/// Build and sign a Stellar payment / create-account transaction.
+#[uniffi::export]
+pub fn stellar_sign_payment(
+    secret_seed: Vec<u8>,
+    network_passphrase: String,
+    sequence: i64,
+    destination_address: String,
+    amount_xlm: String,
+    memo: String,
+    memo_type: String,
+    create_account: bool,
+) -> Result<FfiSignedStellarTransaction, FfiWalletError> {
+    if secret_seed.len() != 32 {
+        return Err(FfiWalletError::Message(
+            "Stellar secret seed must be exactly 32 bytes.".into(),
+        ));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&secret_seed);
+    let s = sign_stellar_payment(
+        &seed,
+        &network_passphrase,
+        sequence,
+        &destination_address,
+        &amount_xlm,
+        &memo,
+        &memo_type,
+        create_account,
+    )?;
+    Ok(FfiSignedStellarTransaction {
+        envelope_base64: s.envelope_base64,
+        tx_hash_hex: s.tx_hash_hex,
+        create_account: s.create_account,
+    })
+}
+
+/// Parse an XLM amount string into exact integer stroops.
+#[uniffi::export]
+pub fn stellar_xlm_to_stroops(amount: String) -> Result<i64, FfiWalletError> {
+    Ok(xlm_to_stroops(&amount)?)
+}
+
+/// M-3: refuse if a recognized Horizon host contradicts the declared network.
+#[uniffi::export]
+pub fn stellar_assert_network_consistency(
+    host: String,
+    testnet: bool,
+) -> Result<(), FfiWalletError> {
+    assert_stellar_network_consistency(&host, testnet)?;
+    Ok(())
 }
 
 #[cfg(test)]

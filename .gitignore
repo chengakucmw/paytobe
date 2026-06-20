@@ -51,3 +51,10 @@ runtime-store*.json
 *runtime-store.json
 payment-inbox-store*.json
 transaction-history-store*.json
+
+# VelarumPay shared wallet-core (UniFFI) generated build artifacts.
+# Regenerate with crates/velarum-wallet-core/scripts/build-apple.sh (iOS) and
+# build-android-host.sh (Android JVM tests).
+crates/velarum-wallet-core/target/
+apps/ios/Generated/
+apps/android/app/uniffi-generated/
