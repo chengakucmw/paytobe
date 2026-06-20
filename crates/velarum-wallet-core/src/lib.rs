@@ -571,6 +571,220 @@ pub fn sign_stellar_payment(
 }
 
 // ---------------------------------------------------------------------------
+// EVM signing (legacy EIP-155 transaction, matching Android web3j) + Solana
+// signing (system transfer, matching Android SolanaTransfer). Both ECDSA/ed25519
+// signatures are deterministic, so the cross-check tests assert byte-identical
+// output vs the native paths.
+// ---------------------------------------------------------------------------
+
+/// A signed EVM transaction, ready to broadcast (`eth_sendRawTransaction`).
+#[derive(Debug, Clone)]
+pub struct EvmSignedTx {
+    pub raw_tx_hex: String,
+    pub tx_hash_hex: String,
+}
+
+/// A signed Solana transaction, ready to broadcast (`sendTransaction`, base64).
+#[derive(Debug, Clone)]
+pub struct SolanaSignedTx {
+    pub transaction_base64: String,
+    /// Base58 of the signature — the transaction id.
+    pub signature_base58: String,
+}
+
+fn parse_u128_dec(s: &str) -> Result<u128, WalletError> {
+    s.trim()
+        .parse::<u128>()
+        .map_err(|_| WalletError::InvalidAmount(format!("invalid integer amount: {s}")))
+}
+
+fn parse_evm_address(addr: &str) -> Result<[u8; 20], WalletError> {
+    let hex = addr.trim().strip_prefix("0x").unwrap_or(addr.trim());
+    let bytes = hex_to_bytes(hex)
+        .ok_or_else(|| WalletError::InvalidDestination("Invalid EVM address.".into()))?;
+    if bytes.len() != 20 {
+        return Err(WalletError::InvalidDestination("Invalid EVM address.".into()));
+    }
+    let mut a = [0u8; 20];
+    a.copy_from_slice(&bytes);
+    Ok(a)
+}
+
+fn min_be(bytes: &[u8]) -> Vec<u8> {
+    let first = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len());
+    bytes[first..].to_vec()
+}
+
+fn rlp_len_prefix(out: &mut Vec<u8>, len: usize, short_base: u8, long_base: u8) {
+    if len < 56 {
+        out.push(short_base + len as u8);
+    } else {
+        let lb = min_be(&len.to_be_bytes());
+        out.push(long_base + lb.len() as u8);
+        out.extend_from_slice(&lb);
+    }
+}
+
+fn rlp_bytes(b: &[u8]) -> Vec<u8> {
+    if b.len() == 1 && b[0] < 0x80 {
+        return vec![b[0]];
+    }
+    let mut out = Vec::new();
+    rlp_len_prefix(&mut out, b.len(), 0x80, 0xb7);
+    out.extend_from_slice(b);
+    out
+}
+
+fn rlp_list(items: &[Vec<u8>]) -> Vec<u8> {
+    let payload: Vec<u8> = items.concat();
+    let mut out = Vec::new();
+    rlp_len_prefix(&mut out, payload.len(), 0xc0, 0xf7);
+    out.extend_from_slice(&payload);
+    out
+}
+
+/// Build and sign a legacy (EIP-155) EVM transaction. `data_hex` is empty for a
+/// native transfer or the call data for an ERC-20 transfer. Amounts are wei.
+#[allow(clippy::too_many_arguments)]
+pub fn sign_evm_transaction(
+    private_key: &[u8; 32],
+    chain_id: u64,
+    nonce: u64,
+    gas_price_wei: &str,
+    gas_limit: u64,
+    to_address: &str,
+    value_wei: &str,
+    data_hex: &str,
+) -> Result<EvmSignedTx, WalletError> {
+    let gas_price = parse_u128_dec(gas_price_wei)?;
+    let value = parse_u128_dec(value_wei)?;
+    let to = parse_evm_address(to_address)?;
+    let data = {
+        let h = data_hex.trim().strip_prefix("0x").unwrap_or(data_hex.trim());
+        if h.is_empty() {
+            Vec::new()
+        } else {
+            hex_to_bytes(h).ok_or_else(|| WalletError::Internal("invalid EVM data hex".into()))?
+        }
+    };
+
+    let fields = |v: &[u8]| rlp_bytes(&min_be(v));
+    let unsigned = rlp_list(&[
+        fields(&nonce.to_be_bytes()),
+        fields(&gas_price.to_be_bytes()),
+        fields(&gas_limit.to_be_bytes()),
+        rlp_bytes(&to),
+        fields(&value.to_be_bytes()),
+        rlp_bytes(&data),
+        fields(&chain_id.to_be_bytes()),
+        rlp_bytes(&[]),
+        rlp_bytes(&[]),
+    ]);
+    let hash = keccak256(&unsigned);
+
+    let signing = k256::ecdsa::SigningKey::from_slice(private_key)
+        .map_err(|e| WalletError::Internal(format!("EVM key: {e}")))?;
+    let (sig, recid) = signing
+        .sign_prehash_recoverable(&hash)
+        .map_err(|e| WalletError::Internal(format!("EVM sign: {e}")))?;
+    let sig_bytes = sig.to_bytes();
+    let v = recid.to_byte() as u64 + chain_id * 2 + 35;
+
+    let signed = rlp_list(&[
+        fields(&nonce.to_be_bytes()),
+        fields(&gas_price.to_be_bytes()),
+        fields(&gas_limit.to_be_bytes()),
+        rlp_bytes(&to),
+        fields(&value.to_be_bytes()),
+        rlp_bytes(&data),
+        fields(&v.to_be_bytes()),
+        rlp_bytes(&min_be(&sig_bytes[0..32])),
+        rlp_bytes(&min_be(&sig_bytes[32..64])),
+    ]);
+    Ok(EvmSignedTx {
+        raw_tx_hex: format!("0x{}", to_hex(&signed)),
+        tx_hash_hex: format!("0x{}", to_hex(&keccak256(&signed))),
+    })
+}
+
+fn decode_base58_32(value: &str, label: &str) -> Result<[u8; 32], WalletError> {
+    let bytes = bs58::decode(value.trim())
+        .into_vec()
+        .map_err(|_| WalletError::InvalidDestination(format!("Invalid Solana {label} address.")))?;
+    if bytes.len() != 32 {
+        return Err(WalletError::InvalidDestination(format!(
+            "Invalid Solana {label} address."
+        )));
+    }
+    let mut a = [0u8; 32];
+    a.copy_from_slice(&bytes);
+    Ok(a)
+}
+
+/// Solana shortvec (compact-u16) length encoding (matches Android `writeCompact`).
+fn write_compact(out: &mut Vec<u8>, mut value: u16) {
+    loop {
+        let mut elem = (value & 0x7f) as u8;
+        value >>= 7;
+        if value == 0 {
+            out.push(elem);
+            break;
+        }
+        elem |= 0x80;
+        out.push(elem);
+    }
+}
+
+fn build_solana_transfer_message(
+    from: &[u8; 32],
+    to: &[u8; 32],
+    blockhash: &[u8; 32],
+    lamports: u64,
+) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.extend_from_slice(&[1, 0, 1]); // header: 1 required sig, 0 ro-signed, 1 ro-unsigned
+    write_compact(&mut out, 3); // accounts: from, to, system program
+    out.extend_from_slice(from);
+    out.extend_from_slice(to);
+    out.extend_from_slice(&[0u8; 32]); // system program id
+    out.extend_from_slice(blockhash);
+    write_compact(&mut out, 1); // 1 instruction
+    out.push(2); // program id index (system program)
+    write_compact(&mut out, 2); // 2 account indexes
+    out.extend_from_slice(&[0, 1]); // from, to
+    let mut data = Vec::with_capacity(12);
+    data.extend_from_slice(&2u32.to_le_bytes()); // SystemInstruction::Transfer
+    data.extend_from_slice(&lamports.to_le_bytes());
+    write_compact(&mut out, data.len() as u16);
+    out.extend_from_slice(&data);
+    out
+}
+
+/// Build and sign a native SOL transfer. `recent_blockhash` and the lamport
+/// amount are resolved by the caller (network). Mirrors Android `SolanaTransfer`.
+pub fn sign_solana_transfer(
+    secret_seed: &[u8; 32],
+    to_address: &str,
+    lamports: u64,
+    recent_blockhash: &str,
+) -> Result<SolanaSignedTx, WalletError> {
+    let signing = SigningKey::from_bytes(secret_seed);
+    let from = signing.verifying_key().to_bytes();
+    let to = decode_base58_32(to_address, "recipient")?;
+    let blockhash = decode_base58_32(recent_blockhash, "blockhash")?;
+    let message = build_solana_transfer_message(&from, &to, &blockhash, lamports);
+    let signature = signing.sign(&message);
+    let mut tx = Vec::new();
+    write_compact(&mut tx, 1);
+    tx.extend_from_slice(&signature.to_bytes());
+    tx.extend_from_slice(&message);
+    Ok(SolanaSignedTx {
+        transaction_base64: STANDARD.encode(&tx),
+        signature_base58: bs58::encode(signature.to_bytes()).into_string(),
+    })
+}
+
+// ---------------------------------------------------------------------------
 // UniFFI layer — exactly what Kotlin (Android) and Swift (iOS) call. Kept as a
 // thin wrapper of FFI-friendly types (Vec<u8>, String) so the pure core API
 // above stays clean and independently testable.
@@ -725,6 +939,78 @@ pub fn solana_derive(
     })
 }
 
+/// FFI mirror of [`EvmSignedTx`].
+#[derive(Debug, uniffi::Record)]
+pub struct FfiEvmSignedTx {
+    pub raw_tx_hex: String,
+    pub tx_hash_hex: String,
+}
+
+/// FFI mirror of [`SolanaSignedTx`].
+#[derive(Debug, uniffi::Record)]
+pub struct FfiSolanaSignedTx {
+    pub transaction_base64: String,
+    pub signature_base58: String,
+}
+
+/// Build + sign a legacy EVM transaction (caller supplies nonce/gas; resolved
+/// via network). `data_hex` empty = native transfer; otherwise ERC-20 call data.
+#[uniffi::export]
+pub fn evm_sign_transaction(
+    private_key: Vec<u8>,
+    chain_id: u64,
+    nonce: u64,
+    gas_price_wei: String,
+    gas_limit: u64,
+    to_address: String,
+    value_wei: String,
+    data_hex: String,
+) -> Result<FfiEvmSignedTx, FfiWalletError> {
+    if private_key.len() != 32 {
+        return Err(FfiWalletError::Message(
+            "EVM private key must be 32 bytes.".into(),
+        ));
+    }
+    let mut pk = [0u8; 32];
+    pk.copy_from_slice(&private_key);
+    let s = sign_evm_transaction(
+        &pk,
+        chain_id,
+        nonce,
+        &gas_price_wei,
+        gas_limit,
+        &to_address,
+        &value_wei,
+        &data_hex,
+    )?;
+    Ok(FfiEvmSignedTx {
+        raw_tx_hex: s.raw_tx_hex,
+        tx_hash_hex: s.tx_hash_hex,
+    })
+}
+
+/// Build + sign a native SOL transfer (caller supplies the recent blockhash).
+#[uniffi::export]
+pub fn solana_sign_transfer(
+    secret_seed: Vec<u8>,
+    to_address: String,
+    lamports: u64,
+    recent_blockhash: String,
+) -> Result<FfiSolanaSignedTx, FfiWalletError> {
+    if secret_seed.len() != 32 {
+        return Err(FfiWalletError::Message(
+            "Solana secret seed must be 32 bytes.".into(),
+        ));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&secret_seed);
+    let s = sign_solana_transfer(&seed, &to_address, lamports, &recent_blockhash)?;
+    Ok(FfiSolanaSignedTx {
+        transaction_base64: s.transaction_base64,
+        signature_base58: s.signature_base58,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -807,6 +1093,31 @@ mod tests {
         assert_eq!(k.address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
         assert_eq!(k.derivation_path, "m/44'/501'/0'/0'");
         assert_eq!(k.public_key.len(), 32);
+    }
+
+    #[test]
+    fn evm_signing_matches_ethers_golden() {
+        // Independent reference: ethers.js wallet.signTransaction (legacy EIP-155).
+        let keys = derive_evm(GOLDEN_MNEMONIC, "").unwrap();
+        let signed = sign_evm_transaction(
+            &keys.private_key, 1, 0, "20000000000", 21000,
+            "0x000000000000000000000000000000000000dEaD", "1000000000000000000", "",
+        )
+        .unwrap();
+        assert_eq!(signed.raw_tx_hex, "0xf86c808504a817c80082520894000000000000000000000000000000000000dead880de0b6b3a76400008026a0d752eab9909ac7da6e7058d003b2c4f694cd8d28ce736a23eacbcd92eddb5b2ba07464ea202ccd1d049e2b3af256472775f0fbfa0a90fdeea357fa11785ac9de0f");
+    }
+
+    #[test]
+    fn solana_signing_matches_web3js_golden() {
+        // Independent reference: @solana/web3.js Transaction.sign + serialize.
+        let keys = derive_solana(GOLDEN_MNEMONIC, "").unwrap();
+        let signed = sign_solana_transfer(
+            &keys.secret_seed, "11111111111111111111111111111112",
+            1_000_000_000, "11111111111111111111111111111111",
+        )
+        .unwrap();
+        assert_eq!(signed.transaction_base64, "AdsnJKZOPWLXxXIeke6MNGmbU1VlIgYcnybb9pOtZODM6oaDOKa77LS0VXh4Zx1FgRDNWF5W32QRbnsElyCefAMBAAED8DYnYkanW53jNJ7UKxXiMvZRj8IPX81PHWToH5vSWPcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAgIAAQwCAAAAAMqaOwAAAAA=");
+        assert_eq!(signed.signature_base58, "5P8bb3PVxxxYzqNShZtu93F9SumLwKvi25ThAbhYPS5Ssyp2aqrvX8rXnVcYteLTdcpCky8xQzcox6rKC3kH3NgA");
     }
 
     // ---- signing ----
