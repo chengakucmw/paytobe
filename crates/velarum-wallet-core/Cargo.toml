@@ -1,0 +1,28 @@
+[package]
+name = "velarum-wallet-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "VelarumPay cross-platform wallet core: HD key derivation and signing shared by the Android and iOS apps (Phase 1: Stellar)."
+publish = false
+
+[lib]
+name = "velarum_wallet_core"
+# Phase 1 milestone 1 builds a plain Rust library so `cargo test` proves the
+# derivation against the cross-platform golden vector. UniFFI crate-types
+# ("cdylib", "staticlib") are added in the bindings milestone.
+crate-type = ["lib"]
+
+[dependencies]
+# Mature, widely-audited crypto building blocks. The whole point of a Rust core
+# is that BOTH platforms run these exact same primitives.
+bip39 = "2.2"            # BIP-39 mnemonic validation + PBKDF2-HMAC-SHA512 seed
+ed25519-dalek = "2"      # ed25519 keypair + signing (RFC 8032)
+hmac = "0.12"            # HMAC-SHA512 for the SLIP-0010 derivation chain
+sha2 = "0.10"
+stellar-strkey = "0.0.18" # Strkey encode/decode (G.../S..., muxed M... detection)
+stellar-xdr = { version = "27", features = ["base64"] }  # canonical Stellar XDR (tx envelope build/parse)
+base64 = "0.22"          # MEMO_HASH / MEMO_RETURN base64 decoding (C-1)
+
+[dev-dependencies]
+serde_json = "1"         # read the shared golden-vector fixture in integration tests
