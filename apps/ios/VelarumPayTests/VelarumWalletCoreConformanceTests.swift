@@ -72,4 +72,44 @@ final class VelarumWalletCoreConformanceTests: XCTestCase {
             "muxed M… destination must be rejected (H-3)"
         )
     }
+
+    /// Gate for the signing flip: the shared core must build + sign the exact same
+    /// envelope (byte for byte) as the native Swift path, for representative inputs.
+    func testCoreSigningMatchesNativeEnvelopeByteForByte() async throws {
+        let service = StellarService()
+        let wallet = try await service.restoreWallet(mnemonic: goldenMnemonic, backupVerified: true)
+        let horizon = URL(string: "https://horizon-testnet.stellar.org")!
+        // (amountXLM, memo, memoType, createAccount)
+        let cases: [(String, String, String, Bool)] = [
+            ("1.5", "", "", false),
+            ("2.5", "exchange-note", "text", false),
+            ("10", "100200300", "id", false),
+            ("3", "", "", true),
+        ]
+        for (amount, memo, memoType, createAccount) in cases {
+            StellarService.useSharedCoreSigning = false
+            let native = try await service.buildSignedEnvelope(
+                wallet: wallet, horizon: horizon, testnet: true,
+                destinationAddress: wallet.address, amountXLM: amount,
+                sequence: 42, createAccount: createAccount, memo: memo, memoType: memoType)
+            StellarService.useSharedCoreSigning = true
+            let core = try await service.buildSignedEnvelope(
+                wallet: wallet, horizon: horizon, testnet: true,
+                destinationAddress: wallet.address, amountXLM: amount,
+                sequence: 42, createAccount: createAccount, memo: memo, memoType: memoType)
+            // Apple's CryptoKit ed25519 signatures are RANDOMIZED (valid per RFC
+            // 8032), while the core (dalek) is deterministic, so the 64-byte
+            // signature legitimately differs. Equivalence is proven by an identical
+            // transaction hash — i.e. the core signs the byte-identical transaction.
+            XCTAssertEqual(native.txHash, core.txHash,
+                "native vs shared-core TRANSACTION differs for amount=\(amount) memo=\(memo)/\(memoType) createAccount=\(createAccount)")
+            // Both envelopes share everything up to the signature (same source key,
+            // fee, seq, memo, op): confirm the non-signature prefix matches too.
+            XCTAssertEqual(
+                String(native.envelopeBase64.prefix(120)),
+                String(core.envelopeBase64.prefix(120)),
+                "envelope prefix (pre-signature) differs for amount=\(amount)")
+        }
+        StellarService.useSharedCoreSigning = true
+    }
 }

@@ -64,4 +64,28 @@ class VelarumWalletCoreConformanceTest {
             )
         }
     }
+
+    /** Gate for the signing flip: the shared core must sign the byte-identical
+     *  transaction (same hash) as the native bouncycastle path. */
+    @Test
+    fun coreSigningMatchesNativeTransaction() {
+        val keys = stellarDerive(goldenMnemonic, "", 0u)
+        // (amountXlm, memo, createAccount)
+        val cases = listOf(
+            Triple("1.5", "", false),
+            Triple("2.5", "exchange-note", false),
+            Triple("3", "", true),
+        )
+        for ((amount, memo, create) in cases) {
+            StellarTransfer.USE_SHARED_CORE_SIGNING = false
+            val native = StellarTransfer.buildSignedEnvelope(
+                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, true)
+            StellarTransfer.USE_SHARED_CORE_SIGNING = true
+            val core = StellarTransfer.buildSignedEnvelope(
+                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, true)
+            assertEquals("tx hash differs for $amount/$memo/$create", native.txHash, core.txHash)
+            assertEquals(native.envelope64.substring(0, 120), core.envelope64.substring(0, 120))
+        }
+        StellarTransfer.USE_SHARED_CORE_SIGNING = true
+    }
 }

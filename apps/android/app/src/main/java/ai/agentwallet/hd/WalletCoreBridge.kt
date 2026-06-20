@@ -1,6 +1,7 @@
 package ai.agentwallet.hd
 
 import uniffi.velarum_wallet_core.stellarDerive
+import uniffi.velarum_wallet_core.stellarSignPayment
 
 /**
  * Java-friendly bridge to the shared Rust wallet core (crates/velarum-wallet-core).
@@ -16,6 +17,25 @@ object WalletCoreBridge {
         val k = stellarDerive(mnemonic, "", account.toUInt())
         return StellarCoreKeys(k.address, k.publicKey, k.secretSeed, k.derivationPath)
     }
+
+    /** Build + sign a Stellar payment / create-account via the shared core. */
+    @JvmStatic
+    fun signStellar(
+        secretSeed: ByteArray,
+        networkPassphrase: String,
+        sequence: Long,
+        destinationAddress: String,
+        amountXlm: String,
+        memo: String,
+        memoType: String,
+        createAccount: Boolean,
+    ): SignedStellarCore {
+        val s = stellarSignPayment(
+            secretSeed, networkPassphrase, sequence, destinationAddress,
+            amountXlm, memo, memoType, createAccount,
+        )
+        return SignedStellarCore(s.envelopeBase64, s.txHashHex, s.createAccount)
+    }
 }
 
 /** Plain holder so Java sees simple public fields. */
@@ -24,4 +44,11 @@ class StellarCoreKeys(
     @JvmField val publicKey: ByteArray,
     @JvmField val secretSeed: ByteArray,
     @JvmField val derivationPath: String,
+)
+
+/** Plain holder for a signed Stellar transaction. */
+class SignedStellarCore(
+    @JvmField val envelopeBase64: String,
+    @JvmField val txHashHex: String,
+    @JvmField val createAccount: Boolean,
 )

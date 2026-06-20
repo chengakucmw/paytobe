@@ -1,6 +1,6 @@
 package ai.agentwallet.hd;
 
-import android.util.Base64;
+import java.util.Base64;
 
 import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
@@ -27,6 +27,14 @@ final class StellarTransfer {
     private static final String TESTNET_PASSPHRASE = "Test SDF Network ; September 2015";
     private static final String PUBLIC_PASSPHRASE = "Public Global Stellar Network ; September 2015";
     private static final long FALLBACK_MIN_CREATE_ACCOUNT_STROOPS = 10_000_000L;
+
+    /**
+     * When true (default), the transaction is built + signed by the shared Rust
+     * core (crates/velarum-wallet-core) via WalletCoreBridge; when false, by the
+     * native path below. A cross-check test asserts identical transaction hashes,
+     * so this preserves behaviour. Network I/O stays native. Set false to revert.
+     */
+    static boolean USE_SHARED_CORE_SIGNING = true;
 
     private StellarTransfer() {}
 
@@ -66,7 +74,7 @@ final class StellarTransfer {
         horizonUrl = normalizeHorizonUrl(horizonUrl, testnet);
         String sourceAddress = StellarStrKey.encodePublicKey(sourcePublic);
         long sequence = fetchSequence(horizonUrl, sourceAddress) + 1;
-        byte[] destinationPublic = StellarStrKey.decodePublicKey(destinationAddress);
+        StellarStrKey.decodePublicKey(destinationAddress); // validate destination up front
         long amount = xlmToStroops(amountXlm);
         boolean createAccount = fetchAccount(horizonUrl, destinationAddress) == null;
         if (createAccount) {
@@ -79,17 +87,9 @@ final class StellarTransfer {
                 );
             }
         }
-        byte[] tx = transactionXdr(sourcePublic, destinationPublic, sequence, amount, createAccount, memo);
-        byte[] networkHash = sha256((testnet ? TESTNET_PASSPHRASE : PUBLIC_PASSPHRASE).getBytes(StandardCharsets.UTF_8));
-        ByteArrayOutputStream signatureBase = new ByteArrayOutputStream();
-        signatureBase.write(networkHash);
-        writeInt(signatureBase, 2);
-        signatureBase.write(tx);
-        byte[] txHashBytes = sha256(signatureBase.toByteArray());
-        String txHash = Hex.bytesToHex(txHashBytes);
-        byte[] signature = sign(sourceSeed, txHashBytes);
-        byte[] envelope = envelopeXdr(tx, sourcePublic, signature);
-        String envelope64 = Base64.encodeToString(envelope, Base64.NO_WRAP);
+        SignedEnvelope signed = buildSignedEnvelope(sourceSeed, sourcePublic, sequence, destinationAddress, amountXlm, createAccount, memo, testnet);
+        String envelope64 = signed.envelope64;
+        String txHash = signed.txHash;
         if (progress != null) progress.onGenerated("Signed Stellar transaction");
         String body = "tx=" + URLEncoder.encode(envelope64, "UTF-8");
         Request request = new Request.Builder()
@@ -167,6 +167,47 @@ final class StellarTransfer {
             }
         }
         return false;
+    }
+
+    /** Pure (no network) build-and-sign, switchable between the shared core and
+     *  the native path so the two can be cross-checked. */
+    static SignedEnvelope buildSignedEnvelope(
+            byte[] sourceSeed,
+            byte[] sourcePublic,
+            long sequence,
+            String destinationAddress,
+            String amountXlm,
+            boolean createAccount,
+            String memo,
+            boolean testnet
+    ) throws Exception {
+        if (USE_SHARED_CORE_SIGNING) {
+            String passphrase = testnet ? TESTNET_PASSPHRASE : PUBLIC_PASSPHRASE;
+            SignedStellarCore s = WalletCoreBridge.signStellar(
+                    sourceSeed, passphrase, sequence, destinationAddress, amountXlm, memo, "", createAccount);
+            return new SignedEnvelope(s.envelopeBase64, s.txHashHex);
+        }
+        byte[] destinationPublic = StellarStrKey.decodePublicKey(destinationAddress);
+        long amount = xlmToStroops(amountXlm);
+        byte[] tx = transactionXdr(sourcePublic, destinationPublic, sequence, amount, createAccount, memo);
+        byte[] networkHash = sha256((testnet ? TESTNET_PASSPHRASE : PUBLIC_PASSPHRASE).getBytes(StandardCharsets.UTF_8));
+        ByteArrayOutputStream signatureBase = new ByteArrayOutputStream();
+        signatureBase.write(networkHash);
+        writeInt(signatureBase, 2);
+        signatureBase.write(tx);
+        byte[] txHashBytes = sha256(signatureBase.toByteArray());
+        byte[] signature = sign(sourceSeed, txHashBytes);
+        byte[] envelope = envelopeXdr(tx, sourcePublic, signature);
+        return new SignedEnvelope(Base64.getEncoder().encodeToString(envelope), Hex.bytesToHex(txHashBytes));
+    }
+
+    static final class SignedEnvelope {
+        final String envelope64;
+        final String txHash;
+        SignedEnvelope(String envelope64, String txHash) {
+            this.envelope64 = envelope64;
+            this.txHash = txHash;
+        }
     }
 
     private static byte[] transactionXdr(byte[] source, byte[] destination, long sequence, long amount, boolean createAccount, String memo) throws Exception {

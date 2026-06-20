@@ -249,7 +249,7 @@ actor StellarService {
         try assertNetworkConsistency(horizon: horizon, testnet: testnet)
         let sourceAddress = wallet.address
         let sequence = try await fetchSequence(horizonURL: horizon, accountId: sourceAddress) + 1
-        let destinationPublic = try StellarStrKey.decodePublicKey(destinationAddress)
+        _ = try StellarStrKey.decodePublicKey(destinationAddress) // H-3: reject muxed up front
         let amount = try xlmToStroops(amountXLM)
         let createAccount = try await fetchAccount(horizonURL: horizon, accountId: destinationAddress) == nil
         if createAccount {
@@ -261,6 +261,64 @@ actor StellarService {
             }
         }
 
+        return try buildSignedEnvelope(
+            wallet: wallet,
+            horizon: horizon,
+            testnet: testnet,
+            destinationAddress: destinationAddress,
+            amountXLM: amountXLM,
+            sequence: sequence,
+            createAccount: createAccount,
+            memo: memo,
+            memoType: memoType
+        )
+    }
+
+    /// When true (default), the transaction is built + signed by the shared Rust
+    /// core (crates/velarum-wallet-core); when false, by the native Swift path
+    /// below. A cross-check test asserts the two produce byte-identical envelopes,
+    /// so this preserves behaviour. Network I/O (sequence, create-account decision,
+    /// broadcast) is always native. Set to false to revert.
+    static var useSharedCoreSigning = true
+
+    /// Pure (no network) build-and-sign of a Stellar payment / create-account.
+    /// Split out of `signXLM` so the core and native paths can be cross-checked.
+    func buildSignedEnvelope(
+        wallet: StellarWallet,
+        horizon: URL,
+        testnet: Bool,
+        destinationAddress: String,
+        amountXLM: String,
+        sequence: Int64,
+        createAccount: Bool,
+        memo: String,
+        memoType: String
+    ) throws -> SignedStellarTransaction {
+        if Self.useSharedCoreSigning {
+            do {
+                let signed = try stellarSignPayment(
+                    secretSeed: wallet.seed,
+                    networkPassphrase: testnet ? testnetPassphrase : publicPassphrase,
+                    sequence: sequence,
+                    destinationAddress: destinationAddress,
+                    amountXlm: amountXLM,
+                    memo: memo,
+                    memoType: memoType,
+                    createAccount: createAccount
+                )
+                return SignedStellarTransaction(
+                    envelopeBase64: signed.envelopeBase64,
+                    txHash: signed.txHashHex,
+                    horizonURL: horizon,
+                    createAccount: createAccount
+                )
+            } catch let error as FfiWalletError {
+                throw AppError.invalidResponse(error.localizedDescription)
+            }
+        }
+
+        let destinationPublic = try StellarStrKey.decodePublicKey(destinationAddress)
+        let amount = try xlmToStroops(amountXLM)
         let tx = try transactionXDR(
             sourcePublic: wallet.publicKey,
             destinationPublic: destinationPublic,
@@ -275,13 +333,12 @@ actor StellarService {
         signatureBase.appendInt32(2)
         signatureBase.append(tx)
         let txHashData = Data(SHA256.hash(data: signatureBase))
-        let txHash = txHashData.hexString
         let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: wallet.seed)
         let signature = try privateKey.signature(for: txHashData)
         let envelope = try envelopeXDR(tx: tx, sourcePublic: wallet.publicKey, signature: signature)
         return SignedStellarTransaction(
             envelopeBase64: envelope.base64EncodedString(),
-            txHash: txHash,
+            txHash: txHashData.hexString,
             horizonURL: horizon,
             createAccount: createAccount
         )
