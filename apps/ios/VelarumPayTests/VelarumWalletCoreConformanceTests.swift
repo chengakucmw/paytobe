@@ -112,4 +112,17 @@ final class VelarumWalletCoreConformanceTests: XCTestCase {
         }
         StellarService.useSharedCoreSigning = true
     }
+
+    /// iOS gains EVM + Solana via the shared core (Android already had them).
+    func testCoreDerivesEvmAndSolanaAddresses() throws {
+        let evm = try evmDerive(mnemonic: goldenMnemonic, passphrase: "")
+        XCTAssertEqual(evm.address, "0x9858EfFD232B4033E47d90003D41EC34EcaEda94")
+        XCTAssertEqual(evm.derivationPath, "m/44'/60'/0'/0/0")
+        XCTAssertEqual(evm.privateKey.count, 32)
+
+        let sol = try solanaDerive(mnemonic: goldenMnemonic, passphrase: "")
+        XCTAssertEqual(sol.address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk")
+        XCTAssertEqual(sol.derivationPath, "m/44'/501'/0'/0'")
+        XCTAssertEqual(sol.publicKey.count, 32)
+    }
 }

@@ -88,4 +88,14 @@ class VelarumWalletCoreConformanceTest {
         }
         StellarTransfer.USE_SHARED_CORE_SIGNING = true
     }
+
+    /** Core EVM + Solana addresses must match Android's existing native HDWallet. */
+    @Test
+    fun coreEvmAndSolanaMatchNativeHdWallet() {
+        val wallet = HDWallet.restore(goldenMnemonic)
+        val coreEvm = uniffi.velarum_wallet_core.evmDerive(goldenMnemonic, "")
+        val coreSol = uniffi.velarum_wallet_core.solanaDerive(goldenMnemonic, "")
+        assertEquals(wallet.evm.address, coreEvm.address)
+        assertEquals(wallet.solana.address, coreSol.address)
+    }
 }

@@ -50,6 +50,10 @@ pub const SUPPORTED_WORD_COUNTS: [usize; 5] = [12, 15, 18, 21, 24];
 pub const DEFAULT_WORD_COUNT: usize = 24;
 /// SLIP-44 coin type for Stellar (SEP-0005).
 pub const STELLAR_COIN_TYPE: u32 = 148;
+/// SLIP-44 coin type for EVM / Ethereum-family chains.
+pub const EVM_COIN_TYPE: u32 = 60;
+/// SLIP-44 coin type for Solana.
+pub const SOLANA_COIN_TYPE: u32 = 501;
 /// Network passphrases (the bytes hashed into the signature base).
 pub const STELLAR_TESTNET_PASSPHRASE: &str = "Test SDF Network ; September 2015";
 pub const STELLAR_PUBLIC_PASSPHRASE: &str = "Public Global Stellar Network ; September 2015";
@@ -204,6 +208,107 @@ fn to_hex(bytes: &[u8]) -> String {
         s.push_str(&format!("{b:02x}"));
     }
     s
+}
+
+// ---------------------------------------------------------------------------
+// EVM + Solana derivation (fills the iOS gap; Android already derives these)
+// ---------------------------------------------------------------------------
+
+/// Derived EVM (Ethereum-family) account.
+#[derive(Debug, Clone)]
+pub struct EvmKeys {
+    /// EIP-55 checksummed `0x…` address.
+    pub address: String,
+    /// 32-byte secp256k1 private key.
+    pub private_key: [u8; 32],
+    /// BIP-44 derivation path, e.g. `m/44'/60'/0'/0/0`.
+    pub derivation_path: String,
+}
+
+/// Derived Solana account.
+#[derive(Debug, Clone)]
+pub struct SolanaKeys {
+    /// Base58 address (the 32-byte ed25519 public key).
+    pub address: String,
+    /// 32-byte ed25519 public key.
+    pub public_key: [u8; 32],
+    /// 32-byte ed25519 secret seed.
+    pub secret_seed: [u8; 32],
+    /// SLIP-0010 derivation path, e.g. `m/44'/501'/0'/0'`.
+    pub derivation_path: String,
+}
+
+/// BIP-39 seed for a validated mnemonic (shared by the EVM/Solana derivations).
+fn validated_seed(mnemonic: &str, passphrase: &str) -> Result<[u8; 64], WalletError> {
+    let phrase = normalize_mnemonic(mnemonic);
+    let count = phrase.split(' ').filter(|w| !w.is_empty()).count();
+    if !SUPPORTED_WORD_COUNTS.contains(&count) {
+        return Err(WalletError::InvalidWordCount(count));
+    }
+    let parsed = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &phrase)
+        .map_err(|e| WalletError::InvalidMnemonic(format!("{e}")))?;
+    Ok(parsed.to_seed(passphrase))
+}
+
+fn keccak256(data: &[u8]) -> [u8; 32] {
+    let mut h = sha3::Keccak256::new();
+    h.update(data);
+    let out = h.finalize();
+    let mut a = [0u8; 32];
+    a.copy_from_slice(&out);
+    a
+}
+
+/// EIP-55 mixed-case checksum encoding of a 20-byte address (mirrors both apps).
+fn eip55(addr20: &[u8]) -> String {
+    let lower: String = addr20.iter().map(|b| format!("{b:02x}")).collect();
+    let hash = keccak256(lower.as_bytes());
+    let mut out = String::from("0x");
+    for (i, c) in lower.chars().enumerate() {
+        if c.is_ascii_digit() {
+            out.push(c);
+        } else {
+            let nibble = (hash[i / 2] >> (if i % 2 == 0 { 4 } else { 0 })) & 0x0f;
+            out.push(if nibble >= 8 { c.to_ascii_uppercase() } else { c });
+        }
+    }
+    out
+}
+
+/// Derive the EVM account at `m/44'/60'/0'/0/0` (BIP-44 secp256k1) from a mnemonic.
+pub fn derive_evm(mnemonic: &str, passphrase: &str) -> Result<EvmKeys, WalletError> {
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    let seed = validated_seed(mnemonic, passphrase)?;
+    let path = "m/44'/60'/0'/0/0";
+    let dpath: bip32::DerivationPath = path
+        .parse()
+        .map_err(|e| WalletError::Internal(format!("bad derivation path: {e}")))?;
+    let xprv = bip32::XPrv::derive_from_path(seed, &dpath)
+        .map_err(|e| WalletError::Internal(format!("BIP-32 derivation failed: {e}")))?;
+    let point = xprv.private_key().verifying_key().to_encoded_point(false); // 0x04 || x || y
+    let address = eip55(&keccak256(&point.as_bytes()[1..65])[12..32]);
+    let mut private_key = [0u8; 32];
+    private_key.copy_from_slice(&xprv.private_key().to_bytes());
+    Ok(EvmKeys {
+        address,
+        private_key,
+        derivation_path: path.to_string(),
+    })
+}
+
+/// Derive the Solana account at `m/44'/501'/0'/0'` (SLIP-0010 ed25519) from a mnemonic.
+pub fn derive_solana(mnemonic: &str, passphrase: &str) -> Result<SolanaKeys, WalletError> {
+    let seed = validated_seed(mnemonic, passphrase)?;
+    let secret_seed = slip10_ed25519(&seed, &[44, SOLANA_COIN_TYPE, 0, 0]);
+    let signing = SigningKey::from_bytes(&secret_seed);
+    let public_key = signing.verifying_key().to_bytes();
+    let address = bs58::encode(public_key).into_string();
+    Ok(SolanaKeys {
+        address,
+        public_key,
+        secret_seed,
+        derivation_path: format!("m/44'/{SOLANA_COIN_TYPE}'/0'/0'"),
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -577,6 +682,49 @@ pub fn stellar_assert_network_consistency(
     Ok(())
 }
 
+/// FFI mirror of [`EvmKeys`].
+#[derive(Debug, uniffi::Record)]
+pub struct FfiEvmKeys {
+    pub address: String,
+    pub private_key: Vec<u8>,
+    pub derivation_path: String,
+}
+
+/// FFI mirror of [`SolanaKeys`].
+#[derive(Debug, uniffi::Record)]
+pub struct FfiSolanaKeys {
+    pub address: String,
+    pub public_key: Vec<u8>,
+    pub secret_seed: Vec<u8>,
+    pub derivation_path: String,
+}
+
+/// Derive the EVM account at m/44'/60'/0'/0/0.
+#[uniffi::export]
+pub fn evm_derive(mnemonic: String, passphrase: String) -> Result<FfiEvmKeys, FfiWalletError> {
+    let k = derive_evm(&mnemonic, &passphrase)?;
+    Ok(FfiEvmKeys {
+        address: k.address,
+        private_key: k.private_key.to_vec(),
+        derivation_path: k.derivation_path,
+    })
+}
+
+/// Derive the Solana account at m/44'/501'/0'/0'.
+#[uniffi::export]
+pub fn solana_derive(
+    mnemonic: String,
+    passphrase: String,
+) -> Result<FfiSolanaKeys, FfiWalletError> {
+    let k = derive_solana(&mnemonic, &passphrase)?;
+    Ok(FfiSolanaKeys {
+        address: k.address,
+        public_key: k.public_key.to_vec(),
+        secret_seed: k.secret_seed.to_vec(),
+        derivation_path: k.derivation_path,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -641,6 +789,24 @@ mod tests {
                 mnemonic.split(' ').next().unwrap()
             );
         }
+    }
+
+    #[test]
+    fn evm_matches_independent_ethers_vector() {
+        // Independent reference: ethers.js HDNodeWallet.fromPhrase (m/44'/60'/0'/0/0).
+        let k = derive_evm(GOLDEN_MNEMONIC, "").unwrap();
+        assert_eq!(k.address, "0x9858EfFD232B4033E47d90003D41EC34EcaEda94");
+        assert_eq!(k.derivation_path, "m/44'/60'/0'/0/0");
+        assert_eq!(k.private_key.len(), 32);
+    }
+
+    #[test]
+    fn solana_matches_independent_slip10_vector() {
+        // Independent reference: ed25519-hd-key SLIP-10 (m/44'/501'/0'/0') + base58.
+        let k = derive_solana(GOLDEN_MNEMONIC, "").unwrap();
+        assert_eq!(k.address, "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk");
+        assert_eq!(k.derivation_path, "m/44'/501'/0'/0'");
+        assert_eq!(k.public_key.len(), 32);
     }
 
     // ---- signing ----
