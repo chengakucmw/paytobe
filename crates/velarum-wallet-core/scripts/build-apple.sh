@@ -15,11 +15,20 @@ LIB=velarum_wallet_core
 OUT="$CRATE_DIR/../../apps/ios/Generated"
 
 echo "==> rust targets"
-rustup target add aarch64-apple-ios aarch64-apple-ios-sim >/dev/null 2>&1 || true
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios >/dev/null 2>&1 || true
 
-echo "==> cross-compile static libs"
+echo "==> cross-compile static libs (device + arm64 sim + x86_64 sim)"
 cargo build --release --target aarch64-apple-ios
 cargo build --release --target aarch64-apple-ios-sim
+cargo build --release --target x86_64-apple-ios
+
+echo "==> lipo a universal (arm64 + x86_64) simulator library"
+SIMLIB="$CRATE_DIR/target/apple-sim-universal/lib${LIB}.a"
+mkdir -p "$(dirname "$SIMLIB")"
+lipo -create \
+  "target/aarch64-apple-ios-sim/release/lib${LIB}.a" \
+  "target/x86_64-apple-ios/release/lib${LIB}.a" \
+  -output "$SIMLIB"
 
 echo "==> generate Swift bindings"
 cargo build --release
@@ -38,7 +47,7 @@ mkdir -p "$OUT"
 rm -rf "$OUT/VelarumWalletCore.xcframework"
 xcodebuild -create-xcframework \
   -library "target/aarch64-apple-ios/release/lib${LIB}.a" -headers "$HDR" \
-  -library "target/aarch64-apple-ios-sim/release/lib${LIB}.a" -headers "$HDR" \
+  -library "$SIMLIB" -headers "$HDR" \
   -output "$OUT/VelarumWalletCore.xcframework" >/dev/null
 
 cp "target/bindings/swift/${LIB}.swift" "$OUT/velarum_wallet_core.swift"

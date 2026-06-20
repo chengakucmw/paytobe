@@ -38,9 +38,33 @@ jobs:
       - name: Cross-component smoke
         run: npm run smoke:cross-component
 
+  wallet-core:
+    name: Wallet-core (Rust) + cross-platform contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Rust toolchain
+        run: rustup toolchain install stable --profile minimal
+
+      - name: Cargo test (derivation + signing)
+        working-directory: crates/velarum-wallet-core
+        run: cargo test
+
+      - name: Cross-platform HD-derivation contract
+        run: node --test tests/protocol/hd-derivation-contract.test.mjs
+
   android:
     name: Android build gate
     runs-on: ubuntu-latest
+    env:
+      NDK_VERSION: "29.0.14206865"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -53,6 +77,18 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Rust toolchain + Android targets + cargo-ndk
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
+          cargo install cargo-ndk --locked
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;${NDK_VERSION}"
+
+      - name: Build wallet-core (Kotlin bindings + host lib + device .so)
+        run: ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" crates/velarum-wallet-core/scripts/build-android.sh
 
       - name: Android unit tests and debug build
         working-directory: apps/android
@@ -71,6 +107,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Rust toolchain + iOS targets
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+
+      - name: Build wallet-core (XCFramework + Swift bindings)
+        run: crates/velarum-wallet-core/scripts/build-apple.sh
 
       - name: iOS simulator build
         run: xcodebuild -project apps/ios/VelarumPay.xcodeproj -scheme VelarumPay -configuration Debug -sdk iphonesimulator build

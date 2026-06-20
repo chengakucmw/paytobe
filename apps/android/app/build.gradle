@@ -107,3 +107,15 @@ dependencies {
     testImplementation "net.java.dev.jna:jna:5.14.0"   // host jnidispatch (JVM unit tests)
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }
+
+// Auto-(re)generate the shared wallet-core Kotlin bindings + host library before
+// compiling, so a fresh checkout / CI does not need to run the script by hand.
+// (Device .so for all ABIs is built by scripts/build-android.sh, which needs the NDK.)
+tasks.register("generateWalletCoreBindings", Exec) {
+    workingDir rootDir
+    commandLine "bash", "${rootDir}/../../crates/velarum-wallet-core/scripts/build-android-host.sh"
+    onlyIf {
+        !file("${projectDir}/uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt").exists()
+    }
+}
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "generateWalletCoreBindings" }

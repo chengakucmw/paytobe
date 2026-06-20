@@ -18,10 +18,17 @@ OUT="$CRATE_DIR/../../apps/android/app/uniffi-generated"
 echo "==> build host shared library"
 cargo build --release
 
-echo "==> generate Kotlin bindings"
+# Host library extension differs by OS (.dylib on macOS, .so on Linux/CI).
+LIBFILE=""
+for ext in dylib so; do
+  if [ -f "target/release/lib${LIB}.${ext}" ]; then LIBFILE="target/release/lib${LIB}.${ext}"; break; fi
+done
+if [ -z "$LIBFILE" ]; then echo "host library not found in target/release" >&2; exit 1; fi
+
+echo "==> generate Kotlin bindings (from $LIBFILE)"
 rm -rf "$OUT"; mkdir -p "$OUT"
 cargo run --quiet --features cli --bin uniffi-bindgen -- \
-  generate --library "target/release/lib${LIB}.dylib" --language kotlin --out-dir "$OUT"
+  generate --library "$LIBFILE" --language kotlin --out-dir "$OUT"
 
 echo "==> done"
 find "$OUT" -name "*.kt"
