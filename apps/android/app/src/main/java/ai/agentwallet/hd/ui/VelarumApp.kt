@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,12 +20,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import ai.agentwallet.hd.AppEntry
 import ai.agentwallet.hd.ScanContract
 import ai.agentwallet.hd.ScanOutcome
+import ai.agentwallet.hd.SettingsRepository
 import ai.agentwallet.hd.ui.components.LocalModalController
 import ai.agentwallet.hd.ui.components.LocalToastController
 import ai.agentwallet.hd.ui.components.ModalController
@@ -53,7 +58,6 @@ import ai.agentwallet.hd.ui.wallet.HomeScreen
 import ai.agentwallet.hd.ui.wallet.IdentityViewModel
 import ai.agentwallet.hd.ui.wallet.InboxScreen
 import ai.agentwallet.hd.ui.wallet.InboxViewModel
-import ai.agentwallet.hd.ui.wallet.ManualReviewScreen
 import ai.agentwallet.hd.ui.wallet.NetworksScreen
 import ai.agentwallet.hd.ui.wallet.NetworksViewModel
 import ai.agentwallet.hd.ui.wallet.NotificationsScreen
@@ -72,7 +76,7 @@ import ai.agentwallet.hd.ui.wallet.WalletViewModel
  * 原生主界面（全部原生，无 WebView hand-off）。Scaffold + 底部导航 + NavHost + Toast/Modal 宿主。
  */
 @Composable
-fun VelarumApp() {
+fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {}) {
     val navController = rememberNavController()
     val toastController = remember { ToastController() }
     val modalController = remember { ModalController() }
@@ -106,6 +110,28 @@ fun VelarumApp() {
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
+
+    // 通知/深链入口路由（退役 MainActivity 后由原生接住）。
+    LaunchedEffect(entry) {
+        when (entry) {
+            is AppEntry.OpenPayment -> navController.navigate("${Routes.DETAIL}/${entry.intentId}")
+            is AppEntry.DeepLink -> {
+                val outcome = ScanContract.classify(entry.uri)
+                if (outcome is ScanOutcome.Pairing) {
+                    pendingPairingCode = outcome.code
+                    navController.navigate(Routes.PAIRING)
+                } else {
+                    val url = withContext(Dispatchers.IO) { SettingsRepository.applyRelayConfigLink(context, entry.uri) }
+                    if (url != null) {
+                        toastController.show("Relay configured", url)
+                        navController.navigate(Routes.DEVELOPER)
+                    }
+                }
+            }
+            AppEntry.None -> {}
+        }
+        if (entry !is AppEntry.None) onEntryHandled()
+    }
 
     CompositionLocalProvider(
         LocalToastController provides toastController,
@@ -146,12 +172,9 @@ fun VelarumApp() {
                         ReceiveScreen(vm = walletVm, onBack = { navController.popBackStack() })
                     }
                     composable(Routes.SEND) {
-                        SendScreen(vm = sendVm, onReview = { navController.navigate(Routes.MANUAL_REVIEW) }, onBack = { navController.popBackStack() })
-                    }
-                    composable(Routes.MANUAL_REVIEW) {
-                        ManualReviewScreen(
+                        SendScreen(
                             vm = sendVm,
-                            onEdit = { navController.popBackStack() },
+                            onExit = { navController.popBackStack() },
                             onFinishToHome = { navController.popBackStack(Routes.HOME, inclusive = false) },
                             onBalanceRefresh = { walletVm.refresh() },
                         )

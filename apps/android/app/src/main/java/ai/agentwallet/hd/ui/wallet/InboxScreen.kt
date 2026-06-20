@@ -36,9 +36,10 @@ fun InboxScreen(vm: InboxViewModel, onOpen: (String) -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
-                VpChip("Pending", ui.filter == "pending") { vm.setFilter("pending") }
                 VpChip("All", ui.filter == "all") { vm.setFilter("all") }
-                VpChip("Final", ui.filter == "final") { vm.setFilter("final") }
+                VpChip("Pending", ui.filter == "pending") { vm.setFilter("pending") }
+                VpChip("Signed", ui.filter == "signed") { vm.setFilter("signed") }
+                VpChip("Completed", ui.filter == "completed") { vm.setFilter("completed") }
             }
             if (ui.items.isEmpty()) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {

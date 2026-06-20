@@ -72,9 +72,9 @@ final class PaymentNotifications {
         if (!hasNotificationPermission(context)) return;
         if (!markNotified(context, intent.id, status)) return;
 
-        Intent launch = new Intent(context, MainActivity.class)
+        Intent launch = new Intent(context, MainComposeActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                .putExtra(MainActivity.EXTRA_OPEN_PAYMENT_INTENT_ID, intent.id);
+                .putExtra(MainComposeActivity.EXTRA_OPEN_PAYMENT_INTENT_ID, intent.id);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,
                 notificationId(intent.id),
@@ -104,7 +104,7 @@ final class PaymentNotifications {
     static Notification foregroundNotification(Context context) {
         ensureChannels(context);
 
-        Intent launch = new Intent(context, MainActivity.class)
+        Intent launch = new Intent(context, MainComposeActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 context,

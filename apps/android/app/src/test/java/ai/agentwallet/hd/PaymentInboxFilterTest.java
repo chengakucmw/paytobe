@@ -8,17 +8,20 @@ import org.junit.Test;
 
 public final class PaymentInboxFilterTest {
     @Test
-    public void pendingFilterIncludesActiveAttentionStates() {
+    public void pendingFilterIncludesPreSignatureAttentionStates() {
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "pending"));
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "missing_context"));
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "blocked"));
-        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "broadcasting"));
-        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "failed"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "needs_review"));
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "network_disabled"));
     }
 
     @Test
-    public void pendingFilterExcludesFinalStates() {
+    public void pendingFilterExcludesSignedAndTerminalStates() {
+        // 已签名/广播中归入 Signed；终态/失败归入 Completed。
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "signed_locally"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "broadcasting"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "failed"));
         assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "confirmed"));
         assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "rejected"));
         assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_PENDING, "expired"));
@@ -26,12 +29,50 @@ public final class PaymentInboxFilterTest {
     }
 
     @Test
-    public void finalFilterContainsOnlyFinalStates() {
+    public void signedFilterContainsOnlySignedStates() {
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_SIGNED, "signed_locally"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_SIGNED, "broadcasting"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_SIGNED, "pending"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_SIGNED, "confirmed"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_SIGNED, "failed"));
+    }
+
+    @Test
+    public void completedFilterContainsTerminalStatesAndFailed() {
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "confirmed"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "rejected"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "expired"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "cancelled"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "failed"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "pending"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_COMPLETED, "broadcasting"));
+    }
+
+    @Test
+    public void legacyFinalFilterStillMatchesCompletedStates() {
+        // 旧 "final" 值仍可用，等同 "completed"。
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "confirmed"));
-        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "rejected"));
         assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "expired"));
-        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "cancelled"));
-        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "failed"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "failed"));
+        assertFalse(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_FINAL, "pending"));
+    }
+
+    @Test
+    public void allFilterMatchesEveryState() {
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_ALL, "pending"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_ALL, "signed_locally"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_ALL, "expired"));
+        assertTrue(PaymentInboxFilter.matches(PaymentInboxFilter.FILTER_ALL, "failed"));
+    }
+
+    @Test
+    public void toneForStateGivesExpiredItsOwnTone() {
+        assertEquals("expired", PaymentInboxFilter.toneForState("expired"));
+        assertEquals("safe", PaymentInboxFilter.toneForState("confirmed"));
+        assertEquals("danger", PaymentInboxFilter.toneForState("failed"));
+        assertEquals("danger", PaymentInboxFilter.toneForState("rejected"));
+        assertEquals("caution", PaymentInboxFilter.toneForState("pending"));
+        assertEquals("info", PaymentInboxFilter.toneForState("broadcasting"));
     }
 
     @Test

@@ -71,6 +71,8 @@ fun DetailScreen(
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("You are paying", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
                         Text("${d.amount} ${d.asset}", style = MaterialTheme.typography.displaySmall, color = VelarumTheme.colors.textStrong)
+                        // 生命周期状态药丸：过期→灰+时钟(EXPIRED)、确认→绿、失败/拒绝→红等，独立于风险等级。
+                        VpBadge(d.stateLabel, vpToneOf(d.stateTone), modifier = Modifier.padding(top = Spacing.s2))
                     }
                 }
                 VpCard(modifier = Modifier.fillMaxWidth()) {

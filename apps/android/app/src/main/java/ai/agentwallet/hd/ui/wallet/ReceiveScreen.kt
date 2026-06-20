@@ -113,12 +113,18 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
                         Icon(Icons.Filled.ContentCopy, contentDescription = "Copy address", tint = VelarumTheme.colors.primary)
                     }
                 }
-                Text(
-                    text = "Use this address only for ${selected.symbol} on ${selected.chain}. Sending a different network or asset here can lose your funds.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VelarumTheme.colors.textMuted,
-                    modifier = Modifier.padding(top = Spacing.s2),
-                )
+                Surface(
+                    shape = VelarumRadii.md,
+                    color = VelarumTheme.colors.primarySoft,
+                    modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
+                ) {
+                    Text(
+                        text = "${selected.chain} network only · only send ${selected.symbol} to this address. Sending a different network or asset here can lose your funds.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = VelarumTheme.colors.primaryActive,
+                        modifier = Modifier.padding(Spacing.s4),
+                    )
+                }
             }
         }
     }

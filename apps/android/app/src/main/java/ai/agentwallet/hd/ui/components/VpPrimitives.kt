@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,14 +31,18 @@ import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumRadii
 import ai.agentwallet.hd.ui.theme.VelarumTheme
 
-/** 语气：对照 design tokens 的 status/risk 语义（safe/caution/danger/info）。 */
-enum class VpTone { SAFE, CAUTION, DANGER, INFO }
+/**
+ * 语气：对照 design tokens 的 status/risk 语义（safe/caution/danger/info）。
+ * EXPIRED 是中性「过期/失效」态：哑光石板灰 + 时钟图标，从而与 info(蓝)/failed(红) 区分开。
+ */
+enum class VpTone { SAFE, CAUTION, DANGER, INFO, EXPIRED }
 
 /** 把后端的 tone/risk 字符串映射为 VpTone。 */
 fun vpToneOf(value: String?): VpTone = when (value?.lowercase()) {
     "safe", "success" -> VpTone.SAFE
     "caution", "warning", "pending" -> VpTone.CAUTION
     "danger", "error", "failed" -> VpTone.DANGER
+    "expired", "muted" -> VpTone.EXPIRED
     else -> VpTone.INFO
 }
 
@@ -47,6 +52,7 @@ internal fun toneAccent(tone: VpTone): Color = when (tone) {
     VpTone.CAUTION -> VelarumTheme.colors.pending
     VpTone.DANGER -> VelarumTheme.colors.failed
     VpTone.INFO -> VelarumTheme.colors.info
+    VpTone.EXPIRED -> VelarumTheme.colors.textMuted
 }
 
 @Composable
@@ -55,6 +61,7 @@ internal fun toneBackground(tone: VpTone): Color = when (tone) {
     VpTone.CAUTION -> VelarumTheme.colors.pendingBg
     VpTone.DANGER -> VelarumTheme.colors.failedBg
     VpTone.INFO -> VelarumTheme.colors.infoBg
+    VpTone.EXPIRED -> VelarumTheme.colors.surfaceSunken
 }
 
 private fun toneIcon(tone: VpTone): ImageVector = when (tone) {
@@ -62,6 +69,7 @@ private fun toneIcon(tone: VpTone): ImageVector = when (tone) {
     VpTone.CAUTION -> Icons.Filled.Warning
     VpTone.DANGER -> Icons.Filled.Warning
     VpTone.INFO -> Icons.Filled.Info
+    VpTone.EXPIRED -> Icons.Filled.Schedule
 }
 
 /** 大写小标签（对照 web 的 .vp-eyebrow）。 */

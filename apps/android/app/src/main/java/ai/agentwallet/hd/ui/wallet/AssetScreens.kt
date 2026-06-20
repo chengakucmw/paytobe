@@ -32,6 +32,18 @@ import ai.agentwallet.hd.ui.components.VpPrimaryButton
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.components.vpToneOf
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumFonts
 import ai.agentwallet.hd.ui.theme.VelarumTheme
@@ -68,6 +80,7 @@ fun AssetDetailScreen(
                         Text("≈ $${formatUsd(fiatUsd(asset.symbol, balance))}", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
                     }
                 }
+                PriceChartCard(symbol = asset.symbol)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                     VpPrimaryButton("Send", onClick = { onSend(asset.symbol, asset.chain) }, modifier = Modifier.weight(1f))
                     VpOutlineButton("Receive", onClick = onReceive, modifier = Modifier.weight(1f))
@@ -90,6 +103,58 @@ fun AssetDetailScreen(
                 VpMenuRow("Activity history", "Transfers for ${asset.symbol}", onClick = { onHistory(asset.symbol) })
             }
         }
+    }
+}
+
+/** 价格走势卡（对照原型 05 的 sparkline + 时间段切换）。
+ *  数据来自 CoinGecko 真实行情（[fetchPriceSeries]）；加载中显示转圈，无数据时显示占位文案。 */
+@Composable
+private fun PriceChartCard(symbol: String) {
+    var timeframe by remember { mutableStateOf("1D") }
+    var points by remember { mutableStateOf<List<Float>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    LaunchedEffect(symbol, timeframe) {
+        loading = true
+        points = fetchPriceSeries(symbol, timeframe)
+        loading = false
+    }
+    VpCard(modifier = Modifier.fillMaxWidth()) {
+        Box(modifier = Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
+            when {
+                points.size >= 2 -> Sparkline(points = points, modifier = Modifier.fillMaxWidth().height(72.dp))
+                loading -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                else -> Text("Price chart unavailable", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            }
+        }
+        Spacer(Modifier.height(Spacing.s3))
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+        ) {
+            listOf("1H", "1D", "1W", "1M", "1Y", "All").forEach { tf ->
+                VpChip(tf, active = tf == timeframe) { timeframe = tf }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Sparkline(points: List<Float>, modifier: Modifier = Modifier) {
+    val line = VelarumTheme.colors.primary
+    Canvas(modifier = modifier) {
+        if (points.size < 2) return@Canvas
+        val min = points.minOrNull() ?: return@Canvas
+        val max = points.maxOrNull() ?: return@Canvas
+        val range = (max - min).takeIf { it > 0f } ?: 1f
+        val dx = size.width / (points.size - 1)
+        val path = Path()
+        points.forEachIndexed { i, p ->
+            val norm = (p - min) / range
+            val x = dx * i
+            val y = size.height * 0.95f - norm * size.height * 0.9f
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        drawPath(path, color = line, style = Stroke(width = 5f, cap = StrokeCap.Round, join = StrokeJoin.Round))
     }
 }
 

@@ -19,10 +19,10 @@ import kotlinx.coroutines.withContext
 data class InboxListUiState(
     val loading: Boolean = true,
     val items: List<InboxItem> = emptyList(),
-    val filter: String = "pending",
+    val filter: String = "all",
 )
 
-/** 收件箱列表：读取 PaymentInboxStore（经 InboxRepository 映射），支持 pending/all/final 过滤。 */
+/** 收件箱列表：读取 PaymentInboxStore（经 InboxRepository 映射），支持 all/pending/signed/completed 过滤。 */
 class InboxViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(InboxListUiState())
     val ui: StateFlow<InboxListUiState> = _ui.asStateFlow()
@@ -66,7 +66,10 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
         intentId = id
         _ui.update { it.copy(loading = true, error = null, done = false, rejected = false) }
         viewModelScope.launch {
-            val detail = withContext(Dispatchers.IO) { InboxRepository.detail(getApplication(), id) }
+            val detail = withContext(Dispatchers.IO) {
+                InboxRepository.ensure(getApplication(), id)
+                InboxRepository.detail(getApplication(), id)
+            }
             _ui.update { it.copy(loading = false, detail = detail) }
         }
     }

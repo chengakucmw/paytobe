@@ -26,7 +26,9 @@ object InboxRepository {
                     asset = intent.asset,
                     network = intent.network,
                     stateLabel = PaymentInboxFilter.label(state),
-                    tone = toneOf(req.riskLevel),
+                    // 状态药丸的语气来自「生命周期/有效状态」（expired→灰+时钟，terminal/failed→红等），
+                    // 终态须压过纯 riskLevel；仅签名前的活跃态回落到 riskLevel 的语气。
+                    tone = toneForBadge(state, req.riskLevel),
                     signable = signable(intent, state),
                     expired = intent.isExpired,
                 ),
@@ -53,9 +55,21 @@ object InboxRepository {
             riskBody = dossier.riskBody,
             riskTone = dossier.tone,
             stateLabel = PaymentInboxFilter.label(state),
+            stateTone = PaymentInboxFilter.toneForState(state),
             signable = signable(intent, state),
             dossier = mapDossier(dossier),
         )
+    }
+
+    /** 通知打开的请求可能尚未落地本地收件箱：缺失则从 relay 拉取并 upsert（对照旧 openPaymentIntentFromNotification）。 */
+    fun ensure(context: Context, intentId: String) {
+        try {
+            if (PaymentInboxStore.find(context, intentId) == null) {
+                val remote = RelayClient.fetchIntent(context, intentId)
+                if (remote != null) PaymentInboxStore.upsert(context, remote)
+            }
+        } catch (e: Exception) {
+        }
     }
 
     private fun signable(intent: PaymentIntent, state: String): Boolean =
@@ -65,6 +79,16 @@ object InboxRepository {
         val req = intent.request
         return firstNonEmpty(intent.merchantName, req.payeeName, intent.recipientName, intent.sourceLabel(), "Unknown payee")
     }
+
+    /**
+     * 状态药丸的最终语气：
+     * - 签名前的活跃关注态（pending/needs_review/...）→ 沿用风险等级 riskLevel 的语气（保持旧观感：caution=琥珀、danger=红）。
+     * - 已签名/广播中/终态/过期 → 由生命周期「有效状态」决定，使 expired 呈独立的灰+时钟（EXPIRED），
+     *   confirmed=绿、failed/rejected/cancelled=红等，终态压过纯风险等级。
+     */
+    private fun toneForBadge(state: String, riskLevel: String?): String =
+        if (PaymentInboxFilter.isActiveAttentionState(state)) toneOf(riskLevel)
+        else PaymentInboxFilter.toneForState(state)
 
     private fun toneOf(value: String?): String = when (value?.lowercase()) {
         "safe", "success" -> "safe"
@@ -131,6 +155,7 @@ data class InboxDetail(
     val riskBody: String,
     val riskTone: String,
     val stateLabel: String,
+    val stateTone: String,
     val signable: Boolean,
     val dossier: DossierUi,
 )

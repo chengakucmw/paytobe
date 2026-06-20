@@ -11,15 +11,15 @@ import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumRadii
 import ai.agentwallet.hd.ui.theme.VelarumTheme
 
-/** 白底卡片：28dp 圆角 + 柔和阴影 + 24dp 内边距（对照 web 的 .vp-card）。 */
+/** 白底卡片：20dp 圆角 + 柔和阴影 + 20dp 内边距（对照原型的 .card）。 */
 @Composable
 fun VpCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(
-        shape = VelarumRadii.xl,
+        shape = VelarumRadii.lg,
         color = VelarumTheme.colors.surfaceCard,
-        shadowElevation = 2.dp,
+        shadowElevation = 1.dp,
         modifier = modifier,
     ) {
-        Column(modifier = Modifier.padding(Spacing.s6), content = content)
+        Column(modifier = Modifier.padding(Spacing.s5), content = content)
     }
 }

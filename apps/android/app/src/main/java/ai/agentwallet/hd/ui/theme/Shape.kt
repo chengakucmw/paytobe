@@ -9,12 +9,12 @@ import androidx.compose.ui.unit.dp
  * circle 用 CircleShape（在用到的地方直接引 androidx.compose.foundation.shape.CircleShape）。
  */
 object VelarumRadii {
-    val xs = RoundedCornerShape(6.dp)
-    val sm = RoundedCornerShape(10.dp)
-    val md = RoundedCornerShape(14.dp)
-    val lg = RoundedCornerShape(20.dp)
-    val xl = RoundedCornerShape(28.dp)   // 主卡片圆角
-    val xxl = RoundedCornerShape(36.dp)
+    val xs = RoundedCornerShape(8.dp)
+    val sm = RoundedCornerShape(12.dp)
+    val md = RoundedCornerShape(16.dp)
+    val lg = RoundedCornerShape(20.dp)   // 标准卡片圆角（--radius-lg）
+    val xl = RoundedCornerShape(24.dp)   // 主视觉/英雄卡（--radius-xl）
+    val xxl = RoundedCornerShape(32.dp)
     val pill = RoundedCornerShape(percent = 50)
 }
 

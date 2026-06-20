@@ -1,6 +1,7 @@
 package ai.agentwallet.hd
 
 import android.content.Context
+import android.net.Uri
 import org.json.JSONObject
 
 private const val IDENTITY_PREFS = "velarum_identity_prefs"
@@ -66,6 +67,26 @@ object SettingsRepository {
 
     fun setRelayUrl(context: Context, url: String) = PaymentInboxStore.setRelayUrl(context, url)
 
+    /**
+     * 处理 agentwallet://relay|configure-relay|setup?url=... 深链：取出 relay URL，校验、保存并尝试注册。
+     * 成功返回 URL，否则 null（对照旧 MainActivity.handleRelayConfigUri）。请在 IO 线程调用。
+     */
+    fun applyRelayConfigLink(context: Context, uri: String): String? {
+        return try {
+            val parsed = Uri.parse(uri)
+            if (!"agentwallet".equals(parsed.scheme, ignoreCase = true)) return null
+            val host = parsed.host?.lowercase()
+            if (host != "relay" && host != "configure-relay" && host != "setup") return null
+            val url = (parsed.getQueryParameter("url") ?: parsed.getQueryParameter("relay_url"))?.trim()
+            if (url.isNullOrBlank() || !(url.startsWith("https://") || url.startsWith("http://"))) return null
+            PaymentInboxStore.setRelayUrl(context, url)
+            try { RelayClient.register(context) } catch (e: Exception) {}
+            url
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private val DEFAULT_DISPLAYED = listOf("xlm", "sol", "eth", "base_usdc")
 
     /** Home 上展示哪些资产（本地偏好）。 */
@@ -88,6 +109,8 @@ object SettingsRepository {
         val tone = when (status.lowercase()) {
             "confirmed", "broadcasted" -> "safe"
             "failed", "rejected" -> "danger"
+            // 过期态走独立语气（灰+时钟，EXPIRED），与 info(蓝) 区分。
+            "expired", "cancelled" -> "expired"
             else -> "info"
         }
         val network = optString("network", "")

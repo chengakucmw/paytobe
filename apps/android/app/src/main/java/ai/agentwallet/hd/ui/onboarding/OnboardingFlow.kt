@@ -115,6 +115,7 @@ private fun CreateWalletScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
+            WelcomeHero()
             VpCard(modifier = Modifier.fillMaxWidth()) {
                 VpBadge("V1 default", VpTone.SAFE)
                 Spacer(Modifier.height(Spacing.s2))
@@ -159,6 +160,21 @@ private fun CreateWalletScreen(
     }
 }
 
+/** 品牌欢迎卡（对照原型 01 Welcome 的 "Your keys. Your crypto." 主张）。 */
+@Composable
+private fun WelcomeHero() {
+    Surface(shape = VelarumRadii.xl, color = VelarumTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(Spacing.s6), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Text("Your keys. Your crypto.", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Text(
+                "A self-custody wallet for Stellar. Sign every payment yourself — agents can ask, only you approve.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.White.copy(alpha = 0.82f),
+            )
+        }
+    }
+}
+
 @Composable
 private fun KeyImportScreen(vm: OnboardingViewModel, onBack: () -> Unit, onImported: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
@@ -179,6 +195,11 @@ private fun KeyImportScreen(vm: OnboardingViewModel, onBack: () -> Unit, onImpor
                 singleLine = false,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                 modifier = Modifier.heightIn(min = 120.dp),
+            )
+            VpRiskBanner(
+                VpTone.DANGER,
+                "Only enter your phrase on a device you trust",
+                "VelarumPay never sends your recovery phrase anywhere.",
             )
             val err = ui.error
             if (err != null) VpRiskBanner(VpTone.DANGER, "Phrase failed local validation", err)
