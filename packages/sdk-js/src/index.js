@@ -252,21 +252,42 @@ function normalizeFailure(data, status, statusText) {
   };
 }
 
-function normalizeError(error) {
+// Shared error normalizer for the SDK and its connectors (MCP, Hermes).
+// Options let each caller keep its exact prior output:
+//   code/message  — connector-specific defaults
+//   emptyField    — true to always emit field:"" (MCP/Hermes) instead of omitting it (SDK)
+//   prefix        — Hermes namespaces nested field paths as `${prefix}.${field}`
+export function normalizeError(error, options = {}) {
+  const {
+    code = "api_error",
+    message = "Platform API request failed",
+    prefix,
+    emptyField = false
+  } = options;
+
   if (!isRecord(error)) {
-    return {
-      code: "api_error",
-      message: String(error || "Platform API request failed"),
-      severity: "blocker"
-    };
+    const normalizedMessage = String(error || message);
+    if (prefix !== undefined) return { code, message: normalizedMessage, field: prefix, severity: "blocker" };
+    if (emptyField) return { code, message: normalizedMessage, field: "", severity: "blocker" };
+    return { code, message: normalizedMessage, severity: "blocker" };
   }
 
   const details = isRecord(error.details) ? error.details : {};
+  const baseField = error.field || details.field;
+  let field;
+  if (prefix !== undefined) {
+    const inner = baseField || "";
+    field = prefix && inner ? `${prefix}.${inner}` : inner || prefix;
+  } else if (emptyField) {
+    field = baseField || "";
+  } else {
+    field = baseField;
+  }
   return {
     ...error,
-    code: error.code || "api_error",
-    message: error.message || error.code || "Platform API request failed",
-    field: error.field || details.field,
+    code: error.code || code,
+    message: error.message || error.code || message,
+    field,
     severity: error.severity || details.severity || "blocker"
   };
 }

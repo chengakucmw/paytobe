@@ -163,14 +163,6 @@ export function createSecurityHeadersMiddleware() {
   };
 }
 
-export function createRequestIdMiddleware() {
-  return (req, res, next) => {
-    req.requestId = req.get?.("x-request-id") || crypto.randomUUID();
-    res.setHeader("X-Request-Id", req.requestId);
-    next();
-  };
-}
-
 export class MemoryRateLimiter {
   constructor({ windowMs = DEFAULT_RATE_LIMIT_WINDOW_MS, max = DEFAULT_RATE_LIMIT_MAX } = {}) {
     this.windowMs = windowMs;
@@ -241,20 +233,6 @@ export function createRateLimitMiddleware(config, options = {}) {
         retry_after_seconds: result.retry_after_seconds
       }
     });
-  };
-}
-
-export function createAuditCompletionMiddleware(config) {
-  return (req, res, next) => {
-    res.on("finish", () => {
-      if (res.statusCode < 400) return;
-      auditLog("http.request_failed", req, {
-        status: res.statusCode,
-        method: req.method,
-        path: req.path
-      }, config);
-    });
-    next();
   };
 }
 

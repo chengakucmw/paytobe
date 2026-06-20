@@ -6,7 +6,27 @@ import { addDecimalStrings, normalizeDecimalString } from "./decimal.js";
 
 const LEGACY_JSON_DATA_PATH = path.resolve("data/relay-store.json");
 const DEFAULT_SQLITE_DATA_PATH = path.resolve("data/relay-store.sqlite");
-const SQLITE_SCHEMA_VERSION = 1;
+const SQLITE_SCHEMA_VERSION = 2;
+
+// Schema v2 persists the relay state as one normalized table per in-memory
+// collection instead of a single JSON blob. Each row is (k, json): the
+// collection's key and its JSON-encoded value, which preserves the exact
+// round-trip the old single-blob store had. `events` (ordered, integer seq PK)
+// and `meta` (scalars like eventSeq) are handled separately. Adding a new
+// top-level collection = add one line here.
+const OBJECT_COLLECTIONS = Object.freeze([
+  { state: "devices", table: "devices" },
+  { state: "pairingSessions", table: "pairing_sessions" },
+  { state: "pairingCodes", table: "pairing_codes" },
+  { state: "connections", table: "connections" },
+  { state: "connectionTokens", table: "connection_tokens" },
+  { state: "paymentRequests", table: "payment_requests" },
+  { state: "paymentRequestIdempotency", table: "payment_request_idempotency" },
+  { state: "intents", table: "intents" },
+  { state: "transactionContexts", table: "transaction_contexts" },
+  { state: "idempotency", table: "idempotency" },
+  { state: "dailySpent", table: "daily_spent" }
+]);
 
 function initialState() {
   return {
@@ -97,19 +117,32 @@ export class Store {
     fs.mkdirSync(path.dirname(this.file), { recursive: true });
     this.db = new DatabaseSync(this.file);
     this.applySqlitePragmas();
-    this.applySqliteMigrations();
-    const row = this.db.prepare("SELECT state_json FROM relay_state WHERE id = 1").get();
-    if (row?.state_json) {
-      this.state = { ...initialState(), ...JSON.parse(row.state_json) };
+    this.ensureSchema();
+
+    // Already on the normalized schema: the per-collection tables are the source
+    // of truth.
+    if (this.schemaVersion() >= SQLITE_SCHEMA_VERSION) {
+      this.loadStateFromTables();
+      return;
+    }
+
+    // First open under the normalized schema. Import from the best available
+    // source exactly once, write it into the tables, then stamp the version so
+    // we never re-import. No source data is dropped: the legacy relay_state blob
+    // row is left intact (just no longer read).
+    const legacy = this.db.prepare("SELECT state_json FROM relay_state WHERE id = 1").get();
+    if (legacy?.state_json) {
+      this.state = { ...initialState(), ...JSON.parse(legacy.state_json) };
+      this.importStateAndStamp();
       return;
     }
     if (this.legacyJsonFile && fs.existsSync(this.legacyJsonFile)) {
       this.state = { ...initialState(), ...JSON.parse(fs.readFileSync(this.legacyJsonFile, "utf8")) };
-      this.save();
+      this.importStateAndStamp();
       this.writeMigrationMarker();
       return;
     }
-    this.save();
+    this.importStateAndStamp();
   }
 
   save() {
@@ -128,7 +161,7 @@ export class Store {
     if (!this.db) throw new Error("SQLite store is not open");
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.writeStateRow();
+      this.persistFullRows();
       this.db.exec("COMMIT");
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
@@ -136,30 +169,121 @@ export class Store {
     }
   }
 
-  // Persist the whole in-memory state into the single relay_state row. The
-  // caller MUST already hold an open transaction (saveSqlite / mutateSqlite).
-  writeStateRow() {
-    const payload = JSON.stringify(this.state);
-    const now = new Date().toISOString();
-    this.db.prepare(`
-      INSERT INTO relay_state (id, state_json, updated_at)
-      VALUES (1, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        state_json = excluded.state_json,
-        updated_at = excluded.updated_at
-    `).run(payload, now);
+  // First-open import: write the imported state into the normalized tables AND
+  // stamp the schema version in ONE transaction, so a crash can never leave the
+  // data imported but the version unstamped (which would otherwise re-run the
+  // import on the next open).
+  importStateAndStamp() {
+    if (!this.db) throw new Error("SQLite store is not open");
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.persistFullRows();
+      this.stampSchemaVersion();
+      this.db.exec("COMMIT");
+    } catch (error) {
+      try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
+      throw error;
+    }
+  }
+
+  // Hydrate the in-memory state from the normalized tables. Every read method
+  // operates on this.state, so loading is "read each table back into the same
+  // object shape initialState() defines".
+  loadStateFromTables() {
+    const next = initialState();
+    for (const { state, table } of OBJECT_COLLECTIONS) {
+      const out = {};
+      for (const row of this.db.prepare(`SELECT k, json FROM ${table}`).all()) {
+        out[row.k] = JSON.parse(row.json);
+      }
+      next[state] = out;
+    }
+    next.events = this.db.prepare("SELECT json FROM events ORDER BY seq").all().map((row) => JSON.parse(row.json));
+    const seqRow = this.db.prepare("SELECT json FROM meta WHERE k = 'eventSeq'").get();
+    next.eventSeq = seqRow ? JSON.parse(seqRow.json) : 0;
+    this.state = next;
+  }
+
+  // Snapshot state as {collection: {key: jsonString}} so the following write can
+  // touch ONLY the rows that actually changed — the whole point of the normalized
+  // schema (no more rewriting the entire database on every single write).
+  snapshotState() {
+    const snap = {};
+    for (const { state } of OBJECT_COLLECTIONS) {
+      const out = {};
+      for (const [k, value] of Object.entries(this.state[state] || {})) out[k] = JSON.stringify(value);
+      snap[state] = out;
+    }
+    const events = {};
+    for (const event of this.state.events || []) events[event.seq] = JSON.stringify(event);
+    snap.events = events;
+    snap.eventSeq = JSON.stringify(this.state.eventSeq ?? 0);
+    return snap;
+  }
+
+  // Full flush: make the tables exactly match this.state. Used by save() and the
+  // one-time import on first open. Caller already holds the transaction.
+  persistFullRows() {
+    for (const { state, table } of OBJECT_COLLECTIONS) {
+      this.db.exec(`DELETE FROM ${table}`);
+      const insert = this.db.prepare(`INSERT INTO ${table} (k, json) VALUES (?, ?)`);
+      for (const [k, value] of Object.entries(this.state[state] || {})) insert.run(k, JSON.stringify(value));
+    }
+    this.db.exec("DELETE FROM events");
+    const insertEvent = this.db.prepare("INSERT INTO events (seq, json) VALUES (?, ?) ON CONFLICT(seq) DO UPDATE SET json = excluded.json");
+    for (const event of this.state.events || []) insertEvent.run(event.seq, JSON.stringify(event));
+    this.writeMeta("eventSeq", this.state.eventSeq ?? 0);
+  }
+
+  // Delta flush: UPSERT changed rows and DELETE removed ones by comparing the
+  // post-mutation state to `before` (the snapshot taken right after the in-lock
+  // reload). Caller already holds the transaction.
+  persistDeltaRows(before) {
+    for (const { state, table } of OBJECT_COLLECTIONS) {
+      const prev = before[state] || {};
+      const curr = this.state[state] || {};
+      const upsert = this.db.prepare(`INSERT INTO ${table} (k, json) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET json = excluded.json`);
+      const remove = this.db.prepare(`DELETE FROM ${table} WHERE k = ?`);
+      for (const [k, value] of Object.entries(curr)) {
+        const json = JSON.stringify(value);
+        if (prev[k] !== json) upsert.run(k, json);
+      }
+      for (const k of Object.keys(prev)) {
+        if (!(k in curr)) remove.run(k);
+      }
+    }
+
+    const prevEvents = before.events || {};
+    const upsertEvent = this.db.prepare("INSERT INTO events (seq, json) VALUES (?, ?) ON CONFLICT(seq) DO UPDATE SET json = excluded.json");
+    const removeEvent = this.db.prepare("DELETE FROM events WHERE seq = ?");
+    const liveSeqs = new Set();
+    for (const event of this.state.events || []) {
+      liveSeqs.add(event.seq);
+      const json = JSON.stringify(event);
+      if (prevEvents[event.seq] !== json) upsertEvent.run(event.seq, json);
+    }
+    for (const seq of Object.keys(prevEvents)) {
+      if (!liveSeqs.has(Number(seq))) removeEvent.run(Number(seq));
+    }
+
+    if (before.eventSeq !== JSON.stringify(this.state.eventSeq ?? 0)) {
+      this.writeMeta("eventSeq", this.state.eventSeq ?? 0);
+    }
+  }
+
+  writeMeta(key, value) {
+    this.db.prepare("INSERT INTO meta (k, json) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET json = excluded.json").run(key, JSON.stringify(value));
   }
 
   reloadSqliteState() {
-    const row = this.db?.prepare("SELECT state_json FROM relay_state WHERE id = 1").get();
-    if (row?.state_json) this.state = { ...initialState(), ...JSON.parse(row.state_json) };
+    if (this.db) this.loadStateFromTables();
   }
 
   // Concurrency-safe whole-store read-modify-write (H4).
   //
   // The store keeps the entire database in memory and, on SQLite, persists it as
-  // one JSON blob in relay_state(id=1). The old code read that blob ONCE at
-  // startup, then rewrote the whole thing on every change from its cached copy.
+  // one normalized table per collection (schema v2). The old code read state
+  // ONCE at startup, then rewrote the whole thing on every change from its cache.
   // With two writers — a second API instance, or the backup/maintenance scripts
   // running beside the server — each overwrote the other's blob wholesale,
   // silently dropping the other's updates. It is the textbook lost update: the
@@ -167,7 +291,7 @@ export class Store {
   //
   // mutate(fn) closes that gap by holding the read and the write together:
   //   SQLite: BEGIN IMMEDIATE takes the write lock up front, we RE-READ the
-  //           latest committed blob inside that lock, apply fn() to that fresh
+  //           latest committed state inside that lock, apply fn() to that fresh
   //           state, write it back, and COMMIT. A concurrent writer can no
   //           longer be clobbered, because nobody else can commit between our
   //           read and our write.
@@ -187,14 +311,15 @@ export class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.reloadSqliteState();
+      const before = this.snapshotState();
       const result = fn();
-      this.writeStateRow();
+      this.persistDeltaRows(before);
       this.db.exec("COMMIT");
       return result;
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
       // fn() may have partly mutated the cache before throwing; resync from the
-      // durable row so the in-memory state never drifts from disk.
+      // durable tables so the in-memory state never drifts from disk.
       try { this.reloadSqliteState(); } catch { /* leave cache as-is */ }
       throw error;
     }
@@ -207,25 +332,30 @@ export class Store {
     this.db.exec("PRAGMA busy_timeout = 5000");
   }
 
-  applySqliteMigrations() {
-    this.db.exec(`
-      CREATE TABLE IF NOT EXISTS schema_migrations (
-        version INTEGER PRIMARY KEY,
-        applied_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS relay_state (
-        id INTEGER PRIMARY KEY CHECK (id = 1),
-        state_json TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-    `);
-    const applied = this.db.prepare("SELECT version FROM schema_migrations WHERE version = ?").get(SQLITE_SCHEMA_VERSION);
-    if (!applied) {
-      this.db.prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)").run(
-        SQLITE_SCHEMA_VERSION,
-        new Date().toISOString()
-      );
+  ensureSchema() {
+    const statements = [
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+      // Legacy v1 single-blob table. Retained read-only so an existing v1 store
+      // can be migrated into the normalized tables; never written after that.
+      "CREATE TABLE IF NOT EXISTS relay_state (id INTEGER PRIMARY KEY CHECK (id = 1), state_json TEXT NOT NULL, updated_at TEXT NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY, json TEXT NOT NULL)",
+      "CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, json TEXT NOT NULL)"
+    ];
+    for (const { table } of OBJECT_COLLECTIONS) {
+      statements.push(`CREATE TABLE IF NOT EXISTS ${table} (k TEXT PRIMARY KEY, json TEXT NOT NULL)`);
     }
+    this.db.exec(statements.join(";\n"));
+  }
+
+  schemaVersion() {
+    const row = this.db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get();
+    return Number(row?.version) || 0;
+  }
+
+  stampSchemaVersion() {
+    const now = new Date().toISOString();
+    const insert = this.db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)");
+    for (let version = 1; version <= SQLITE_SCHEMA_VERSION; version++) insert.run(version, now);
   }
 
   writeMigrationMarker() {

@@ -16,11 +16,13 @@ import {
   detectUnsupportedTransferTarget,
   findSupportedTransferAsset,
   normalizePaymentRequestV1,
-  normalizeTransactionContextV1,
+  normalizeTransactionContextV1
+} from "../../packages/protocol/src/index.js";
+import {
   paymentRequestFixtures,
   protocolFixtureClock,
   transactionContextFixtures
-} from "../../packages/protocol/src/index.js";
+} from "../../packages/protocol/src/fixtures.js";
 import {
   normalizePaymentRequestV1 as normalizeApiPaymentRequestV1
 } from "../../services/platform-api/src/velarum.js";

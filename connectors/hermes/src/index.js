@@ -1,6 +1,7 @@
 import {
   DEFAULT_BASE_URL,
   createVelarumPayClient,
+  normalizeError as normalizeApiError,
   validatePaymentRequest,
   validateTransactionContext
 } from "@velarumpay/sdk-js";
@@ -420,23 +421,11 @@ function apiFailure(step, result) {
 }
 
 function normalizeError(error, prefix = "") {
-  if (!isRecord(error)) {
-    return {
-      code: "hermes_connector_error",
-      message: String(error || "Hermes connector request failed"),
-      field: prefix,
-      severity: "blocker"
-    };
-  }
-  const details = isRecord(error.details) ? error.details : {};
-  const field = error.field || details.field || "";
-  return {
-    ...error,
-    code: error.code || "hermes_connector_error",
-    message: error.message || error.code || "Hermes connector request failed",
-    field: prefix && field ? `${prefix}.${field}` : field || prefix,
-    severity: error.severity || details.severity || "blocker"
-  };
+  return normalizeApiError(error, {
+    code: "hermes_connector_error",
+    message: "Hermes connector request failed",
+    prefix
+  });
 }
 
 function normalizeAgent(agent = {}) {

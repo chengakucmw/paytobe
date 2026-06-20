@@ -1,6 +1,7 @@
 import {
   DEFAULT_BASE_URL,
   createVelarumPayClient,
+  normalizeError as normalizeApiError,
   validatePaymentRequest,
   validateTransactionContext
 } from "@velarumpay/sdk-js";
@@ -387,22 +388,7 @@ function toolResult(data, isError) {
 }
 
 function normalizeError(error) {
-  if (!isRecord(error)) {
-    return {
-      code: "api_error",
-      message: String(error || "Request failed"),
-      field: "",
-      severity: "blocker"
-    };
-  }
-  const details = isRecord(error.details) ? error.details : {};
-  return {
-    ...error,
-    code: error.code || "api_error",
-    message: error.message || error.code || "Request failed",
-    field: error.field || details.field || "",
-    severity: error.severity || details.severity || "blocker"
-  };
+  return normalizeApiError(error, { message: "Request failed", emptyField: true });
 }
 
 function standardOutputSchema() {

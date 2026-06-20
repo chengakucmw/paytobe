@@ -1,5 +1,5 @@
 import { hmacHex, sha256Hex, verifyHmac } from "./crypto.js";
-import { compareDecimalStrings, normalizeDecimalString } from "./decimal.js";
+import { addDecimalStrings, compareDecimalStrings, decimalString, normalizeDecimalString } from "./decimal.js";
 import {
   createTransactionContextSnapshot as createProtocolTransactionContextSnapshot,
   normalizePaymentRequestV1 as normalizeProtocolPaymentRequestV1,
@@ -134,22 +134,6 @@ export function adaptVelarum(paymentIntent, env = process.env) {
     expected_signature: secret && !signature ? `sha256=${hmacHex(secret, canonical)}` : undefined
   };
   return { ok: true, warnings: paymentIntent.velarum.verified ? [] : ["Velarum signature was not verified"] };
-}
-
-function decimalString(value) {
-  return typeof value === "string" && /^(0|[1-9]\d*)(\.\d+)?$/.test(value);
-}
-
-function addDecimalStrings(left, right) {
-  const [leftWhole, leftFraction = ""] = String(left).split(".");
-  const [rightWhole, rightFraction = ""] = String(right).split(".");
-  const scale = Math.max(leftFraction.length, rightFraction.length);
-  const leftUnits = BigInt(leftWhole) * 10n ** BigInt(scale) + BigInt(leftFraction.padEnd(scale, "0") || "0");
-  const rightUnits = BigInt(rightWhole) * 10n ** BigInt(scale) + BigInt(rightFraction.padEnd(scale, "0") || "0");
-  const sum = leftUnits + rightUnits;
-  const whole = sum / (10n ** BigInt(scale));
-  const fraction = String(sum % (10n ** BigInt(scale))).padStart(scale, "0").replace(/0+$/, "");
-  return fraction ? `${whole}.${fraction}` : String(whole);
 }
 
 // True when two amounts denote the same value. Decimal strings/numbers are

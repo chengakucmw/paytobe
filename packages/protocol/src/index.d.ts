@@ -29,6 +29,7 @@ export const TERMINAL_PAYMENT_STATUSES: readonly string[];
 export const SOURCE_TYPES: readonly string[];
 export const VERIFICATION_STATUSES: readonly string[];
 export const RISK_SEVERITIES: readonly string[];
+export const RISK_LIMITS: Readonly<{ daily_limit_default: string; unverified_recipient_cap: string }>;
 export const PAIRING_SCOPES: readonly string[];
 export const DEFAULT_PAIRING_SCOPES: readonly string[];
 export const DEPRECATED_PAIRING_SCOPE_ALIASES: Readonly<Record<string, string>>;
@@ -36,9 +37,8 @@ export const TRANSACTION_CONTEXT_TYPES: readonly string[];
 export const TRANSACTION_CONTEXT_STATUSES: readonly string[];
 export const SUPPORTED_NETWORKS: readonly string[];
 
-export const protocolFixtureClock: Readonly<Record<string, string>>;
-export const transactionContextFixtures: Readonly<Record<string, Record<string, unknown>>>;
-export const paymentRequestFixtures: Readonly<Record<string, Record<string, unknown>>>;
+// (protocolFixtureClock / transactionContextFixtures / paymentRequestFixtures are
+// test-only and intentionally not part of the public type surface — see index.js.)
 
 export type TransferAsset = {
   id: string;
