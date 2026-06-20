@@ -1,5 +1,7 @@
 package ai.agentwallet.hd
 
+import uniffi.velarum_wallet_core.evmSignTransaction
+import uniffi.velarum_wallet_core.solanaSignTransfer
 import uniffi.velarum_wallet_core.stellarDerive
 import uniffi.velarum_wallet_core.stellarSignPayment
 
@@ -36,6 +38,37 @@ object WalletCoreBridge {
         )
         return SignedStellarCore(s.envelopeBase64, s.txHashHex, s.createAccount)
     }
+
+    /** Build + sign a legacy EVM transaction via the shared core. */
+    @JvmStatic
+    fun signEvm(
+        privateKey: ByteArray,
+        chainId: Long,
+        nonce: Long,
+        gasPriceWei: String,
+        gasLimit: Long,
+        toAddress: String,
+        valueWei: String,
+        dataHex: String,
+    ): EvmSignedCore {
+        val s = evmSignTransaction(
+            privateKey, chainId.toULong(), nonce.toULong(), gasPriceWei,
+            gasLimit.toULong(), toAddress, valueWei, dataHex,
+        )
+        return EvmSignedCore(s.rawTxHex, s.txHashHex)
+    }
+
+    /** Build + sign a native SOL transfer via the shared core. */
+    @JvmStatic
+    fun signSolana(
+        secretSeed: ByteArray,
+        toAddress: String,
+        lamports: Long,
+        recentBlockhash: String,
+    ): SolanaSignedCore {
+        val s = solanaSignTransfer(secretSeed, toAddress, lamports.toULong(), recentBlockhash)
+        return SolanaSignedCore(s.transactionBase64, s.signatureBase58)
+    }
 }
 
 /** Plain holder so Java sees simple public fields. */
@@ -51,4 +84,16 @@ class SignedStellarCore(
     @JvmField val envelopeBase64: String,
     @JvmField val txHashHex: String,
     @JvmField val createAccount: Boolean,
+)
+
+/** Plain holder for a signed EVM transaction. */
+class EvmSignedCore(
+    @JvmField val rawTxHex: String,
+    @JvmField val txHashHex: String,
+)
+
+/** Plain holder for a signed Solana transaction. */
+class SolanaSignedCore(
+    @JvmField val transactionBase64: String,
+    @JvmField val signatureBase58: String,
 )

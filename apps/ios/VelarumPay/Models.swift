@@ -75,6 +75,17 @@ struct StellarWallet: Codable, Equatable {
         Data(base64Encoded: publicKeyBase64) ?? Data()
     }
 
+    /// EVM (Ethereum) address derived from the same recovery phrase via the shared core.
+    /// Lets the UI show the multi-chain address with `wallet.evmAddress`.
+    var evmAddress: String? {
+        recoveryPhrase.flatMap { try? evmDerive(mnemonic: $0, passphrase: "").address }
+    }
+
+    /// Solana address derived from the same recovery phrase via the shared core.
+    var solanaAddress: String? {
+        recoveryPhrase.flatMap { try? solanaDerive(mnemonic: $0, passphrase: "").address }
+    }
+
     var isBackupVerified: Bool {
         backupVerified == true
     }

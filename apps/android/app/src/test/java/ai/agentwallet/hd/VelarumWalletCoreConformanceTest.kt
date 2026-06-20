@@ -98,4 +98,34 @@ class VelarumWalletCoreConformanceTest {
         assertEquals(wallet.evm.address, coreEvm.address)
         assertEquals(wallet.solana.address, coreSol.address)
     }
+
+    /** Core EVM signing must byte-match web3j (Android's native EVM signer). */
+    @Test
+    fun coreEvmSigningMatchesWeb3j() {
+        val evm = uniffi.velarum_wallet_core.evmDerive(goldenMnemonic, "")
+        val to = "0x000000000000000000000000000000000000dEaD"
+        val credentials = org.web3j.crypto.Credentials.create(Hex.bytesToHex(evm.privateKey))
+        val tx = org.web3j.crypto.RawTransaction.createEtherTransaction(
+            java.math.BigInteger.ZERO, java.math.BigInteger("20000000000"),
+            java.math.BigInteger.valueOf(21000), to, java.math.BigInteger("1000000000000000000"))
+        val web3jRaw = org.web3j.utils.Numeric.toHexString(
+            org.web3j.crypto.TransactionEncoder.signMessage(tx, 1L, credentials))
+        val core = WalletCoreBridge.signEvm(
+            evm.privateKey, 1L, 0L, "20000000000", 21000L, to, "1000000000000000000", "")
+        assertEquals(web3jRaw, core.rawTxHex)
+    }
+
+    /** Core Solana signing must byte-match Android's native SolanaTransfer. */
+    @Test
+    fun coreSolanaSigningMatchesNative() {
+        val sol = uniffi.velarum_wallet_core.solanaDerive(goldenMnemonic, "")
+        val toAddr = "11111111111111111111111111111112"
+        val blockhash = "11111111111111111111111111111111"
+        val lamports = 1_000_000_000L
+        val nativeMessage = SolanaTransfer.buildMessage(
+            sol.publicKey, Base58.decode(toAddr), Base58.decode(blockhash), lamports)
+        val nativeB64 = SolanaTransfer.encodeSignedTx(sol.secretSeed, nativeMessage)
+        val core = WalletCoreBridge.signSolana(sol.secretSeed, toAddr, lamports, blockhash)
+        assertEquals(nativeB64, core.transactionBase64)
+    }
 }

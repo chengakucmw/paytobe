@@ -24,6 +24,10 @@ final class EvmTransfer {
     private static final BigInteger ERC20_FALLBACK_GAS = BigInteger.valueOf(100_000);
     private static final OkHttpClient HTTP = WalletHttp.oneShot();
 
+    /** When true (default), EVM transactions are signed by the shared Rust core
+     *  (byte-identical to web3j, verified by a cross-check test). Set false to revert. */
+    static boolean USE_SHARED_CORE_SIGNING = true;
+
     private EvmTransfer() {}
 
     static String sendNative(
@@ -58,9 +62,15 @@ final class EvmTransfer {
         BigInteger gasPrice = gasResp.getGasPrice();
         BigInteger gasLimit = BigInteger.valueOf(21_000);
         BigInteger value = Convert.toWei(new BigDecimal(amountNative), Convert.Unit.ETHER).toBigIntegerExact();
-        RawTransaction tx = RawTransaction.createEtherTransaction(nonce, gasPrice, gasLimit, toAddress, value);
-        byte[] signed = TransactionEncoder.signMessage(tx, chainId, credentials);
-        String raw = Numeric.toHexString(signed);
+        String raw;
+        if (USE_SHARED_CORE_SIGNING) {
+            raw = WalletCoreBridge.signEvm(privateKey, chainId, nonce.longValueExact(),
+                    gasPrice.toString(), gasLimit.longValueExact(), toAddress, value.toString(), "").rawTxHex;
+        } else {
+            RawTransaction tx = RawTransaction.createEtherTransaction(nonce, gasPrice, gasLimit, toAddress, value);
+            byte[] signed = TransactionEncoder.signMessage(tx, chainId, credentials);
+            raw = Numeric.toHexString(signed);
+        }
         if (progress != null) progress.onGenerated("Signed EVM transaction");
         EthSendTransaction sent = web3j.ethSendRawTransaction(raw).send();
         if (sent.hasError()) throw new IllegalStateException(sent.getError().getMessage());

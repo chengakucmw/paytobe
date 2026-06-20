@@ -1,6 +1,6 @@
 package ai.agentwallet.hd;
 
-import android.util.Base64;
+import java.util.Base64;
 
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.signers.Ed25519Signer;
@@ -31,14 +31,24 @@ final class SolanaTransfer {
     private static final byte[] PDA_MARKER = "ProgramDerivedAddress".getBytes(StandardCharsets.US_ASCII);
     private static final BigInteger MAX_U64 = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
 
+    /** When true (default), native SOL transfers are signed by the shared Rust core
+     *  (byte-identical to the native path, verified by a cross-check). Set false to revert. */
+    static boolean USE_SHARED_CORE_SIGNING = true;
+
     private SolanaTransfer() {}
 
     static String sendSol(String rpcUrl, byte[] privateSeed, byte[] fromPub, String toAddress, String amountSol) throws Exception {
         byte[] toPub = Base58.decode(toAddress.trim());
         if (toPub.length != 32) throw new IllegalArgumentException("Invalid Solana recipient address");
         String blockhash = getLatestBlockhash(rpcUrl);
-        byte[] message = buildMessage(fromPub, toPub, Base58.decode(blockhash), solToLamports(amountSol));
-        return signAndSend(rpcUrl, privateSeed, message);
+        long lamports = solToLamports(amountSol);
+        String encoded;
+        if (USE_SHARED_CORE_SIGNING) {
+            encoded = WalletCoreBridge.signSolana(privateSeed, toAddress.trim(), lamports, blockhash).transactionBase64;
+        } else {
+            encoded = encodeSignedTx(privateSeed, buildMessage(fromPub, toPub, Base58.decode(blockhash), lamports));
+        }
+        return broadcastSolana(rpcUrl, encoded);
     }
 
     static String sendSplToken(
@@ -82,12 +92,20 @@ final class SolanaTransfer {
     }
 
     private static String signAndSend(String rpcUrl, byte[] privateSeed, byte[] message) throws Exception {
+        return broadcastSolana(rpcUrl, encodeSignedTx(privateSeed, message));
+    }
+
+    /** Native sign + assemble + base64 (kept for SPL + the cross-check test). */
+    static String encodeSignedTx(byte[] privateSeed, byte[] message) throws Exception {
         byte[] signature = sign(privateSeed, message);
         ByteArrayOutputStream tx = new ByteArrayOutputStream();
         writeCompact(tx, 1);
         tx.write(signature);
         tx.write(message);
-        String encoded = Base64.encodeToString(tx.toByteArray(), Base64.NO_WRAP);
+        return Base64.getEncoder().encodeToString(tx.toByteArray());
+    }
+
+    private static String broadcastSolana(String rpcUrl, String encoded) throws Exception {
         JSONObject params = new JSONObject()
                 .put("encoding", "base64")
                 .put("skipPreflight", false);
@@ -135,7 +153,7 @@ final class SolanaTransfer {
         }
     }
 
-    private static byte[] buildMessage(byte[] from, byte[] to, byte[] recentBlockhash, long lamports) throws Exception {
+    static byte[] buildMessage(byte[] from, byte[] to, byte[] recentBlockhash, long lamports) throws Exception {
         if (recentBlockhash.length != 32) throw new IllegalArgumentException("Invalid Solana blockhash");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         out.write(1);

@@ -125,4 +125,23 @@ final class VelarumWalletCoreConformanceTests: XCTestCase {
         XCTAssertEqual(sol.derivationPath, "m/44'/501'/0'/0'")
         XCTAssertEqual(sol.publicKey.count, 32)
     }
+
+    /// iOS gains EVM + Solana signing via the shared core (verified vs ethers.js / web3.js).
+    func testCoreSignsEvmAndSolanaTransactions() throws {
+        let evmKeys = try evmDerive(mnemonic: goldenMnemonic, passphrase: "")
+        let evm = try evmSignTransaction(
+            privateKey: evmKeys.privateKey, chainId: 1, nonce: 0,
+            gasPriceWei: "20000000000", gasLimit: 21000,
+            toAddress: "0x000000000000000000000000000000000000dEaD",
+            valueWei: "1000000000000000000", dataHex: "")
+        XCTAssertEqual(evm.rawTxHex, "0xf86c808504a817c80082520894000000000000000000000000000000000000dead880de0b6b3a76400008026a0d752eab9909ac7da6e7058d003b2c4f694cd8d28ce736a23eacbcd92eddb5b2ba07464ea202ccd1d049e2b3af256472775f0fbfa0a90fdeea357fa11785ac9de0f")
+
+        let solKeys = try solanaDerive(mnemonic: goldenMnemonic, passphrase: "")
+        let sol = try solanaSignTransfer(
+            secretSeed: solKeys.secretSeed,
+            toAddress: "11111111111111111111111111111112",
+            lamports: 1_000_000_000,
+            recentBlockhash: "11111111111111111111111111111111")
+        XCTAssertEqual(sol.signatureBase58, "5P8bb3PVxxxYzqNShZtu93F9SumLwKvi25ThAbhYPS5Ssyp2aqrvX8rXnVcYteLTdcpCky8xQzcox6rKC3kH3NgA")
+    }
 }
