@@ -108,14 +108,92 @@ dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }
 
-// Auto-(re)generate the shared wallet-core Kotlin bindings + host library before
-// compiling, so a fresh checkout / CI does not need to run the script by hand.
-// (Device .so for all ABIs is built by scripts/build-android.sh, which needs the NDK.)
+// --- VelarumPay shared Rust wallet-core (UniFFI) build wiring ----------------
+// Two artifacts are derived from crates/velarum-wallet-core and MUST stay in
+// lock-step, or the app crashes on first use (e.g. creating a wallet) with:
+//     "Error looking up function 'uniffi_..._fn_func_xxx': undefined symbol".
+//   (a) Kotlin bindings    : uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt
+//   (b) device native libs : src/main/jniLibs/<abi>/libvelarum_wallet_core.so
+// (a) is cheap to build (host cargo, no NDK). (b) needs the Android NDK + cargo-ndk.
+//
+// The old wiring only regenerated (a), and only when it was missing. So editing
+// the Rust core (e.g. adding evm_sign_transaction) advanced the bindings while
+// the bundled .so stayed stale -> the APK shipped a binding that referenced a
+// symbol the .so did not export -> runtime crash. The tasks below keep (a) and
+// (b) in sync and FAIL THE BUILD if they ever drift apart.
+
+ext.wcCrateDir = file("${rootDir}/../../crates/velarum-wallet-core")
+ext.wcBindings = file("${projectDir}/uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt")
+ext.wcJniLibs  = file("${projectDir}/src/main/jniLibs")
+ext.wcAbis     = ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"]
+
+def wcHasExe = { String exe ->
+    (System.getenv("PATH") ?: "").split(File.pathSeparator).any { new File(it, exe).canExecute() }
+}
+
+// (a) Kotlin bindings + host lib (for JVM unit tests). No NDK needed. Regenerates
+//     whenever the Rust source changes (real up-to-date checks) — this replaces
+//     the old `onlyIf { !exists }` that pinned stale bindings forever.
 tasks.register("generateWalletCoreBindings", Exec) {
     workingDir rootDir
-    commandLine "bash", "${rootDir}/../../crates/velarum-wallet-core/scripts/build-android-host.sh"
+    commandLine "bash", "${wcCrateDir}/scripts/build-android-host.sh"
+    inputs.dir("${wcCrateDir}/src")
+    inputs.file("${wcCrateDir}/Cargo.toml")
+    outputs.file(wcBindings)
     onlyIf {
-        !file("${projectDir}/uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt").exists()
+        if (wcHasExe("cargo")) return true
+        if (wcBindings.exists()) { logger.warn("wallet-core: 'cargo' not on PATH; reusing existing Kotlin bindings."); return false }
+        throw new GradleException("wallet-core: 'cargo' is required to generate the Kotlin bindings on a fresh checkout. Install Rust: https://rustup.rs")
     }
 }
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "generateWalletCoreBindings" }
+
+// (b) Device .so for every ABI (needs NDK + cargo-ndk). Wired into native-lib
+//     PACKAGING (not preBuild) so JVM unit tests still run without an NDK.
+tasks.register("buildWalletCoreDeviceLibs", Exec) {
+    dependsOn "generateWalletCoreBindings"
+    workingDir rootDir
+    commandLine "bash", "${wcCrateDir}/scripts/build-android.sh"
+    inputs.dir("${wcCrateDir}/src")
+    inputs.file("${wcCrateDir}/Cargo.toml")
+    wcAbis.each { abi -> outputs.file("${wcJniLibs}/${abi}/libvelarum_wallet_core.so") }
+    onlyIf {
+        def ok = wcHasExe("cargo") && wcHasExe("cargo-ndk")
+        if (!ok) logger.warn("wallet-core: cargo/cargo-ndk not on PATH — skipping device .so rebuild. " +
+            "The verify step will FAIL the build if the bundled .so is stale. " +
+            "Refresh manually: crates/velarum-wallet-core/scripts/build-android.sh")
+        ok
+    }
+}
+
+// (c) Safety gate: every native symbol the bindings reference MUST exist in the
+//     packaged .so. This is exactly the check that would have caught the crash.
+tasks.register("verifyWalletCoreNativeLibs") {
+    dependsOn "buildWalletCoreDeviceLibs"
+    doLast {
+        if (!wcBindings.exists())
+            throw new GradleException("wallet-core: Kotlin bindings missing — run generateWalletCoreBindings.")
+        def so = new File("${wcJniLibs}/arm64-v8a/libvelarum_wallet_core.so")   // real-device ABI
+        if (!so.exists()) so = wcAbis.collect { new File("${wcJniLibs}/${it}/libvelarum_wallet_core.so") }.find { it.exists() }
+        if (so == null)
+            throw new GradleException("wallet-core: no libvelarum_wallet_core.so in src/main/jniLibs. " +
+                "Build it (needs Android NDK + cargo-ndk): crates/velarum-wallet-core/scripts/build-android.sh")
+        def referenced = []
+        def m = (wcBindings.getText("UTF-8") =~ /uniffi_velarum_wallet_core_(?:fn_func|checksum_func|fn_method|fn_constructor|fn_clone|fn_free|checksum_method|checksum_constructor)_[A-Za-z0-9_]+/)
+        while (m.find()) referenced << m.group()
+        referenced = referenced.unique()
+        def haystack = new String(so.bytes, "ISO-8859-1")
+        def missing = referenced.findAll { !haystack.contains(it) }
+        if (!missing.isEmpty())
+            throw new GradleException("wallet-core: ${so.parentFile.name}/${so.name} is OUT OF SYNC with the " +
+                "Kotlin bindings — missing ${missing.size()} symbol(s), e.g.:\n  " + missing.take(6).join("\n  ") +
+                "\nThe app would crash at runtime with 'undefined symbol'. Rebuild the native libs:\n" +
+                "  crates/velarum-wallet-core/scripts/build-android.sh")
+        logger.lifecycle("wallet-core: verified ${referenced.size()} UniFFI symbols present in ${so.parentFile.name}/${so.name} ✓")
+    }
+}
+
+// Rebuild + verify the native libs before they are merged into the APK/bundle.
+tasks.matching { it.name ==~ /merge.*(NativeLibs|JniLibFolders)/ }.configureEach {
+    dependsOn "verifyWalletCoreNativeLibs"
+}
