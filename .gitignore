@@ -58,3 +58,4 @@ transaction-history-store*.json
 crates/velarum-wallet-core/target/
 apps/ios/Generated/
 apps/android/app/uniffi-generated/
+apps/android/app/src/main/jniLibs/

@@ -26,6 +26,15 @@ final class HDWallet {
     static final List<Integer> SUPPORTED_IMPORT_WORD_COUNTS = Arrays.asList(12, 15, 18, 21, 24);
     private static final SecureRandom RNG = new SecureRandom();
 
+    /**
+     * When true (default), Stellar key derivation is delegated to the shared
+     * cross-platform Rust core (crates/velarum-wallet-core) via WalletCoreBridge,
+     * instead of the bitcoinj/bouncycastle path below. Both produce identical
+     * results — pinned by the golden vector (GB3J…QBYX) and the conformance tests
+     * — so this preserves behaviour. Set to false to revert to the native path.
+     */
+    static boolean USE_SHARED_CORE_DERIVATION = true;
+
     final String mnemonic;
     final byte[] seed;
     final EvmAccount evm;
@@ -80,10 +89,16 @@ final class HDWallet {
         byte[] solPub = solPriv.generatePublicKey().getEncoded();
         EdAccount solana = new EdAccount(solSeed, solPub, Base58.encode(solPub), "m/44'/501'/0'/0'");
 
-        byte[] stellarSeed = deriveSlip10(seed, 44, 148, 0);
-        Ed25519PrivateKeyParameters stellarPriv = new Ed25519PrivateKeyParameters(stellarSeed, 0);
-        byte[] stellarPub = stellarPriv.generatePublicKey().getEncoded();
-        EdAccount stellar = new EdAccount(stellarSeed, stellarPub, StellarStrKey.encodePublicKey(stellarPub), "m/44'/148'/0'");
+        EdAccount stellar;
+        if (USE_SHARED_CORE_DERIVATION) {
+            StellarCoreKeys k = WalletCoreBridge.deriveStellar(mnemonic, 0);
+            stellar = new EdAccount(k.secretSeed, k.publicKey, k.address, k.derivationPath);
+        } else {
+            byte[] stellarSeed = deriveSlip10(seed, 44, 148, 0);
+            Ed25519PrivateKeyParameters stellarPriv = new Ed25519PrivateKeyParameters(stellarSeed, 0);
+            byte[] stellarPub = stellarPriv.generatePublicKey().getEncoded();
+            stellar = new EdAccount(stellarSeed, stellarPub, StellarStrKey.encodePublicKey(stellarPub), "m/44'/148'/0'");
+        }
         return new HDWallet(mnemonic, seed, evm, solana, stellar);
     }
 

@@ -27,12 +27,13 @@ android {
         jvmTarget = "17"
     }
 
-    // --- VelarumPay shared Rust wallet core (UniFFI) — JVM unit-test wiring only ---
-    // Compiles the generated Kotlin bindings into the unit-test classpath and lets
-    // JNA load the HOST build of the core (.dylib/.so). Device (.so) packaging via
-    // the NDK is a separate, later step; this does not affect the app build.
+    // --- VelarumPay shared Rust wallet core (UniFFI) ---
+    // The generated Kotlin bindings compile into the app (main) so production
+    // HDWallet can call the shared core. On device the core ships as
+    // src/main/jniLibs/*/libvelarum_wallet_core.so (built by build-android.sh);
+    // JVM unit tests load the host build via jna.library.path below.
     sourceSets {
-        test {
+        main {
             java.srcDirs += "uniffi-generated"
         }
     }
@@ -102,6 +103,7 @@ dependencies {
 
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.json:json:20250517"
-    testImplementation "net.java.dev.jna:jna:5.14.0"
+    implementation "net.java.dev.jna:jna:5.14.0@aar"   // Android jnidispatch (device)
+    testImplementation "net.java.dev.jna:jna:5.14.0"   // host jnidispatch (JVM unit tests)
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }

@@ -1,4 +1,5 @@
 import XCTest
+@testable import VelarumPay
 
 // Conformance test for the SHARED Rust wallet core (crates/velarum-wallet-core),
 // reached from iOS through the generated UniFFI bindings + VelarumWalletCore.xcframework.

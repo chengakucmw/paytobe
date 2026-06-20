@@ -15,6 +15,7 @@
 		100000000000000000000106 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000206 /* RelayClient.swift */; };
 		100000000000000000000107 /* StellarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000207 /* StellarService.swift */; };
 		100000000000000000000108 /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000208 /* WebAssets */; };
+		100000000000000000000150 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000250 /* Fonts */; };
 		100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001201 /* PaymentRequestParsingTests.swift */; };
 		100000000000000000000109 /* WalletViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000209 /* WalletViews.swift */; };
 		100000000000000000000110 /* InboxHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000210 /* InboxHistoryViews.swift */; };
@@ -53,6 +54,7 @@
 		100000000000000000000206 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		100000000000000000000207 /* StellarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StellarService.swift; sourceTree = "<group>"; };
 		100000000000000000000208 /* WebAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebAssets; sourceTree = "<group>"; };
+		100000000000000000000250 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
 		100000000000000000001201 /* PaymentRequestParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentRequestParsingTests.swift; sourceTree = "<group>"; };
 		100000000000000000000209 /* WalletViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/WalletViews.swift"; sourceTree = "<group>"; };
 		100000000000000000000210 /* InboxHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/InboxHistoryViews.swift"; sourceTree = "<group>"; };
@@ -75,6 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				100000000000000000001111 /* VelarumWalletCore.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -82,7 +85,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				100000000000000000001111 /* VelarumWalletCore.xcframework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,6 +112,7 @@
 				100000000000000000000206 /* RelayClient.swift */,
 				100000000000000000000207 /* StellarService.swift */,
 				100000000000000000000208 /* WebAssets */,
+				100000000000000000000250 /* Fonts */,
 				100000000000000000000209 /* WalletViews.swift */,
 				100000000000000000000210 /* InboxHistoryViews.swift */,
 				100000000000000000000211 /* SettingsViews.swift */,
@@ -234,6 +237,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				100000000000000000000108 /* WebAssets in Resources */,
+				100000000000000000000150 /* Fonts in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -268,6 +272,7 @@
 				100000000000000000000116 /* UIModels.swift in Sources */,
 				100000000000000000000117 /* PaymentPresentation.swift in Sources */,
 				100000000000000000000118 /* Extensions.swift in Sources */,
+				100000000000000000001110 /* velarum_wallet_core.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,7 +283,6 @@
 				100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */,
 				100000000000000000001102 /* HDDerivationGoldenTests.swift in Sources */,
 				100000000000000000001103 /* VelarumWalletCoreConformanceTests.swift in Sources */,
-				100000000000000000001110 /* velarum_wallet_core.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -412,6 +416,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Generated",
+				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -441,6 +449,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Generated",
+				);
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";

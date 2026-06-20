@@ -30,9 +30,36 @@ actor StellarService {
         try wallet(fromMnemonic: mnemonic, backupVerified: backupVerified, source: "imported")
     }
 
+    /// When true (default), Stellar key derivation is delegated to the shared
+    /// cross-platform Rust core (crates/velarum-wallet-core) instead of the native
+    /// Swift path below. Both produce identical results — pinned by the golden
+    /// vector (GB3J…QBYX) and the conformance tests — so this preserves behaviour.
+    /// Set to false to instantly revert to the native implementation.
+    static var useSharedCoreDerivation = true
+
     private func wallet(fromMnemonic mnemonic: String, backupVerified: Bool, source: String) throws -> StellarWallet {
         let words = try validatedMnemonicWords(mnemonic)
         let phrase = words.joined(separator: " ")
+
+        if Self.useSharedCoreDerivation {
+            do {
+                let keys = try stellarDerive(mnemonic: phrase, passphrase: "", account: 0)
+                return StellarWallet(
+                    seedBase64: keys.secretSeed.base64EncodedString(),
+                    publicKeyBase64: keys.publicKey.base64EncodedString(),
+                    address: keys.address,
+                    recoveryPhrase: phrase,
+                    mnemonicWordCount: words.count,
+                    backupVerified: backupVerified,
+                    derivationPath: keys.derivationPath,
+                    walletSource: source
+                )
+            } catch let error as FfiWalletError {
+                // Preserve the app's error type/UX for any core-side validation failure.
+                throw AppError.invalidResponse(error.localizedDescription)
+            }
+        }
+
         let seed = bip39Seed(mnemonic: phrase)
         let privateSeed = try slip10Ed25519Seed(seed: seed, path: [44, 148, 0])
         let privateKey = try Curve25519.Signing.PrivateKey(rawRepresentation: privateSeed)
