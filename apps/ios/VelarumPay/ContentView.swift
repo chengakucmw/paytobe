@@ -35,6 +35,7 @@ struct VelarumRootView: View {
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(AppTab.settings)
         }
+        .tint(VPColor.brand)
         .sheet(item: $app.selectedIntent) { intent in
             PaymentDetailView(intent: intent)
                 .environmentObject(app)

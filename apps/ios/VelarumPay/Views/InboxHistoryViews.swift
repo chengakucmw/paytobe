@@ -59,6 +59,8 @@ struct InboxView: View {
                 }
             }
             .navigationTitle("Inbox")
+            .scrollContentBackground(.hidden)
+            .background(VPColor.surfacePage.ignoresSafeArea())
         }
     }
 }
@@ -95,6 +97,8 @@ struct HistoryView: View {
                 }
             }
             .navigationTitle("History")
+            .scrollContentBackground(.hidden)
+            .background(VPColor.surfacePage.ignoresSafeArea())
         }
     }
 }

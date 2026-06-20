@@ -68,13 +68,13 @@ struct ConnectionDetailView: View {
                                 Text(connection.status == "paused" ? "Resume Agent" : "Pause Agent")
                                     .frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(VPButtonStyle(kind: .secondary))
                             Button(role: .destructive) {
                                 confirmingRevoke = true
                             } label: {
                                 Text("Revoke").frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(VPButtonStyle(kind: .danger))
                         }
                     }
                 }

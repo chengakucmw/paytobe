@@ -60,14 +60,29 @@ struct PaymentDetailView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text(intent.title)
-                        .font(.largeTitle.bold())
-                    HStack {
-                        TonePill(text: paymentStatusLabel(displayState), tone: paymentTone(displayState, canSign: canSign))
-                        TonePill(text: paymentRiskLabel(intent), tone: paymentRiskTone(intent))
+                    // Requester header + amount hero — matches prototype 11.
+                    HStack(spacing: VPSpace.s3) {
+                        VPTokenBadge(symbol: String(valueOr(intent.payeeDisplayName, intent.title).prefix(1)).uppercased())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(intent.title)
+                                .font(VPType.display(18, .semibold)).foregroundStyle(VPColor.textPrimary)
+                            Text(intent.summary)
+                                .font(VPType.sans(13)).foregroundStyle(VPColor.textMuted).lineLimit(2)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Text(intent.summary)
-                        .foregroundStyle(.secondary)
+                    VStack(spacing: VPSpace.s3) {
+                        Text("\(valueOr(intent.amount, "0")) \(intent.asset)")
+                            .font(VPType.display(34, .semibold)).foregroundStyle(VPColor.textPrimary)
+                        HStack(spacing: VPSpace.s2) {
+                            TonePill(text: paymentStatusLabel(displayState), tone: paymentTone(displayState, canSign: canSign))
+                            TonePill(text: paymentRiskLabel(intent), tone: paymentRiskTone(intent))
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(VPSpace.s6)
+                    .background(VPColor.surfaceCard, in: RoundedRectangle(cornerRadius: VPRadius.lg))
+                    .overlay(RoundedRectangle(cornerRadius: VPRadius.lg).stroke(VPColor.borderSubtle, lineWidth: 1))
                     PaymentFactsCard(intent: intent)
                     PaymentStateCard(intent: intent, state: displayState, canSign: canSign)
                     TruthPanelCard(intent: intent)
@@ -169,7 +184,7 @@ struct PaymentStateCard: View {
                         Text(paymentStateTitle(state, canSign: canSign))
                             .font(.headline)
                         Text(paymentStateCopy(intent, state: state, canSign: canSign))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(VPColor.textMuted)
                     }
                     Spacer()
                     TonePill(text: paymentStatusLabel(state), tone: paymentTone(state, canSign: canSign))
@@ -225,7 +240,7 @@ struct TruthSectionView: View {
                         .font(.headline)
                     Text(section.note)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                 }
                 Spacer()
                 TonePill(text: truthToneLabel(section.tone), tone: section.tone)
@@ -266,7 +281,7 @@ struct TruthRowView: View {
             if !row.evidence.isEmpty {
                 Text(row.evidence)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VPColor.textMuted)
             }
         }
         .padding(12)
@@ -297,7 +312,7 @@ struct PaymentContextCard: View {
                 }
                 if intent.orderId.isEmpty && intent.restaurantName.isEmpty && intent.transactionIdText.isEmpty {
                     Text("No additional context arrived with this request.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                 }
             }
         }
@@ -320,16 +335,15 @@ struct PaymentDetailActions: View {
     var body: some View {
         VStack(spacing: 10) {
             if canSign {
-                HStack {
+                HStack(spacing: VPSpace.s3) {
                     Button(role: .destructive, action: onReject) {
-                        Text("Reject").frame(maxWidth: .infinity)
+                        Text("Reject")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(VPButtonStyle(kind: .secondary))
                     Button(action: requiresWarningStepUp ? onReviewWarnings : onSign) {
                         Text(requiresWarningStepUp ? "Review warnings" : intent.payButtonTitle)
-                            .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VPButtonStyle(kind: requiresWarningStepUp ? .danger : .primary))
                 }
             } else {
                 nonSigningActions
@@ -345,38 +359,38 @@ struct PaymentDetailActions: View {
                 Button(action: onOpenSecurity) {
                     Text("Open Settings").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VPButtonStyle(kind: .primary))
                 Button(role: .destructive, action: onReject) {
                     Text("Reject request").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(VPButtonStyle(kind: .secondary))
             }
         } else if ["missing_context", "needs_review", "source_review_required"].contains(normalized) && intent.status == PaymentStatus.pending.rawValue {
             HStack {
                 Button(action: onRequestContext) {
                     Text("Request context").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VPButtonStyle(kind: .primary))
                 Button(role: .destructive, action: onReject) {
                     Text("Reject request").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(VPButtonStyle(kind: .secondary))
             }
         } else if normalized == "blocked" && intent.status == PaymentStatus.pending.rawValue {
             Button(role: .destructive, action: onReject) {
                 Text("Reject request").frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(VPButtonStyle(kind: .danger))
         } else if normalized == "network_disabled" && intent.status == PaymentStatus.pending.rawValue {
             HStack {
                 Button(action: onEnableNetwork) {
                     Text("Enable network").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VPButtonStyle(kind: .primary))
                 Button(role: .destructive, action: onReject) {
                     Text("Reject request").frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(VPButtonStyle(kind: .secondary))
             }
         } else if normalized == "failed" {
             InfoCard(title: "Retry requires review", bodyText: "Retry only after re-checking fee, recipient, and the prior transaction state.")
@@ -385,7 +399,7 @@ struct PaymentDetailActions: View {
                 Label("Copy transaction", systemImage: "doc.on.doc")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(VPButtonStyle(kind: .secondary))
             .disabled(intent.txHash.isEmpty)
         } else if normalized == "expired" {
             InfoCard(title: "Approval window closed", bodyText: "Ask the agent to create a new request if payment is still needed.")
@@ -409,7 +423,7 @@ struct WarningReviewSheet: View {
                     Text("Review before signing")
                         .font(.largeTitle.bold())
                     Text("Some context is unverified or AI-only. Continue only if you accept those limits.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                     Card {
                         VStack(alignment: .leading, spacing: 12) {
                             SectionHeader(title: "On-chain action", note: "final check")
@@ -446,7 +460,7 @@ struct WarningReviewSheet: View {
                         Text("Accept unverified context and Sign")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VPButtonStyle(kind: .primary))
                     .controlSize(.large)
                 }
             }

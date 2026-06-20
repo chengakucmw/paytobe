@@ -190,7 +190,7 @@ struct PairingReviewView: View {
                                 Text(scopeDisplayName(scope))
                                 Text(scope)
                                     .font(.caption.monospaced())
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(VPColor.textMuted)
                             }
                         }
                     }
@@ -225,13 +225,13 @@ struct PairingReviewView: View {
                             } label: {
                                 Text("Reject").frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(VPButtonStyle(kind: .secondary))
                             Button {
                                 app.approvePairing(session, scopes: approvedScopes)
                             } label: {
                                 Text("Approve Selected").frame(maxWidth: .infinity)
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(VPButtonStyle(kind: .primary))
                         }
                     }
                 }

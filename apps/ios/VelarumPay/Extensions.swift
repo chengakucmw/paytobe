@@ -15,45 +15,14 @@ import AVFoundation
 #endif
 
 extension Color {
-    static var appGroupedBackground: Color {
-        #if canImport(UIKit)
-        Color(UIColor.systemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(NSColor.windowBackgroundColor)
-        #else
-        Color.gray.opacity(0.08)
-        #endif
-    }
-
-    static var appSecondaryGroupedBackground: Color {
-        #if canImport(UIKit)
-        Color(UIColor.secondarySystemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(NSColor.controlBackgroundColor)
-        #else
-        Color.gray.opacity(0.12)
-        #endif
-    }
-
-    static var appSystemBackground: Color {
-        #if canImport(UIKit)
-        Color(UIColor.systemBackground)
-        #elseif canImport(AppKit)
-        Color(NSColor.windowBackgroundColor)
-        #else
-        Color.white
-        #endif
-    }
-
-    static var appSeparator: Color {
-        #if canImport(UIKit)
-        Color(UIColor.separator)
-        #elseif canImport(AppKit)
-        Color(NSColor.separatorColor)
-        #else
-        Color.gray
-        #endif
-    }
+    // Re-pointed to the Velar Teal design system (VPColor) so the legacy `app*`
+    // surface helpers used across every screen now resolve to DS tokens. This
+    // flips page/card/field backgrounds to the teal DS app-wide with no per-site
+    // edits. (2026-06-20 — teal DS rollout to the remaining iOS screens.)
+    static var appGroupedBackground: Color { VPColor.surfacePage }
+    static var appSecondaryGroupedBackground: Color { VPColor.surfaceSunken }
+    static var appSystemBackground: Color { VPColor.surfaceCard }
+    static var appSeparator: Color { VPColor.borderSubtle }
 }
 
 extension View {

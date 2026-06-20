@@ -183,7 +183,8 @@ func paymentTone(_ state: String, canSign: Bool) -> String {
     if canSign && value == "pending" { return "safe" }
     if canSign { return "caution" }
     if value == "confirmed" { return "safe" }
-    if ["broadcasting", "signed_locally", "expired", "cancelled"].contains(value) { return "info" }
+    if value == "expired" { return "expired" }
+    if ["broadcasting", "signed_locally", "cancelled"].contains(value) { return "info" }
     if value == WalletSecurityNavigationPolicy.backupRequiredReviewState { return "caution" }
     if ["missing_context", "needs_review", "source_review_required", "network_disabled"].contains(value) { return "caution" }
     return "danger"
@@ -611,15 +612,39 @@ func truthToneLabel(_ tone: String) -> String {
 
 func toneColor(_ tone: String) -> Color {
     switch tone {
-    case "safe", "success": return .green
-    case "caution", "warning": return .orange
-    case "danger": return .red
-    default: return .blue
+    case "safe", "success": return VPColor.positive
+    case "caution", "warning": return VPColor.warning
+    case "danger": return VPColor.negative
+    case "expired", "muted": return VPColor.ink500
+    case "info": return VPColor.info
+    default: return VPColor.info
     }
 }
 
 func toneBackground(_ tone: String) -> Color {
-    toneColor(tone).opacity(0.12)
+    switch tone {
+    case "safe", "success": return VPColor.positiveSoft
+    case "caution", "warning": return VPColor.warningSoft
+    case "danger": return VPColor.negativeSoft
+    case "expired", "muted": return VPColor.ink100
+    case "info": return VPColor.infoSoft
+    default: return VPColor.infoSoft
+    }
+}
+
+/// SF Symbol for a status tone so each state is distinguishable beyond color
+/// alone. `expired` gets a clock badge — visually distinct from info (blue),
+/// pending (amber), failed (red) and success (green). A bad symbol name simply
+/// renders nothing, so this is safe across iOS versions.
+func toneIcon(_ tone: String) -> String {
+    switch tone {
+    case "safe", "success": return "checkmark.seal.fill"
+    case "caution", "warning": return "exclamationmark.triangle.fill"
+    case "danger": return "xmark.octagon.fill"
+    case "expired", "muted": return "clock.badge.xmark"
+    case "info": return "info.circle.fill"
+    default: return "info.circle.fill"
+    }
 }
 
 func titleize(_ value: String, fallback: String) -> String {

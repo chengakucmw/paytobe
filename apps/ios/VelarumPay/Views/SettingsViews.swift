@@ -24,10 +24,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    ProfileIdentityHeader()
+                }
+                .listRowBackground(Color.clear)
                 Section("Security") {
                     Text("Settings > Security is the only place for wallet creation, recovery phrase backup, import, and recovery flows. Signing stays locked until the offline backup is verified.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                     if let wallet = app.wallet {
                         FieldRow(title: "Mnemonic type", value: wallet.displayMnemonicType)
                         FieldRow(title: "Backup status", value: wallet.isBackupVerified ? "Verified" : "Required before signing")
@@ -56,7 +60,7 @@ struct SettingsView: View {
                     }
                     Label("Device risk controls: local Keychain storage, no cloud backup in v1, and local user approval before signing.", systemImage: "iphone")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                     if app.wallet != nil {
                         Button("Clear Local Wallet", role: .destructive) {
                             app.clearWallet()
@@ -96,7 +100,7 @@ struct SettingsView: View {
                     }
                     Text("Pairing lets agents prepare requests only. It never grants signing permission or payment approval.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                 }
                 Section("Connected Agents") {
                     if app.connections.isEmpty {
@@ -115,7 +119,7 @@ struct SettingsView: View {
                 Section("Networks") {
                     Text("Add EVM-compatible networks after verifying that the RPC endpoint reports the exact Chain ID. Personal RPC settings stay on this device.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                     ForEach(app.networks) { network in
                         NetworkConfigRow(network: network)
                     }
@@ -131,6 +135,8 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .scrollContentBackground(.hidden)
+            .background(VPColor.surfacePage.ignoresSafeArea())
             .onAppear { relayDraft = app.relayURL }
         }
         .sheet(isPresented: $showingBackup) {
@@ -154,23 +160,54 @@ struct SettingsView: View {
     }
 }
 
+/// Profile identity header (avatar + copyable address) — matches prototype 18.
+struct ProfileIdentityHeader: View {
+    @EnvironmentObject private var app: AppState
+    var body: some View {
+        VStack(spacing: VPSpace.s3) {
+            ZStack {
+                Circle()
+                    .fill(LinearGradient(colors: [VPColor.teal400, VPColor.teal700], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 72, height: 72)
+                Text("V").font(VPType.display(30, .bold)).foregroundStyle(.white)
+            }
+            if let wallet = app.wallet {
+                Button { app.copy(wallet.address) } label: {
+                    HStack(spacing: 6) {
+                        Text(shortAddress(wallet.address)).font(VPType.mono(14))
+                        Image(systemName: "doc.on.doc").font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundStyle(VPColor.textSecondary)
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(VPColor.surfaceSunken, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text("No wallet yet").font(VPType.sans(14)).foregroundStyle(VPColor.textMuted)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, VPSpace.s2)
+    }
+}
+
 struct NetworkConfigRow: View {
     let network: WalletNetworkConfig
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: network.source == WalletNetworkConfig.sourceBuiltIn ? "checkmark.seal.fill" : "network")
-                .foregroundStyle(.green)
+                .foregroundStyle(VPColor.positive)
             VStack(alignment: .leading, spacing: 4) {
                 Text(network.name)
                     .font(.headline)
                 Text(network.displayLine)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VPColor.textMuted)
                 if !network.defaultRPCURL.isEmpty {
                     Text(network.defaultRPCURL)
                         .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                         .lineLimit(1)
                 }
             }
@@ -202,7 +239,7 @@ struct AddNetworkSheet: View {
                         FieldRow(title: "Network", value: "\(valueOr(sourceIntent.network, "Unknown network"))\(requestChainSuffix(sourceIntent))")
                         Text("Adding this network only enables local review. You still approve or reject the request separately.")
                             .font(.footnote)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(VPColor.textMuted)
                     }
                 }
                 Section {
@@ -226,7 +263,7 @@ struct AddNetworkSheet: View {
                 }
                 Section("Verification") {
                     Text(verificationText)
-                        .foregroundColor(verifiedFingerprint.isEmpty ? Color.secondary : Color.green)
+                        .foregroundColor(verifiedFingerprint.isEmpty ? VPColor.textMuted : VPColor.positive)
                     Button {
                         Task { await testRPC() }
                     } label: {

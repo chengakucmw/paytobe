@@ -14,33 +14,219 @@ import AppKit
 import AVFoundation
 #endif
 
+/// Home / Wallet tab — restyled 2026-06-20 to the Velar Teal design system
+/// (prototypes/html20260620 · screens/04-home.html). Visual only: every value
+/// is read from the real AppState, no mock data is introduced.
 struct WalletView: View {
     @EnvironmentObject private var app: AppState
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    HeaderCard(title: "VelarumPay", subtitle: "Local signing wallet", status: app.statusText)
-                    if let wallet = app.wallet {
-                        AddressCard(
-                            title: "Stellar",
-                            address: wallet.address,
-                            note: "Use this address only for Stellar XLM. Other networks show separate receive details when their signer is enabled."
-                        )
-                        WalletRelayCard()
-                    } else {
-                        EmptyWalletCard()
-                    }
-                    InfoCard(
-                        title: "Payment support",
-                        bodyText: "iOS v1 signs Stellar XLM Payment Requests locally. Other rails remain review-only until their signer is enabled."
-                    )
-                }
-                .padding()
+        ScrollView {
+            VStack(spacing: VPSpace.s4) {
+                VPBrandHeader(
+                    onScan: { app.showingPairingScanner = true },
+                    onInbox: { app.selectedTab = .inbox },
+                    inboxBadge: !app.inbox.isEmpty
+                )
+                walletHero
+                if !app.inbox.isEmpty { pendingTeaser }
+                accountSection
+                agentsSection
+                WalletRelayCard()
             }
-            .background(Color.appGroupedBackground)
+            .padding(.horizontal, VPSpace.s5)
+            .padding(.top, VPSpace.s2)
+            .padding(.bottom, VPSpace.s8)
         }
+        .background(VPColor.surfacePage.ignoresSafeArea())
+    }
+
+    // Hero balance/status card (teal→ink gradient).
+    private var walletHero: some View {
+        VPHeroCard {
+            VStack(alignment: .leading, spacing: VPSpace.s3) {
+                HStack {
+                    Text("STELLAR WALLET")
+                        .font(VPType.sans(12, .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(.white.opacity(0.72))
+                    Spacer()
+                    VPGlassChip(text: "Stellar mainnet")
+                }
+                if let wallet = app.wallet {
+                    Text(shortAddress(wallet.address))
+                        .font(VPType.mono(26, .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.top, VPSpace.s1)
+                    HStack(spacing: VPSpace.s2) {
+                        VPBadge(
+                            text: wallet.isBackupVerified ? "Backed up" : "Backup required",
+                            tone: wallet.isBackupVerified ? .positive : .warning,
+                            showDot: true
+                        )
+                        Button {
+                            app.copy(wallet.address)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Text("Copy address").font(VPType.sans(13, .semibold))
+                                Image(systemName: "doc.on.doc").font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                            .background(.white.opacity(0.16), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    Text("No wallet yet")
+                        .font(VPType.display(28, .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.top, VPSpace.s1)
+                    Text("Create or import in Settings → Security")
+                        .font(VPType.sans(14))
+                        .foregroundStyle(.white.opacity(0.78))
+                }
+                HStack(spacing: VPSpace.s2) {
+                    VPQuickAction(icon: "qrcode", label: "Receive", onHero: true) { app.copy(app.wallet?.address ?? "") }
+                    VPQuickAction(icon: "antenna.radiowaves.left.and.right", label: "Register", onHero: true) { app.registerRelay() }
+                    VPQuickAction(icon: "arrow.clockwise", label: "Sync", onHero: true) { app.syncInbox() }
+                    VPQuickAction(icon: "gearshape", label: "Settings", onHero: true) { app.openSecuritySettings() }
+                }
+                .padding(.top, VPSpace.s3)
+            }
+        }
+    }
+
+    // Pending-requests teaser (ink card → Inbox tab).
+    private var pendingTeaser: some View {
+        Button {
+            app.selectedTab = .inbox
+        } label: {
+            HStack(spacing: VPSpace.s3) {
+                ZStack {
+                    Circle().fill(.white.opacity(0.12)).frame(width: 44, height: 44)
+                    Image(systemName: "tray.full").font(.system(size: 18, weight: .semibold)).foregroundStyle(VPColor.mint)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(app.inbox.count) request\(app.inbox.count == 1 ? "" : "s") awaiting review")
+                        .font(VPType.sans(16, .semibold)).foregroundStyle(.white)
+                    Text("Tap to review before signing")
+                        .font(VPType.sans(13)).foregroundStyle(.white.opacity(0.7))
+                }
+                Spacer()
+                VPBadge(text: "Review", tone: .warning)
+            }
+            .padding(VPSpace.s5)
+            .frame(maxWidth: .infinity)
+            .background(VPColor.surfaceInk, in: RoundedRectangle(cornerRadius: VPRadius.lg))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Account — the Stellar address as an asset-style row.
+    private var accountSection: some View {
+        VStack(alignment: .leading, spacing: VPSpace.s2) {
+            VPSectionHeader(title: "Account")
+            if let wallet = app.wallet {
+                Button {
+                    app.copy(wallet.address)
+                } label: {
+                    HStack(spacing: VPSpace.s3) {
+                        VPTokenBadge(symbol: "XLM", gradient: [Color(hex: 0x1A1A2E), Color(hex: 0x0F1626)])
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Stellar Lumens").font(VPType.sans(16, .semibold)).foregroundStyle(VPColor.textPrimary)
+                            Text(shortAddress(wallet.address)).font(VPType.mono(13)).foregroundStyle(VPColor.textMuted)
+                        }
+                        Spacer()
+                        VPBadge(text: "Mainnet", tone: .brand)
+                    }
+                    .padding(VPSpace.s4)
+                    .frame(maxWidth: .infinity)
+                    .background(VPColor.surfaceCard, in: RoundedRectangle(cornerRadius: VPRadius.lg))
+                    .overlay(RoundedRectangle(cornerRadius: VPRadius.lg).stroke(VPColor.borderSubtle, lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                // EVM + Solana addresses from the shared wallet core (wallet.evmAddress / .solanaAddress).
+                if let evm = wallet.evmAddress {
+                    otherChainRow(symbol: "ETH", name: "Ethereum / EVM", address: evm,
+                                  gradient: [Color(hex: 0x627EEA), Color(hex: 0x2B2F36)])
+                }
+                if let sol = wallet.solanaAddress {
+                    otherChainRow(symbol: "SOL", name: "Solana", address: sol,
+                                  gradient: [Color(hex: 0x9945FF), Color(hex: 0x14F195)])
+                }
+            } else {
+                emptyHint("No account yet", "Set up a wallet to see your Stellar address here.")
+            }
+        }
+    }
+
+    // An EVM/Solana address row, styled like the Stellar account row above.
+    private func otherChainRow(symbol: String, name: String, address: String, gradient: [Color]) -> some View {
+        Button {
+            app.copy(address)
+        } label: {
+            HStack(spacing: VPSpace.s3) {
+                VPTokenBadge(symbol: symbol, gradient: gradient)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(VPType.sans(16, .semibold)).foregroundStyle(VPColor.textPrimary)
+                    Text(shortAddress(address)).font(VPType.mono(13)).foregroundStyle(VPColor.textMuted)
+                }
+                Spacer()
+                VPBadge(text: "Mainnet", tone: .brand)
+            }
+            .padding(VPSpace.s4)
+            .frame(maxWidth: .infinity)
+            .background(VPColor.surfaceCard, in: RoundedRectangle(cornerRadius: VPRadius.lg))
+            .overlay(RoundedRectangle(cornerRadius: VPRadius.lg).stroke(VPColor.borderSubtle, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // Connected agents.
+    private var agentsSection: some View {
+        VStack(alignment: .leading, spacing: VPSpace.s2) {
+            VPSectionHeader(title: "Connected agents")
+            if app.connections.isEmpty {
+                emptyHint("No agents connected", "Scan an agent's code to grant scoped, revocable access.")
+            } else {
+                VStack(spacing: VPSpace.s2) {
+                    ForEach(app.connections) { connection in
+                        Button {
+                            app.selectedConnection = connection
+                        } label: {
+                            HStack(spacing: VPSpace.s3) {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: VPRadius.sm).fill(VPColor.brandSoft).frame(width: 38, height: 38)
+                                    Image(systemName: "cpu").font(.system(size: 16, weight: .semibold)).foregroundStyle(VPColor.textBrand)
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(connection.displayName).font(VPType.sans(16, .semibold)).foregroundStyle(VPColor.textPrimary)
+                                    Text(connection.status).font(VPType.sans(13)).foregroundStyle(VPColor.textMuted)
+                                }
+                                Spacer()
+                                VPBadge(text: "Active", tone: .positive, showDot: true)
+                            }
+                            .padding(VPSpace.s4)
+                            .frame(maxWidth: .infinity)
+                            .background(VPColor.surfaceCard, in: RoundedRectangle(cornerRadius: VPRadius.lg))
+                            .overlay(RoundedRectangle(cornerRadius: VPRadius.lg).stroke(VPColor.borderSubtle, lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func emptyHint(_ title: String, _ subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(VPType.sans(15, .semibold)).foregroundStyle(VPColor.textSecondary)
+            Text(subtitle).font(VPType.sans(13)).foregroundStyle(VPColor.textMuted)
+        }
+        .padding(VPSpace.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(VPColor.surfaceSunken, in: RoundedRectangle(cornerRadius: VPRadius.lg))
     }
 }
 
@@ -53,14 +239,14 @@ struct EmptyWalletCard: View {
                 Text("No wallet yet")
                     .font(.title2.bold())
                 Text("Set up or recover a wallet from Settings > Security. Home will show your Stellar receive address and a scannable QR code after a wallet is loaded.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VPColor.textMuted)
                 Button {
                     app.openSecuritySettings()
                 } label: {
                     Label("Open Settings", systemImage: "gearshape")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VPButtonStyle(kind: .primary))
                 .controlSize(.large)
             }
         }
@@ -76,25 +262,25 @@ struct WalletRelayCard: View {
                 Text("Payment Request relay")
                     .font(.title2.bold())
                 Text("Register this device with a VelarumPay relay, connect trusted agents, then review incoming requests before signing.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VPColor.textMuted)
                 HStack {
                     Button {
                         app.registerRelay()
                     } label: {
                         Label("Register", systemImage: "antenna.radiowaves.left.and.right")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VPButtonStyle(kind: .primary))
                     Button {
                         app.syncInbox()
                     } label: {
                         Label("Sync", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(VPButtonStyle(kind: .secondary))
                 }
                 if app.relayURL.isEmpty {
                     Text("Set a relay URL in Settings before registering or syncing.")
                         .font(.footnote)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(VPColor.textMuted)
                 } else {
                     FieldRow(title: "Relay URL", value: app.relayURL)
                 }
@@ -116,7 +302,7 @@ struct MnemonicBackupCard: View {
                             .font(.title2.bold())
                         Text(wallet.displayMnemonicType)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(VPColor.textMuted)
                     }
                     Spacer()
                     TonePill(text: wallet.isBackupVerified ? "Verified" : "Required", tone: wallet.isBackupVerified ? "success" : "warning")
@@ -125,14 +311,14 @@ struct MnemonicBackupCard: View {
                     FieldRow(title: "Stellar path", value: path)
                 }
                 Text(wallet.isBackupVerified ? "This wallet is ready for local signing." : "Back up and verify the recovery phrase before signing Payment Requests.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(VPColor.textMuted)
                 Button {
                     onBackup()
                 } label: {
                     Label(wallet.isBackupVerified ? "Review Backup" : "Back Up Now", systemImage: "lock.shield")
                         .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(VPButtonStyle(kind: .primary))
                 .controlSize(.large)
             }
         }
@@ -182,7 +368,7 @@ struct RecoveryPhraseBackupSheet: View {
                         if !verificationMessage.isEmpty {
                             Text(verificationMessage)
                                 .font(.footnote.bold())
-                                .foregroundStyle(.red)
+                                .foregroundStyle(VPColor.negative)
                         }
                         Button {
                             verify()
@@ -190,7 +376,7 @@ struct RecoveryPhraseBackupSheet: View {
                             Label("Verify Backup", systemImage: "checkmark.shield")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(VPButtonStyle(kind: .primary))
                         .controlSize(.large)
                     } else {
                         Button {
@@ -199,7 +385,7 @@ struct RecoveryPhraseBackupSheet: View {
                             Label("Show Recovery Phrase", systemImage: "eye")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(VPButtonStyle(kind: .primary))
                         .controlSize(.large)
                     }
                 }
@@ -260,7 +446,7 @@ struct RecoveryPhraseImportSheet: View {
                         Label("Preview Address", systemImage: "doc.text.magnifyingglass")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(VPButtonStyle(kind: .primary))
                     .controlSize(.large)
                     if let preview {
                         Card {
@@ -270,8 +456,14 @@ struct RecoveryPhraseImportSheet: View {
                                 FieldRow(title: "Mnemonic type", value: preview.displayMnemonicType)
                                 FieldRow(title: "Stellar path", value: preview.derivationPath ?? "m/44'/148'/0'")
                                 FieldRow(title: "Stellar address", value: preview.address)
+                                if let evm = preview.evmAddress {
+                                    FieldRow(title: "EVM address", value: evm)
+                                }
+                                if let sol = preview.solanaAddress {
+                                    FieldRow(title: "Solana address", value: sol)
+                                }
                                 Text(backupConfirmed ? "This wallet will be marked as backed up." : "Backup verification will be required before signing.")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(VPColor.textMuted)
                                 Button {
                                     app.restoreWallet(mnemonic: phraseText, backupVerified: backupConfirmed)
                                     dismiss()
@@ -279,7 +471,7 @@ struct RecoveryPhraseImportSheet: View {
                                     Label("Import to this Device", systemImage: "square.and.arrow.down")
                                         .frame(maxWidth: .infinity)
                                 }
-                                .buttonStyle(.borderedProminent)
+                                .buttonStyle(VPButtonStyle(kind: .primary))
                                 .controlSize(.large)
                             }
                         }
@@ -287,7 +479,7 @@ struct RecoveryPhraseImportSheet: View {
                     if !errorMessage.isEmpty {
                         Text(errorMessage)
                             .font(.footnote.bold())
-                            .foregroundStyle(.red)
+                            .foregroundStyle(VPColor.negative)
                     }
                 }
                 .padding()
@@ -320,19 +512,21 @@ struct MnemonicGrid: View {
     let words: [String]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+        // 3-column word chips, matching prototype 02 (.words / .word).
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: VPSpace.s2), count: 3), spacing: VPSpace.s2) {
             ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                HStack(spacing: 8) {
-                    Text(String(format: "%02d", index + 1))
-                        .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    Text("\(index + 1)")
+                        .font(VPType.sans(12, .semibold))
+                        .foregroundStyle(VPColor.textMuted)
                     Text(word)
-                        .fontWeight(.semibold)
+                        .font(VPType.mono(14, .medium))
+                        .foregroundStyle(VPColor.textPrimary)
                     Spacer(minLength: 0)
                 }
-                .font(.system(.subheadline, design: .monospaced))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 10)
-                .background(Color.appSecondaryGroupedBackground, in: RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, VPSpace.s3)
+                .padding(.vertical, VPSpace.s3)
+                .background(VPColor.surfaceSunken, in: RoundedRectangle(cornerRadius: VPRadius.sm))
             }
         }
     }

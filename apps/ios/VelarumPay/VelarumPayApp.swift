@@ -5,6 +5,10 @@ struct VelarumPayApp: App {
     @StateObject private var appState = AppState()
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        VPFonts.registerBundled()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
