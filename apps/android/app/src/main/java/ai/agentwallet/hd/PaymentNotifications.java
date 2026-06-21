@@ -84,7 +84,7 @@ final class PaymentNotifications {
 
         String detail = intent.title() + " to " + shortAddress(intent.to);
         Notification notification = new Notification.Builder(context, PAYMENT_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_stat_velarum)
                 .setContentTitle("New payment request")
                 .setContentText(detail)
                 .setStyle(new Notification.BigTextStyle().bigText(
@@ -114,7 +114,7 @@ final class PaymentNotifications {
         );
 
         return new Notification.Builder(context, RELAY_CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setSmallIcon(R.drawable.ic_stat_velarum)
                 .setContentTitle("AgentWallet relay connected")
                 .setContentText("Listening for OpenClaw payment requests.")
                 .setContentIntent(pendingIntent)
@@ -162,9 +162,8 @@ final class PaymentNotifications {
     }
 
     private static String shortAddress(String value) {
-        if (value == null) return "";
-        if (value.length() <= 18) return value;
-        return value.substring(0, 10) + "..." + value.substring(value.length() - 8);
+        // Delegates to the shared AddressFormat (D9/Q5) — unified 10…8 form.
+        return AddressFormat.medium(value);
     }
 
     private static NotificationManager manager(Context context) {

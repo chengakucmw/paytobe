@@ -2,6 +2,7 @@ package ai.agentwallet.hd.ui.onboarding
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -42,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import ai.agentwallet.hd.R
 import ai.agentwallet.hd.ui.components.VpBadge
 import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpFactRow
@@ -165,6 +169,11 @@ private fun CreateWalletScreen(
 private fun WelcomeHero() {
     Surface(shape = VelarumRadii.xl, color = VelarumTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.s6), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+            Image(
+                painter = painterResource(R.drawable.velarum_mark),
+                contentDescription = "VelarumPay",
+                modifier = Modifier.size(44.dp),
+            )
             Text("Your keys. Your crypto.", style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Text(
                 "A self-custody wallet for Stellar. Sign every payment yourself — agents can ask, only you approve.",

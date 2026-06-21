@@ -1,3 +1,4 @@
 <resources>
-    <color name="ic_launcher_background">#2E7D43</color>
+    <!-- VelarumPay ink (teal-tinted near-black) — adaptive icon background -->
+    <color name="ic_launcher_background">#0B1310</color>
 </resources>

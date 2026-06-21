@@ -682,12 +682,11 @@ struct VPBrandHeader: View {
     var inboxBadge: Bool = false
     var body: some View {
         HStack(spacing: VPSpace.s3) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(LinearGradient(colors: [VPColor.teal400, VPColor.brandStrong], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .frame(width: 40, height: 40)
-                Image(systemName: "arrow.up").font(.system(size: 18, weight: .bold)).foregroundStyle(.white)
-            }
+            Image("VelarumLogoMark")
+                .resizable()
+                .interpolation(.high)
+                .frame(width: 40, height: 40)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
             VStack(alignment: .leading, spacing: 0) {
                 Text("VelarumPay").font(VPType.display(20, .bold)).foregroundStyle(VPColor.textPrimary)
                 Text("Self-custody wallet").font(VPType.sans(13)).foregroundStyle(VPColor.textMuted)

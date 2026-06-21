@@ -1,7 +1,6 @@
 package ai.agentwallet.hd.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
@@ -20,9 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import ai.agentwallet.hd.R
 import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumRadii
 import ai.agentwallet.hd.ui.theme.VelarumTheme
@@ -37,15 +35,13 @@ fun VpHomeTopBar(onSearch: () -> Unit, onScan: () -> Unit, modifier: Modifier = 
             .padding(horizontal = Spacing.s5, vertical = Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
+        Image(
+            painter = painterResource(R.drawable.velarum_logo_mark),
+            contentDescription = "VelarumPay",
             modifier = Modifier
                 .size(40.dp)
-                .clip(VelarumRadii.sm)
-                .background(Brush.linearGradient(listOf(VelarumTheme.colors.primary, VelarumTheme.colors.brandStrong))),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Filled.ArrowUpward, contentDescription = null, tint = Color.White)
-        }
+                .clip(VelarumRadii.sm),
+        )
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s3)) {
             Text("VelarumPay", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
             Text("Self-custody wallet", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)

@@ -16,6 +16,7 @@
 		100000000000000000000107 /* StellarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000207 /* StellarService.swift */; };
 		100000000000000000000108 /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000208 /* WebAssets */; };
 		100000000000000000000150 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000250 /* Fonts */; };
+		100000000000000000000160 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000260 /* Assets.xcassets */; };
 		100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001201 /* PaymentRequestParsingTests.swift */; };
 		100000000000000000000109 /* WalletViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000209 /* WalletViews.swift */; };
 		100000000000000000000110 /* InboxHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000210 /* InboxHistoryViews.swift */; };
@@ -27,8 +28,12 @@
 		100000000000000000000116 /* UIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000216 /* UIModels.swift */; };
 		100000000000000000000117 /* PaymentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000217 /* PaymentPresentation.swift */; };
 		100000000000000000000118 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000218 /* Extensions.swift */; };
+		100000000000000000000119 /* RiskPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000219 /* RiskPolicy.swift */; };
 		100000000000000000001102 /* HDDerivationGoldenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001202 /* HDDerivationGoldenTests.swift */; };
 		100000000000000000001103 /* VelarumWalletCoreConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001203 /* VelarumWalletCoreConformanceTests.swift */; };
+		100000000000000000001104 /* LocalRiskPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001204 /* LocalRiskPolicyTests.swift */; };
+		100000000000000000001105 /* PaymentIntentStatusGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */; };
+		100000000000000000001106 /* PaymentRequestExpiryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001206 /* PaymentRequestExpiryTests.swift */; };
 		100000000000000000001110 /* velarum_wallet_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001210 /* velarum_wallet_core.swift */; };
 		100000000000000000001111 /* VelarumWalletCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 100000000000000000001211 /* VelarumWalletCore.xcframework */; };
 /* End PBXBuildFile section */
@@ -55,6 +60,7 @@
 		100000000000000000000207 /* StellarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StellarService.swift; sourceTree = "<group>"; };
 		100000000000000000000208 /* WebAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebAssets; sourceTree = "<group>"; };
 		100000000000000000000250 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
+		100000000000000000000260 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		100000000000000000001201 /* PaymentRequestParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentRequestParsingTests.swift; sourceTree = "<group>"; };
 		100000000000000000000209 /* WalletViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/WalletViews.swift"; sourceTree = "<group>"; };
 		100000000000000000000210 /* InboxHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/InboxHistoryViews.swift"; sourceTree = "<group>"; };
@@ -66,8 +72,12 @@
 		100000000000000000000216 /* UIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIModels.swift"; sourceTree = "<group>"; };
 		100000000000000000000217 /* PaymentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/PaymentPresentation.swift"; sourceTree = "<group>"; };
 		100000000000000000000218 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions.swift"; sourceTree = "<group>"; };
+		100000000000000000000219 /* RiskPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiskPolicy.swift; sourceTree = "<group>"; };
 		100000000000000000001202 /* HDDerivationGoldenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDDerivationGoldenTests.swift; sourceTree = "<group>"; };
 		100000000000000000001203 /* VelarumWalletCoreConformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VelarumWalletCoreConformanceTests.swift; sourceTree = "<group>"; };
+		100000000000000000001204 /* LocalRiskPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRiskPolicyTests.swift; sourceTree = "<group>"; };
+		100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentIntentStatusGuardTests.swift; sourceTree = "<group>"; };
+		100000000000000000001206 /* PaymentRequestExpiryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentRequestExpiryTests.swift; sourceTree = "<group>"; };
 		100000000000000000001210 /* velarum_wallet_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = velarum_wallet_core.swift; path = Generated/velarum_wallet_core.swift; sourceTree = SOURCE_ROOT; };
 		100000000000000000001211 /* VelarumWalletCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = VelarumWalletCore.xcframework; path = Generated/VelarumWalletCore.xcframework; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
@@ -113,6 +123,7 @@
 				100000000000000000000207 /* StellarService.swift */,
 				100000000000000000000208 /* WebAssets */,
 				100000000000000000000250 /* Fonts */,
+				100000000000000000000260 /* Assets.xcassets */,
 				100000000000000000000209 /* WalletViews.swift */,
 				100000000000000000000210 /* InboxHistoryViews.swift */,
 				100000000000000000000211 /* SettingsViews.swift */,
@@ -123,6 +134,7 @@
 				100000000000000000000216 /* UIModels.swift */,
 				100000000000000000000217 /* PaymentPresentation.swift */,
 				100000000000000000000218 /* Extensions.swift */,
+				100000000000000000000219 /* RiskPolicy.swift */,
 			);
 			path = VelarumPay;
 			sourceTree = "<group>";
@@ -142,6 +154,9 @@
 				100000000000000000001201 /* PaymentRequestParsingTests.swift */,
 				100000000000000000001202 /* HDDerivationGoldenTests.swift */,
 				100000000000000000001203 /* VelarumWalletCoreConformanceTests.swift */,
+				100000000000000000001204 /* LocalRiskPolicyTests.swift */,
+				100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */,
+				100000000000000000001206 /* PaymentRequestExpiryTests.swift */,
 			);
 			path = VelarumPayTests;
 			sourceTree = "<group>";
@@ -238,6 +253,7 @@
 			files = (
 				100000000000000000000108 /* WebAssets in Resources */,
 				100000000000000000000150 /* Fonts in Resources */,
+				100000000000000000000160 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -272,6 +288,7 @@
 				100000000000000000000116 /* UIModels.swift in Sources */,
 				100000000000000000000117 /* PaymentPresentation.swift in Sources */,
 				100000000000000000000118 /* Extensions.swift in Sources */,
+				100000000000000000000119 /* RiskPolicy.swift in Sources */,
 				100000000000000000001110 /* velarum_wallet_core.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -283,6 +300,9 @@
 				100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */,
 				100000000000000000001102 /* HDDerivationGoldenTests.swift in Sources */,
 				100000000000000000001103 /* VelarumWalletCoreConformanceTests.swift in Sources */,
+				100000000000000000001104 /* LocalRiskPolicyTests.swift in Sources */,
+				100000000000000000001105 /* PaymentIntentStatusGuardTests.swift in Sources */,
+				100000000000000000001106 /* PaymentRequestExpiryTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -415,6 +435,7 @@
 		100000000000000000000B01 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
@@ -448,6 +469,7 @@
 		100000000000000000000B02 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
