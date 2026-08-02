@@ -1,0 +1,32 @@
+VelarumPay
+Copyright 2026 VelarumPay contributors
+
+This product includes software developed by VelarumPay contributors.
+
+The VelarumPay name, logos, wordmarks, and other brand identifiers are not
+licensed for trademark use by the Apache License, Version 2.0.
+
+Reviewed third-party dependency notices
+
+unicode-ident 1.0.24
+Upstream: https://github.com/dtolnay/unicode-ident
+Declared license: (MIT OR Apache-2.0) AND Unicode-3.0
+Selected option: Apache-2.0 AND Unicode-3.0
+The required Unicode copyright and permission notice is preserved at:
+third_party/licenses/unicode-ident-1.0.24-LICENSE-UNICODE
+
+The active BIP-39 dependency graph also includes reviewed CC0-1.0 code:
+bip39 2.2.2, bitcoin_hashes 0.14.2, and hex-conservative 0.2.2.
+These versions remain locked in crates/velarum-wallet-core/Cargo.lock.
+
+The website, developer documentation site, merchant portal, and AgentFood
+reference demo bundle the following unmodified fonts from the official Google
+Fonts repository:
+
+- Schibsted Grotesk, Copyright 2023 The Schibsted-Grotesk Project Authors.
+- Hanken Grotesk, Copyright 2021 The Hanken Grotesk Project Authors.
+- Space Mono, Copyright 2016 The Space Mono Project Authors.
+
+Each font is licensed under the SIL Open Font License, Version 1.1. The full
+copyright notices and license texts are distributed beside the font files in
+each application's public/fonts directory.

@@ -44,6 +44,7 @@ object SettingsRepository {
             NetworkUi(it.name, it.chainId, it.rpcUrl, it.currencySymbol, it.source, it.verificationStatus)
         }
     } catch (e: Exception) {
+        VpLog.w("SettingsRepository", "load networks failed", e)
         emptyList()
     }
 
@@ -56,22 +57,29 @@ object SettingsRepository {
     fun activity(context: Context): List<ActivityUi> = try {
         TransactionHistoryStore.list(context).map { it.toActivityUi() }
     } catch (e: Exception) {
+        VpLog.w("SettingsRepository", "load activity history failed", e)
         emptyList()
     }
 
     fun deviceInfo(context: Context): DeviceInfoUi = DeviceInfoUi(
         deviceId = PaymentInboxStore.deviceId(context),
         relayUrl = PaymentInboxStore.relayUrl(context),
-        deviceToken = PaymentInboxStore.deviceToken(context),
+        // Never render a bearer token where screenshots or accessibility services can capture it.
+        deviceToken = SecureWalletStore.deviceTokenLabel(context),
     )
 
-    fun setRelayUrl(context: Context, url: String) = PaymentInboxStore.setRelayUrl(context, url)
+    fun setRelayUrl(context: Context, url: String) {
+        if (PlatformServiceConfig.isManaged()) return
+        PaymentInboxStore.setRelayUrl(context, url)
+        FirebaseBootstrap.registerCurrentToken(context)
+    }
 
     /**
      * 处理 agentwallet://relay|configure-relay|setup?url=... 深链：取出 relay URL，校验、保存并尝试注册。
      * 成功返回 URL，否则 null（对照旧 MainActivity.handleRelayConfigUri）。请在 IO 线程调用。
      */
     fun applyRelayConfigLink(context: Context, uri: String): String? {
+        if (PlatformServiceConfig.isManaged()) return null
         return try {
             val parsed = Uri.parse(uri)
             if (!"agentwallet".equals(parsed.scheme, ignoreCase = true)) return null
@@ -80,9 +88,11 @@ object SettingsRepository {
             val url = (parsed.getQueryParameter("url") ?: parsed.getQueryParameter("relay_url"))?.trim()
             if (url.isNullOrBlank() || !(url.startsWith("https://") || url.startsWith("http://"))) return null
             PaymentInboxStore.setRelayUrl(context, url)
-            try { RelayClient.register(context) } catch (e: Exception) {}
+            try { RelayClient.register(context) } catch (e: Exception) { VpLog.w("SettingsRepository", "relay register after config link failed", e) }
+            FirebaseBootstrap.registerCurrentToken(context)
             url
         } catch (e: Exception) {
+            VpLog.w("SettingsRepository", "apply relay config link failed", e)
             null
         }
     }
@@ -100,9 +110,9 @@ object SettingsRepository {
             .putString("displayed_keys", keys.joinToString(",")).apply()
     }
 
-    fun backupVerified(context: Context): Boolean = try { SecureWalletStore.isBackupVerified(context) } catch (e: Exception) { false }
+    fun backupVerified(context: Context): Boolean = try { SecureWalletStore.isBackupVerified(context) } catch (e: Exception) { VpLog.d("SettingsRepository", "backupVerified check failed; defaulting false: $e"); false }
 
-    fun notificationsEnabled(context: Context): Boolean = try { PaymentNotifications.hasNotificationPermission(context) } catch (e: Exception) { false }
+    fun notificationsEnabled(context: Context): Boolean = try { PaymentNotifications.hasNotificationPermission(context) } catch (e: Exception) { VpLog.d("SettingsRepository", "notificationsEnabled check failed; defaulting false: $e"); false }
 
     private fun JSONObject.toActivityUi(): ActivityUi {
         val status = optString("status", "")

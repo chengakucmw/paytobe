@@ -57,6 +57,9 @@ jobs:
         working-directory: crates/velarum-wallet-core
         run: cargo test
 
+      - name: License policy (Node manifests/locks + Rust graph)
+        run: npm run license:check
+
       - name: Cross-platform HD-derivation contract
         run: node --test tests/protocol/hd-derivation-contract.test.mjs
 
@@ -92,17 +95,19 @@ jobs:
 
       - name: Android unit tests and debug build
         working-directory: apps/android
-        run: ./gradlew testDebugUnitTest assembleDebug
+        run: ./gradlew testStandardDebugUnitTest assembleStandardDebug testStellarTestnetDebugUnitTest assembleStellarTestnetDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: VelarumPay-debug-apk
-          path: apps/android/app/build/outputs/apk/debug/*.apk
+          path: |
+            apps/android/app/build/outputs/apk/standard/debug/*.apk
+            apps/android/app/build/outputs/apk/stellarTestnet/debug/*.apk
           if-no-files-found: error
 
   ios:
-    name: iOS simulator build gate
+    name: iOS simulator build + unit tests
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -111,10 +116,23 @@ jobs:
       - name: Rust toolchain + iOS targets
         run: |
           rustup toolchain install stable --profile minimal
-          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
       - name: Build wallet-core (XCFramework + Swift bindings)
         run: crates/velarum-wallet-core/scripts/build-apple.sh
 
-      - name: iOS simulator build
-        run: xcodebuild -project apps/ios/VelarumPay.xcodeproj -scheme VelarumPay -configuration Debug -sdk iphonesimulator build
+      - name: Select an available iOS simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; print(next(x['udid'] for rt in d for x in d[rt] if x.get('isAvailable') and 'iPhone' in x['name']))")
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator $UDID"
+
+      - name: iOS unit tests (HD-derivation golden + wallet-core conformance)
+        run: |
+          xcodebuild test \
+            -project apps/ios/VelarumPay.xcodeproj \
+            -scheme VelarumPay \
+            -sdk iphonesimulator \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO

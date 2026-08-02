@@ -16,6 +16,7 @@ final class WalletNetworkStore {
 
     static List<WalletNetworkConfig> builtInEvmNetworks() {
         List<WalletNetworkConfig> networks = new ArrayList<>();
+        if (BuildConfig.TESTNET_ONLY) return networks;
         networks.add(new WalletNetworkConfig(
                 WalletNetworkConfig.FAMILY_EVM,
                 "Ethereum",
@@ -49,6 +50,98 @@ final class WalletNetworkStore {
                 WalletNetworkConfig.STATUS_VERIFIED,
                 0L
         ));
+        // The remaining EVM chains in TransferAssetRegistry share the generic EvmTransfer
+        // signer (secp256k1); they only lacked a built-in RPC, which is why they could not be
+        // sent before. Wiring verified public RPC endpoints here makes every direct_broadcast
+        // EVM chain genuinely send-ready (chain-id is what WalletNetworkConfig.matches keys on).
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Arbitrum One",
+                "https://arb1.arbitrum.io/rpc",
+                42161L,
+                "ETH",
+                "https://arbiscan.io",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Optimism",
+                "https://mainnet.optimism.io",
+                10L,
+                "ETH",
+                "https://optimistic.etherscan.io",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "BNB Smart Chain",
+                "https://bsc-dataseed.binance.org",
+                56L,
+                "BNB",
+                "https://bscscan.com",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Avalanche C-Chain",
+                "https://api.avax.network/ext/bc/C/rpc",
+                43114L,
+                "AVAX",
+                "https://snowtrace.io",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Cronos",
+                "https://evm.cronos.org",
+                25L,
+                "CRO",
+                "https://cronoscan.com",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Mantle",
+                "https://rpc.mantle.xyz",
+                5000L,
+                "MNT",
+                "https://explorer.mantle.xyz",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "ZKsync Era",
+                "https://mainnet.era.zksync.io",
+                324L,
+                "ETH",
+                "https://explorer.zksync.io",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
+        networks.add(new WalletNetworkConfig(
+                WalletNetworkConfig.FAMILY_EVM,
+                "Linea",
+                "https://rpc.linea.build",
+                59144L,
+                "ETH",
+                "https://lineascan.build",
+                WalletNetworkConfig.SOURCE_BUILT_IN,
+                WalletNetworkConfig.STATUS_VERIFIED,
+                0L
+        ));
         return networks;
     }
 
@@ -60,17 +153,22 @@ final class WalletNetworkStore {
                 out.add(WalletNetworkConfig.fromJson(array.getJSONObject(i)));
             }
         } catch (Exception ignored) {
+            VpLog.w("WalletNetworkStore", "read user networks failed; returning partial list", ignored);
         }
         return out;
     }
 
     static synchronized List<WalletNetworkConfig> all(Context context) {
+        if (BuildConfig.TESTNET_ONLY) return new ArrayList<>();
         List<WalletNetworkConfig> out = builtInEvmNetworks();
         out.addAll(userAdded(context));
         return out;
     }
 
     static synchronized void upsert(Context context, WalletNetworkConfig network) throws Exception {
+        if (BuildConfig.TESTNET_ONLY) {
+            throw new IllegalStateException("Custom EVM networks are disabled in the testnet build");
+        }
         List<WalletNetworkConfig> networks = userAdded(context);
         boolean replaced = false;
         for (int i = 0; i < networks.size(); i++) {

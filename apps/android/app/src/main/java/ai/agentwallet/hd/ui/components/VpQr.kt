@@ -1,5 +1,6 @@
 package ai.agentwallet.hd.ui.components
 
+import ai.agentwallet.hd.VpLog
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ private fun generateQr(content: String, size: Int): Bitmap? {
             it.setPixels(pixels, 0, width, 0, 0, width, height)
         }
     } catch (e: Exception) {
+        VpLog.w("VpQr", "QR encode failed; showing empty placeholder", e)
         null
     }
 }

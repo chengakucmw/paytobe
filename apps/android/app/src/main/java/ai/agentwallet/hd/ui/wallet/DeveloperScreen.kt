@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ai.agentwallet.hd.BuildConfig
 import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpPrimaryButton
 import ai.agentwallet.hd.ui.components.VpSubheader
@@ -42,10 +43,17 @@ fun DeveloperScreen(vm: DeveloperViewModel, onBack: () -> Unit, onPair: () -> Un
                 LabeledMono("Device ID", info?.deviceId ?: "—")
                 LabeledMono("Device token", info?.deviceToken ?: "—")
             }
-            VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Relay", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
-                VpTextField(value = relay, onValueChange = { relay = it }, label = "Relay URL")
-                VpPrimaryButton("Save relay URL", onClick = { vm.setRelay(relay) }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2))
+            if (BuildConfig.MANAGED_PLATFORM_SERVICE) {
+                VpCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Platform service", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Managed automatically for this testnet build. Connect Key does not require a Relay URL.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody)
+                }
+            } else {
+                VpCard(modifier = Modifier.fillMaxWidth()) {
+                    Text("Platform service", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
+                    VpTextField(value = relay, onValueChange = { relay = it }, label = "Platform API URL")
+                    VpPrimaryButton("Save Platform API URL", onClick = { vm.setRelay(relay) }, modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2))
+                }
             }
             VpPrimaryButton("Pair a local agent", onClick = onPair, modifier = Modifier.fillMaxWidth())
         }

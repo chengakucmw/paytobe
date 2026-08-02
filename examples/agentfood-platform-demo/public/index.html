@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="description" content="Browse food and plan an order with AgentFood while VelarumPay keeps payment approval in your wallet.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="AgentFood — browse, ask, review">
+    <meta property="og:description" content="Browse food beside a dedicated AI conversation, then review the payment request in VelarumPay.">
+    <meta property="og:image" content="__SITE_ORIGIN__/assets/agentfood-social-v2.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <title>AgentFood — browse, ask, review</title>
+    <link rel="stylesheet" href="/styles.css?v=colorgood-20260802">
+  </head>
+  <body>
+    <div class="announcement">REAL CONNECT KEY · MOCK MERCHANTS · STELLAR TESTNET · WALLET APPROVAL REQUIRED</div>
+
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="AgentFood home">
+        <span class="brand-mark" aria-hidden="true">AF</span>
+        <span class="brand-copy">
+          <strong>AgentFood</strong>
+          <small>Powered by VelarumPay</small>
+        </span>
+      </a>
+      <nav class="main-nav" aria-label="Primary navigation">
+        <a href="#discover">Discover</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#safety">Payment safety</a>
+      </nav>
+      <a class="google-signin" id="identity-button" href="/signin-with-chatgpt?return_to=%2F" aria-label="Continue with Google through ChatGPT identity">
+        <span class="google-mark" aria-hidden="true">G</span>
+        <span><strong id="identity-label">Continue with Google</strong><small id="identity-detail">Secure sign-in via ChatGPT</small></span>
+      </a>
+    </header>
+
+    <main class="product-workspace">
+      <section class="browse-pane" id="discover" aria-labelledby="browse-title">
+        <div class="browse-intro">
+          <div>
+            <p class="eyebrow">Tonight's edit · Taipei</p>
+            <h1 id="browse-title">Good food,<br>found in conversation.</h1>
+          </div>
+          <p class="intro-copy">Browse a focused menu while AgentFood stays beside you. Ask for a mood, a dietary need, or a budget—the Agent turns it into an order for wallet review.</p>
+        </div>
+
+        <div class="category-bar" aria-label="Food categories">
+          <button class="category-button active" type="button" data-filter="all">All dishes</button>
+          <button class="category-button" type="button" data-filter="vegetarian">Vegetarian</button>
+          <button class="category-button" type="button" data-filter="spicy">Spicy</button>
+          <button class="category-button" type="button" data-filter="noodles">Noodles</button>
+          <button class="category-button" type="button" data-filter="bento">Bento</button>
+        </div>
+
+        <section class="feature-story" aria-label="Featured menu">
+          <figure class="feature-image">
+            <img src="/assets/agentfood-dishes-v2.jpg" alt="A green vegetable bowl, chili noodles, and salmon bento arranged on a warm cream table">
+            <figcaption>Three kitchens · one conversation</figcaption>
+          </figure>
+          <div class="feature-copy">
+            <p>Agent pick 01</p>
+            <h2>Spicy, green,<br>or quietly comforting?</h2>
+            <span>Tell AgentFood what kind of evening you are having. It will compare dishes, respect your limit, and explain the cart before anything reaches your wallet.</span>
+            <button type="button" class="ask-feature" data-prompt="Find me a comforting dinner under 20 XLM and explain why you chose it">Ask for a dinner edit</button>
+          </div>
+        </section>
+
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Browse the cases</p>
+            <h2>Menus with context</h2>
+          </div>
+          <p id="result-count">3 restaurants</p>
+        </div>
+        <div class="merchant-grid" id="merchant-grid" aria-live="polite"></div>
+
+        <section class="how-grid" id="how-it-works" aria-label="How AgentFood works">
+          <article><span>01</span><h3>Browse freely</h3><p>Compare food, ingredients, delivery time, and representative testnet prices.</p></article>
+          <article><span>02</span><h3>Talk naturally</h3><p>Ask the Agent to optimize for taste, dietary needs, merchant, or budget.</p></article>
+          <article id="safety"><span>03</span><h3>Review in wallet</h3><p>AgentFood can request a payment. Only you can approve and sign in VelarumPay.</p></article>
+        </section>
+
+        <footer class="browse-footer">
+          <p>All merchants, food, pricing, recipients, and orders are representative demo data.</p>
+          <p>Original food image generated for AgentFood. No real transaction is broadcast.</p>
+        </footer>
+      </section>
+
+      <aside class="assistant-pane" aria-labelledby="agent-title">
+        <header class="assistant-header">
+          <div class="agent-identity">
+            <span class="agent-orb" aria-hidden="true">AI</span>
+            <div><p>Platform Agent</p><h2 id="agent-title">AgentFood AI</h2></div>
+          </div>
+          <span class="status-dot" id="connection-status">Not connected</span>
+        </header>
+
+        <div class="assistant-trust">
+          <span>No private keys</span>
+          <span>No Agent signing</span>
+          <span>User approval</span>
+        </div>
+
+        <div class="messages" id="messages" aria-live="polite" aria-label="Conversation with AgentFood">
+          <article class="message agent-message">
+            <span class="message-label">AgentFood</span>
+            <p>Hi. I can see the menus beside us. Connect the safe demo, then tell me what sounds good—spicy, vegetarian, high-protein, comforting, or simply under budget.</p>
+          </article>
+        </div>
+
+        <div class="quick-prompts" aria-label="Suggested prompts">
+          <button type="button" data-prompt="Find me a spicy vegetarian dinner under 20 XLM">Spicy + vegetarian</button>
+          <button type="button" data-prompt="I want a high-protein meal that arrives in under 30 minutes">High protein · fast</button>
+          <button type="button" data-prompt="Compare the noodle and bento options for me">Compare two menus</button>
+        </div>
+
+        <div class="connect-card" id="connect-card">
+          <div><strong>Connect your wallet</strong><span id="composer-hint">Connect Keys expire and work once.</span></div>
+          <button type="button" id="demo-connect-button">Connect VelarumPay</button>
+        </div>
+
+        <form class="composer" id="chat-form">
+          <label for="chat-input">Tell AgentFood what you need</label>
+          <textarea id="chat-input" rows="3" placeholder="Example: something spicy and vegetarian under 20 XLM" required></textarea>
+          <div class="composer-footer">
+            <span>Payment facts remain visible in VelarumPay.</span>
+            <button type="submit" aria-label="Send message">Send <span aria-hidden="true">↗</span></button>
+          </div>
+        </form>
+      </aside>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,86 @@
+[
+  {
+    "name": "cross-network",
+    "code": "unsupported_network",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "base_mainnet",
+      "asset": "XLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    }
+  },
+  {
+    "name": "wrong-contract",
+    "code": "invalid_contract",
+    "input": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "address": "0x1111111111111111111111111111111111111111",
+      "contract": "0x2222222222222222222222222222222222222222"
+    }
+  },
+  {
+    "name": "unexpected-issuer",
+    "code": "unexpected_issuer",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "XLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      "issuer": "GAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQDZ7H"
+    }
+  },
+  {
+    "name": "unicode-asset-confusable",
+    "code": "recipient_unicode_confusable",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "ＸLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    }
+  },
+  {
+    "name": "stellar-checksum",
+    "code": "invalid_recipient",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "XLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    }
+  },
+  {
+    "name": "oversized-stellar-memo",
+    "code": "recipient_memo_too_long",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "XLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      "memo": "12345678901234567890123456789"
+    }
+  },
+  {
+    "name": "forbidden-base-memo",
+    "code": "recipient_memo_forbidden",
+    "input": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "address": "0x1111111111111111111111111111111111111111",
+      "contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "memo": "not-supported"
+    }
+  },
+  {
+    "name": "unsupported-asset",
+    "code": "unsupported_asset",
+    "input": {
+      "network": "stellar_testnet",
+      "asset": "FAKE",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+    }
+  }
+]

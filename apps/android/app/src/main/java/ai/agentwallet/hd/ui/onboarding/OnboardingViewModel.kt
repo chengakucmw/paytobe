@@ -20,6 +20,8 @@ data class OnboardingUiState(
     val created: Boolean = false,
     val imported: Boolean = false,
     val backupConfirmed: Boolean = false,
+    /** 验证页点错后回到备份页时，用它在备份页上提示「刚才没对上」。 */
+    val verifyMismatch: Boolean = false,
 )
 
 /**
@@ -76,10 +78,24 @@ class OnboardingViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /**
+     * 仅在用户「按顺序点选」验证通过后调用：持久化「已备份」标记并触发进入主界面。
+     * 验证逻辑在 UI 层用纯函数 SeedVerification.isCorrect 完成，这里不改动任何业务/密钥逻辑。
+     */
     fun confirmBackup() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { runCatching { WalletRepository.confirmBackup(getApplication()) } }
-            _ui.update { it.copy(backupConfirmed = true) }
+            _ui.update { it.copy(backupConfirmed = true, verifyMismatch = false) }
         }
+    }
+
+    /** 验证点错：打个标记，让备份页提示用户重新核对后再试。 */
+    fun flagVerifyMismatch() {
+        _ui.update { it.copy(verifyMismatch = true) }
+    }
+
+    /** 重新进入验证页前清除上一次的「没对上」提示。 */
+    fun clearVerifyMismatch() {
+        if (_ui.value.verifyMismatch) _ui.update { it.copy(verifyMismatch = false) }
     }
 }

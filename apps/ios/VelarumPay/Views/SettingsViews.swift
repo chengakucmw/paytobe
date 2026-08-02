@@ -81,6 +81,12 @@ struct SettingsView: View {
                     }
                 }
                 Section("Agent Pairing") {
+                    Button {
+                        app.createConnectInvitation()
+                    } label: {
+                        Label(app.isCreatingConnectKey ? "Creating Connect Key…" : "Create one-time Connect Key", systemImage: "link.badge.plus")
+                    }
+                    .disabled(app.isCreatingConnectKey)
                     TextField("Pairing short code or velarumpay://pair URI", text: $app.pairingInput)
                         .relayURLInputStyle()
                     Button {
@@ -411,4 +417,3 @@ struct AddNetworkSheet: View {
         return id > 0 ? " / Chain ID \(id)" : ""
     }
 }
-

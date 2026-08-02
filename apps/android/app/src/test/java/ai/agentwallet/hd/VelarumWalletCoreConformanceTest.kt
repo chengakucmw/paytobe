@@ -3,14 +3,11 @@ package ai.agentwallet.hd
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
-import uniffi.velarum_wallet_core.FfiWalletException
-import uniffi.velarum_wallet_core.stellarDerive
-import uniffi.velarum_wallet_core.stellarSignPayment
 
 /**
  * Conformance test for the SHARED Rust wallet core (crates/velarum-wallet-core),
- * reached from Android through the generated UniFFI Kotlin bindings + the host
- * shared library (loaded by JNA; see build.gradle test wiring).
+ * reached from Android through the stable C ABI + the host shared library
+ * (loaded by JNA; see build.gradle test wiring).
  *
  * Proves on the real Android/Kotlin toolchain that:
  *  1. Android builds against and calls the shared core, and
@@ -28,7 +25,7 @@ class VelarumWalletCoreConformanceTest {
 
     @Test
     fun coreDerivesGoldenStellarAddress() {
-        val keys = stellarDerive(goldenMnemonic, "", 0u)
+        val keys = WalletCoreBridge.deriveStellar(goldenMnemonic, 0)
         assertEquals(
             "Shared Rust core derived a different Stellar address on Android — cross-platform drift",
             goldenAddress,
@@ -41,18 +38,18 @@ class VelarumWalletCoreConformanceTest {
 
     @Test
     fun coreSignsDeterministically() {
-        val keys = stellarDerive(goldenMnemonic, "", 0u)
-        val a = stellarSignPayment(keys.secretSeed, testnetPassphrase, 7L, keys.address, "1.5", "", "", false)
-        val b = stellarSignPayment(keys.secretSeed, testnetPassphrase, 7L, keys.address, "1.5", "", "", false)
+        val keys = WalletCoreBridge.deriveStellar(goldenMnemonic, 0)
+        val a = WalletCoreBridge.signStellar(keys.secretSeed, testnetPassphrase, 7L, keys.address, "1.5", "", "", false)
+        val b = WalletCoreBridge.signStellar(keys.secretSeed, testnetPassphrase, 7L, keys.address, "1.5", "", "", false)
         assertEquals(a.envelopeBase64, b.envelopeBase64)
         assertEquals(64, a.txHashHex.length)
     }
 
     @Test
     fun coreRejectsMuxedDestination() {
-        val keys = stellarDerive(goldenMnemonic, "", 0u)
-        assertThrows(FfiWalletException::class.java) {
-            stellarSignPayment(
+        val keys = WalletCoreBridge.deriveStellar(goldenMnemonic, 0)
+        assertThrows(WalletCoreException::class.java) {
+            WalletCoreBridge.signStellar(
                 keys.secretSeed,
                 testnetPassphrase,
                 1L,
@@ -69,7 +66,7 @@ class VelarumWalletCoreConformanceTest {
      *  transaction (same hash) as the native bouncycastle path. */
     @Test
     fun coreSigningMatchesNativeTransaction() {
-        val keys = stellarDerive(goldenMnemonic, "", 0u)
+        val keys = WalletCoreBridge.deriveStellar(goldenMnemonic, 0)
         // (amountXlm, memo, createAccount)
         val cases = listOf(
             Triple("1.5", "", false),
@@ -79,10 +76,10 @@ class VelarumWalletCoreConformanceTest {
         for ((amount, memo, create) in cases) {
             StellarTransfer.USE_SHARED_CORE_SIGNING = false
             val native = StellarTransfer.buildSignedEnvelope(
-                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, true)
+                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, "", true)
             StellarTransfer.USE_SHARED_CORE_SIGNING = true
             val core = StellarTransfer.buildSignedEnvelope(
-                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, true)
+                keys.secretSeed, keys.publicKey, 42L, keys.address, amount, create, memo, "", true)
             assertEquals("tx hash differs for $amount/$memo/$create", native.txHash, core.txHash)
             assertEquals(native.envelope64.substring(0, 120), core.envelope64.substring(0, 120))
         }
@@ -93,8 +90,8 @@ class VelarumWalletCoreConformanceTest {
     @Test
     fun coreEvmAndSolanaMatchNativeHdWallet() {
         val wallet = HDWallet.restore(goldenMnemonic)
-        val coreEvm = uniffi.velarum_wallet_core.evmDerive(goldenMnemonic, "")
-        val coreSol = uniffi.velarum_wallet_core.solanaDerive(goldenMnemonic, "")
+        val coreEvm = WalletCoreBridge.deriveEvm(goldenMnemonic)
+        val coreSol = WalletCoreBridge.deriveSolana(goldenMnemonic)
         assertEquals(wallet.evm.address, coreEvm.address)
         assertEquals(wallet.solana.address, coreSol.address)
     }
@@ -102,7 +99,7 @@ class VelarumWalletCoreConformanceTest {
     /** Core EVM signing must byte-match web3j (Android's native EVM signer). */
     @Test
     fun coreEvmSigningMatchesWeb3j() {
-        val evm = uniffi.velarum_wallet_core.evmDerive(goldenMnemonic, "")
+        val evm = WalletCoreBridge.deriveEvm(goldenMnemonic)
         val to = "0x000000000000000000000000000000000000dEaD"
         val credentials = org.web3j.crypto.Credentials.create(Hex.bytesToHex(evm.privateKey))
         val tx = org.web3j.crypto.RawTransaction.createEtherTransaction(
@@ -118,7 +115,7 @@ class VelarumWalletCoreConformanceTest {
     /** Core Solana signing must byte-match Android's native SolanaTransfer. */
     @Test
     fun coreSolanaSigningMatchesNative() {
-        val sol = uniffi.velarum_wallet_core.solanaDerive(goldenMnemonic, "")
+        val sol = WalletCoreBridge.deriveSolana(goldenMnemonic)
         val toAddr = "11111111111111111111111111111112"
         val blockhash = "11111111111111111111111111111111"
         val lamports = 1_000_000_000L
@@ -127,5 +124,55 @@ class VelarumWalletCoreConformanceTest {
         val nativeB64 = SolanaTransfer.encodeSignedTx(sol.secretSeed, nativeMessage)
         val core = WalletCoreBridge.signSolana(sol.secretSeed, toAddr, lamports, blockhash)
         assertEquals(nativeB64, core.transactionBase64)
+    }
+
+    /** Core ERC-20 (legacy EVM tx, value 0 + transfer() call data) must byte-match
+     *  web3j — the same path Android's EvmTransfer.sendErc20 now routes through. */
+    @Test
+    fun coreErc20SigningMatchesWeb3j() {
+        val evm = WalletCoreBridge.deriveEvm(goldenMnemonic)
+        val credentials = org.web3j.crypto.Credentials.create(Hex.bytesToHex(evm.privateKey))
+        val contract = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+        // transfer(0x..dEaD, 1_000_000)
+        val data = "0xa9059cbb" +
+            "000000000000000000000000000000000000000000000000000000000000dead" +
+            "00000000000000000000000000000000000000000000000000000000000f4240"
+        val nonce = java.math.BigInteger.valueOf(3)
+        val gasPrice = java.math.BigInteger("25000000000")
+        val gasLimit = java.math.BigInteger.valueOf(60000)
+        val tx = org.web3j.crypto.RawTransaction.createTransaction(
+            nonce, gasPrice, gasLimit, contract, java.math.BigInteger.ZERO, data)
+        val web3jRaw = org.web3j.utils.Numeric.toHexString(
+            org.web3j.crypto.TransactionEncoder.signMessage(tx, 1L, credentials))
+        val core = WalletCoreBridge.signEvm(
+            evm.privateKey, 1L, nonce.toLong(), gasPrice.toString(), gasLimit.toLong(),
+            contract, "0", data)
+        assertEquals(web3jRaw, core.rawTxHex)
+    }
+
+    /** Core SPL transferChecked (both the plain and create-ATA variants) must byte-match
+     *  Android's native SolanaTransfer — the path sendSplToken now routes through. The
+     *  associated token accounts are derived natively and passed into the core. */
+    @Test
+    fun coreSplTransferMatchesNative() {
+        val sol = WalletCoreBridge.deriveSolana(goldenMnemonic)
+        val owner = sol.publicKey
+        val mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        val recipientWallet = "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"
+        val blockhash = "11111111111111111111111111111111"
+        val amountUnits = java.math.BigInteger.valueOf(1_500_000L)
+        val decimals = 6
+        for (create in listOf(false, true)) {
+            val sourceAta = SolanaTransfer.associatedTokenAddress(owner, Base58.decode(mint))
+            val destAta = SolanaTransfer.associatedTokenAddress(Base58.decode(recipientWallet), Base58.decode(mint))
+            val nativeMsg = SolanaTransfer.buildSplMessage(
+                owner, sourceAta, destAta, Base58.decode(recipientWallet), Base58.decode(mint),
+                Base58.decode(blockhash), amountUnits, decimals, create)
+            val nativeB64 = SolanaTransfer.encodeSignedTx(sol.secretSeed, nativeMsg)
+            val core = WalletCoreBridge.signSplToken(
+                sol.secretSeed, Base58.encode(sourceAta), Base58.encode(destAta),
+                mint, recipientWallet, amountUnits.toString(), decimals, blockhash, create)
+            assertEquals("SPL tx differs for create=$create", nativeB64, core.transactionBase64)
+        }
     }
 }

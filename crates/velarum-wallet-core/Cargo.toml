@@ -2,13 +2,13 @@
 name = "velarum-wallet-core"
 version = "0.1.0"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "VelarumPay cross-platform wallet core: HD key derivation and signing shared by the Android and iOS apps (Phase 1: Stellar)."
 publish = false
 
 [lib]
 name = "velarum_wallet_core"
-# "lib" keeps the rlib for `cargo test` and the bindgen bin; "cdylib" is the
+# "lib" keeps the rlib for `cargo test`; "cdylib" is the
 # shared library the apps load (.so on Android, linked into the iOS framework);
 # "staticlib" supports static linking on iOS.
 crate-type = ["lib", "cdylib", "staticlib"]
@@ -23,21 +23,8 @@ sha2 = "0.10"
 stellar-strkey = "0.0.18" # Strkey encode/decode (G.../S..., muxed M... detection)
 stellar-xdr = { version = "27", features = ["base64"] }  # canonical Stellar XDR (tx envelope build/parse)
 base64 = "0.22"          # MEMO_HASH / MEMO_RETURN base64 decoding (C-1)
-uniffi = "0.31"          # generates the Kotlin (Android) + Swift (iOS) bindings
 bip32 = { version = "0.5", default-features = false, features = ["secp256k1", "std"] }  # EVM BIP32 secp256k1
 k256 = "0.13"            # secp256k1 public key -> Ethereum address
 sha3 = "0.10"            # Keccak-256 (Ethereum address + EIP-55 checksum)
 bs58 = "0.5"             # Solana base58 address
-
-[dev-dependencies]
-serde_json = "1"         # read the shared golden-vector fixture in integration tests
-
-# The `cli` feature is only enabled when building the binding generator, so the
-# shipped cdylib does not pull in clap and other CLI-only dependencies.
-[features]
-cli = ["uniffi/cli"]
-
-[[bin]]
-name = "uniffi-bindgen"
-path = "src/bin/uniffi-bindgen.rs"
-required-features = ["cli"]
+serde_json = "1"         # versioned C ABI request/response envelope

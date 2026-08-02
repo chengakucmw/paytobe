@@ -1,0 +1,26 @@
+{
+  "vector": "velarumpay.agent_assertion.mock.v1",
+  "purpose": "Deterministic SDK serialization test only",
+  "accepted_by_live_api": false,
+  "contains_private_key": false,
+  "protected_header": {
+    "alg": "EdDSA",
+    "kid": "credential_test_0001",
+    "typ": "JWT"
+  },
+  "claims": {
+    "iss": "agent_test_0001",
+    "sub": "client_test_0001",
+    "aud": "https://api-testnet.velarumpay.com/v1/agent-auth/token",
+    "iat": 1754042400,
+    "exp": 1754042700,
+    "jti": "jti_test_0001",
+    "scope": [
+      "payment.requests.create",
+      "payment.requests.read"
+    ]
+  },
+  "signing_input": "eyJhbGciOiJFZERTQSIsImtpZCI6ImNyZWRlbnRpYWxfdGVzdF8wMDAxIiwidHlwIjoiSldUIn0.eyJpc3MiOiJhZ2VudF90ZXN0XzAwMDEiLCJzdWIiOiJjbGllbnRfdGVzdF8wMDAxIiwiYXVkIjoiaHR0cHM6Ly9hcGktdGVzdG5ldC52ZWxhcnVtcGF5LmNvbS92MS9hZ2VudC1hdXRoL3Rva2VuIiwiaWF0IjoxNzU0MDQyNDAwLCJleHAiOjE3NTQwNDI3MDAsImp0aSI6Imp0aV90ZXN0XzAwMDEiLCJzY29wZSI6WyJwYXltZW50LnJlcXVlc3RzLmNyZWF0ZSIsInBheW1lbnQucmVxdWVzdHMucmVhZCJdfQ",
+  "mock_signature": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "note": "The mock signature is deliberately invalid. A secure local signer must sign signing_input; never copy a private key into an SDK option, fixture, log, or request."
+}

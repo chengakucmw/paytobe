@@ -35,6 +35,12 @@ final class SolanaTransfer {
      *  (byte-identical to the native path, verified by a cross-check). Set false to revert. */
     static boolean USE_SHARED_CORE_SIGNING = true;
 
+    /** When true (default), SPL token transfers are signed by the shared Rust core.
+     *  The associated token accounts are still derived natively (the existing, tested
+     *  PDA code) and passed in; the core does the deterministic message-build + sign,
+     *  byte-identical to the native path (verified by a cross-check). Set false to revert. */
+    static boolean USE_SHARED_CORE_SPL = true;
+
     private SolanaTransfer() {}
 
     static String sendSol(String rpcUrl, byte[] privateSeed, byte[] fromPub, String toAddress, String amountSol) throws Exception {
@@ -70,18 +76,28 @@ final class SolanaTransfer {
             throw new IllegalStateException("Recipient associated token account does not exist");
         }
         String blockhash = getLatestBlockhash(rpcUrl);
-        byte[] message = buildSplMessage(
-                ownerPub,
-                sourceAta,
-                destinationAta,
-                recipientWallet,
-                mint,
-                Base58.decode(blockhash),
-                tokenUnitsU64(amount, decimals),
-                decimals,
-                !destinationExists && createRecipientAta
-        );
-        return signAndSend(rpcUrl, privateSeed, message);
+        boolean createAta = !destinationExists && createRecipientAta;
+        java.math.BigInteger amountUnits = tokenUnitsU64(amount, decimals);
+        String encoded;
+        if (USE_SHARED_CORE_SPL) {
+            encoded = WalletCoreBridge.signSplToken(
+                    privateSeed,
+                    Base58.encode(sourceAta),
+                    Base58.encode(destinationAta),
+                    mintAddress,
+                    recipientWalletAddress,
+                    amountUnits.toString(),
+                    decimals,
+                    blockhash,
+                    createAta
+            ).transactionBase64;
+        } else {
+            byte[] message = buildSplMessage(
+                    ownerPub, sourceAta, destinationAta, recipientWallet, mint,
+                    Base58.decode(blockhash), amountUnits, decimals, createAta);
+            encoded = encodeSignedTx(privateSeed, message);
+        }
+        return broadcastSolana(rpcUrl, encoded);
     }
 
     static String associatedTokenAddressText(String ownerAddress, String mintAddress) throws Exception {
@@ -134,6 +150,38 @@ final class SolanaTransfer {
         return res.getJSONObject("result").getJSONObject("value").getString("blockhash");
     }
 
+    /**
+     * Read-only live fee estimate (no signing, no broadcast): builds the same transfer message
+     * the send path would, then asks the RPC {@code getFeeForMessage}. Falls back to the base
+     * signature fee (5000 lamports) on any error or when the node can't price the message.
+     */
+    static long estimateFeeLamports(String rpcUrl, String fromAddress, String toAddress, String amountSol) {
+        final long BASE_FEE = 5000L;
+        try {
+            byte[] fromPub = Base58.decode(fromAddress.trim());
+            byte[] toPub = Base58.decode(toAddress.trim());
+            if (fromPub.length != 32 || toPub.length != 32) return BASE_FEE;
+            String blockhash = getLatestBlockhash(rpcUrl);
+            long lamports;
+            try { lamports = solToLamports(amountSol); } catch (Exception ignored) { lamports = 0L; }
+            byte[] message = buildMessage(fromPub, toPub, Base58.decode(blockhash), lamports);
+            String messageB64 = Base64.getEncoder().encodeToString(message);
+            JSONObject req = rpc("getFeeForMessage")
+                    .put("params", new org.json.JSONArray()
+                            .put(messageB64)
+                            .put(new JSONObject().put("commitment", "processed")));
+            JSONObject res = post(rpcUrl, req);
+            if (res.has("error")) return BASE_FEE;
+            JSONObject result = res.optJSONObject("result");
+            if (result == null || result.isNull("value")) return BASE_FEE;
+            long value = result.optLong("value", BASE_FEE);
+            return value <= 0L ? BASE_FEE : value;
+        } catch (Exception ignored) {
+            VpLog.w("SolanaTransfer", "fee estimate failed; using base 5000 lamports", ignored);
+            return BASE_FEE;
+        }
+    }
+
     private static JSONObject rpc(String method) throws Exception {
         return new JSONObject()
                 .put("jsonrpc", "2.0")
@@ -175,7 +223,7 @@ final class SolanaTransfer {
         return out.toByteArray();
     }
 
-    private static byte[] buildSplMessage(
+    static byte[] buildSplMessage(
             byte[] owner,
             byte[] sourceAta,
             byte[] destinationAta,
@@ -228,16 +276,13 @@ final class SolanaTransfer {
     }
 
     private static long solToLamports(String sol) {
-        BigDecimal value = new BigDecimal(sol).multiply(new BigDecimal("1000000000"));
-        return value.toBigIntegerExact().longValueExact();
+        // Delegates to shared AmountUnits (D9/Q4): now validated with friendly messages
+        // instead of leaking raw NumberFormatException / ArithmeticException to the user.
+        return AmountUnits.solToLamports(sol);
     }
 
-    private static BigInteger tokenUnitsU64(String amount, int decimals) {
-        if (decimals < 0 || decimals > 255) throw new IllegalArgumentException("SPL token decimals must be between 0 and 255");
-        BigInteger units = new BigDecimal(amount.trim()).movePointRight(decimals).toBigIntegerExact();
-        if (units.signum() <= 0) throw new IllegalArgumentException("Token amount must be greater than zero");
-        if (units.compareTo(MAX_U64) > 0) throw new IllegalArgumentException("SPL token amount exceeds u64");
-        return units;
+    static BigInteger tokenUnitsU64(String amount, int decimals) {
+        return AmountUnits.tokenUnitsU64(amount, decimals);
     }
 
     private static byte[] transferCheckedData(BigInteger amountUnits, int decimals) {
@@ -267,7 +312,7 @@ final class SolanaTransfer {
         out.write(data, 0, data.length);
     }
 
-    private static byte[] associatedTokenAddress(byte[] owner, byte[] mint) throws Exception {
+    static byte[] associatedTokenAddress(byte[] owner, byte[] mint) throws Exception {
         return findProgramAddress(new byte[][]{owner, TOKEN_PROGRAM, mint}, ASSOCIATED_TOKEN_PROGRAM);
     }
 

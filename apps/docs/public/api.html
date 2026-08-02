@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>REST API · VelarumPay Docs</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
+  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumpay.com/preview">View program boundaries</a></div>
   <header class="topbar">
     <div class="inner">
       <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
@@ -14,8 +15,11 @@
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
         <a href="/api.html">REST API</a>
+        <a href="/agent-auth.html">Agent Auth</a>
+        <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
+        <a href="https://velarumpay.com/business">Business</a>
       </nav>
     </div>
   </header>
@@ -23,15 +27,20 @@
   <main>
     <span class="pill">REST API v1</span>
     <h1>REST API reference</h1>
-    <p class="lead">Base URL is your Platform API host, e.g. <code>http://127.0.0.1:8787</code> locally or <code>https://api.your-domain.com</code> in production. All paths below are prefixed with <code>/v1</code>.</p>
+    <p class="lead">The official testnet origin is <code>https://api-testnet.velarumpay.com</code>; local contract tests may use <code>http://127.0.0.1:8787</code>. All API paths below are prefixed with <code>/v1</code>.</p>
+    <div class="note">Download the canonical <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1 document</a>. Legacy <code>/v1/payment-intents</code> and OpenClaw-specific routes are migration-only and are not part of this public contract.</div>
 
     <h2>Authentication</h2>
-    <p>There are two credentials, used by two different callers:</p>
+    <p>Credentials are separated by caller and purpose:</p>
     <table>
       <tr><th>Caller</th><th>Credential</th><th>How to send</th></tr>
-      <tr><td>Agent (after pairing)</td><td>Connection token</td><td><code>Authorization: Bearer conn_tok_...</code> &nbsp;(or <code>X-Connection-Token</code> header, or <code>connection_token</code> in body)</td></tr>
+      <tr><td>Merchant operator</td><td>HttpOnly merchant session + CSRF proof</td><td>Same-origin cookie; <code>X-CSRF-Token</code> on mutations.</td></tr>
+      <tr><td>Registered Agent</td><td>Short Agent token</td><td><code>Authorization: Bearer &lt;agent-token&gt;</code>; currently used for authenticated Connect claim.</td></tr>
+      <tr><td>Connected Agent</td><td>Connection token</td><td><code>Authorization: Bearer &lt;connection-token&gt;</code> for scoped context and Payment Request calls.</td></tr>
+      <tr><td>Connect claimant</td><td>Short claim token</td><td>Bearer token only on invitation detail and exchange.</td></tr>
       <tr><td>Wallet app</td><td>App device token</td><td><code>device_id</code> + <code>token</code> in the body (or query for GET)</td></tr>
     </table>
+    <p>Never place <code>merchant_id</code>, <code>tenant_id</code>, or self-declared Agent identity in a request to obtain authorization. The API derives tenant and actor identity from the verified credential.</p>
     <div class="note">Idempotency: send <code>X-Idempotency-Key</code> (or <code>idempotency_key</code> in the body) when creating payment requests so retries never double-charge.</div>
 
     <h2>Pairing &amp; connections</h2>
@@ -45,6 +54,29 @@
       <tr><td>PATCH</td><td><code>/v1/connections/:id</code></td><td>Wallet</td><td>Pause or re-activate a connection.</td></tr>
       <tr><td>DELETE</td><td><code>/v1/connections/:id</code></td><td>Wallet</td><td>Revoke a connection.</td></tr>
       <tr><td>POST</td><td><code>/v1/connections/:id/rotate-token</code></td><td>Wallet</td><td>Rotate the connection token.</td></tr>
+    </table>
+
+    <h2>Merchant control plane</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
+      <tr><td>POST</td><td><code>/v1/merchant-accounts/registrations</code></td><td>Start enumeration-safe email registration.</td></tr>
+      <tr><td>POST</td><td><code>/v1/merchants</code></td><td>Consume the email-verification session grant and create an organization.</td></tr>
+      <tr><td>POST</td><td><code>/v1/merchant-sessions</code></td><td>Consume the next one-time grant and issue an HttpOnly session plus CSRF proof.</td></tr>
+      <tr><td>POST</td><td><code>/v1/merchant-domains</code></td><td>Register an exact DNS/HTTPS verification challenge.</td></tr>
+      <tr><td>POST</td><td><code>/v1/recipients</code></td><td>Create a versioned Recipient; verify and activate before payments.</td></tr>
+      <tr><td>POST</td><td><code>/v1/agents</code></td><td>Register an Agent and its allowed scopes.</td></tr>
+      <tr><td>POST</td><td><code>/v1/agents/{agentId}/credentials</code></td><td>Register an Ed25519 public credential; activate it with the returned proof challenge.</td></tr>
+      <tr><td>POST</td><td><code>/v1/webhook-endpoints</code></td><td>Create a signed Webhook endpoint; generated secret is shown once.</td></tr>
+      <tr><td>GET</td><td><code>/v1/webhook-deliveries</code></td><td>Inspect tenant-scoped delivery attempts without response bodies or secrets.</td></tr>
+    </table>
+
+    <h2>Agent Auth and Connect</h2>
+    <table>
+      <tr><th>Method</th><th>Path</th><th>Credential</th></tr>
+      <tr><td>POST</td><td><code>/v1/agent-auth/token</code></td><td>Locally signed Agent Assertion.</td></tr>
+      <tr><td>POST</td><td><code>/v1/connect-invitations/claim</code></td><td>Short Agent token.</td></tr>
+      <tr><td>GET</td><td><code>/v1/connect-invitations/{id}</code></td><td>Connect claim token or authenticated wallet.</td></tr>
+      <tr><td>POST</td><td><code>/v1/connect-invitations/{id}/exchange</code></td><td>Connect claim token after wallet approval.</td></tr>
     </table>
 
     <h2>Payments &amp; context</h2>
@@ -66,29 +98,22 @@
     </table>
 
     <h2>Example: create a payment request</h2>
-    <pre><code>curl -X POST https://api.your-domain.com/v1/payment-requests \
-  -H "Authorization: Bearer conn_tok_..." \
+    <pre><code>curl -X POST https://api-testnet.velarumpay.com/v1/payment-requests \
+  -H "Authorization: Bearer $VELARUMPAY_CONNECTION_TOKEN" \
   -H "X-Idempotency-Key: demo-payment-1" \
   -H "Content-Type: application/json" \
   -d '{
-    "protocol": "velarum.payment_request.v1",
-    "transaction_id": "txn_demo_1",
+    "recipient_id": "recipient_test_0001",
+    "recipient_version_id": "recipient_version_test_0001",
     "payment": {
-      "rail": "base_usdc",
-      "network": "base_mainnet",
-      "asset": "USDC",
-      "amount": "42.00",
-      "to": "0x71d83a5924b0e6d3c8a9f102bb48e4c912a556d0",
-      "token_contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-      "chain_id": 8453,
-      "decimals": 6
+      "amount": "1.00"
     },
-    "payee": { "name": "VelarumPay Developer Test", "verified": false },
     "policy": { "requires_user_approval": true }
   }'</code></pre>
+    <div class="note">Recipient network, asset, address, memo, contract, and issuer are server-derived from the active verified Recipient version. The response remains pending until the wallet user approves and signs locally.</div>
 
     <h2>Errors</h2>
-    <p>Failures return <code>ok: false</code> with a structured <code>error</code> object (<code>code</code>, a human message, and a <code>field</code> when relevant). Risk and validation problems list every issue so you can fix them in one pass.</p>
+    <p>Failures return <code>ok: false</code> with a structured <code>error</code> object (<code>code</code>, a human message, <code>request_id</code>, and <code>field</code> when relevant). Risk and validation problems list every issue so you can fix them in one pass. A retry must retain the same idempotency key and request intent.</p>
   </main>
 
   <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>

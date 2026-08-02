@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VelarumPay Preview — Current program boundaries</title>
+  <meta name="description" content="See what the VelarumPay Developer Preview is for, what remains gated, and how personal and business evaluators can participate." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="VelarumPay Developer Preview" />
+  <meta property="og:description" content="Evaluation, sandbox integration, and selected pilots—not open live merchant onboarding." />
+  <meta property="og:image" content="__SITE_ORIGIN__/og.png" />
+  <meta property="og:url" content="__SITE_ORIGIN__/preview" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#2727E6" />
+  <link rel="canonical" href="https://velarumpay.com/preview" />
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802" />
+  <script src="/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="preview-bar">Developer Preview · Test and pilot use only</div>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="/" aria-label="VelarumPay home"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a>
+    <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-navigation" data-menu-button></button>
+    <nav class="site-nav" id="site-navigation" aria-label="Primary navigation" data-site-nav><a href="/personal">Personal</a><a href="/business">Business</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://docs.velarumpay.com">Developers</a><a class="button compact" href="/business#pilot">Request a pilot</a></nav>
+  </div></header>
+
+  <main id="main">
+    <section class="shell page-hero">
+      <span class="eyebrow">Developer Preview</span>
+      <h1>Evaluate the control model before live availability.</h1>
+      <p class="lead">This program introduces the wallet experience, public contracts, integration paths, and selected pilot workflows while production release evidence remains gated.</p>
+    </section>
+
+    <section class="shell section compact">
+      <div class="status-panel">
+        <div class="status-summary"><span class="eyebrow">Program status</span><h2>Preview and pilot.</h2><p>This is not a general-availability or live-merchant launch.</p></div>
+        <div class="status-detail">
+          <div class="status-item"><div><strong>Product and safety education</strong><small>Public information for people, businesses, and developers.</small></div></div>
+          <div class="status-item"><div><strong>Published developer contracts</strong><small>OpenAPI, JSON Schema, Quickstart, protocol, and MCP guidance.</small></div></div>
+          <div class="status-item"><div><strong>Selected evaluation and pilot access</strong><small>Start with sandbox, test data, and explicit capability labels.</small></div></div>
+          <div class="status-item pending"><div><strong>General live onboarding</strong><small>Not open. Production support remains subject to release, legal, security, and operational gates.</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="section-header"><div><span class="eyebrow">What to evaluate</span><h2>Focus on behavior and boundaries.</h2></div><p>The Preview is most useful when participants test how a request moves across systems and how the user remains in control.</p></div>
+      <div class="grid-3">
+        <article class="card"><h3>Wallet review</h3><p>Understand connections, scopes, facts, context, risk presentation, rejection, approval, and local signing.</p></article>
+        <article class="card"><h3>Integration contracts</h3><p>Validate pairing, Payment Request creation, exact amount handling, expiry, idempotency, status, and events.</p></article>
+        <article class="card"><h3>Operational clarity</h3><p>Identify failures, unsupported capabilities, user support needs, and evidence required before a live decision.</p></article>
+      </div>
+    </section>
+
+    <section class="section surface-band">
+      <div class="shell">
+        <div class="section-header"><div><span class="eyebrow">What not to assume</span><h2>Preview access is deliberately narrow.</h2></div><p>Examples demonstrate contracts and behavior. They do not expand the supported product surface.</p></div>
+        <div class="grid-2">
+          <article class="card dark"><h3>No blanket network or asset support</h3><p>Only use combinations explicitly enabled and labeled in the exact wallet build being evaluated.</p></article>
+          <article class="card dark"><h3>No production compliance conclusion</h3><p>A non-custodial design is a product boundary, not a substitute for jurisdiction-specific legal review.</p></article>
+          <article class="card dark"><h3>No recovery by the server</h3><p>Loss of recovery material can mean loss of access. Cloud recovery is outside the current v1 boundary.</p></article>
+          <article class="card dark"><h3>No merchant or agent signing authority</h3><p>Pairing and connection tokens do not grant access to private keys or permission to sign for the user.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="section-header"><div><span class="eyebrow">Choose a Preview path</span><h2>Different participants, one control model.</h2></div></div>
+      <div class="grid-3">
+        <article class="card audience-card"><span class="pill">Personal</span><h3>Learn the wallet experience.</h3><p>Understand how requests are reviewed, approved, signed, and revoked before using any enabled test path.</p><a class="card-link" href="/personal">Personal Preview →</a></article>
+        <article class="card audience-card"><span class="pill">Business</span><h3>Propose a selected pilot.</h3><p>Describe your use case and integration method without sending secrets or production user data.</p><a class="card-link" href="/business#pilot">Request a pilot →</a></article>
+        <article class="card audience-card"><span class="pill">Developer</span><h3>Inspect the contracts.</h3><p>Review the Quickstart, Platform API, protocol schemas, and MCP connector on the developer subdomain.</p><a class="card-link" href="https://docs.velarumpay.com">Open developer docs →</a></article>
+      </div>
+    </section>
+
+    <section class="shell section compact"><div class="cta-band"><div><h2>Preview carefully. Expand only with evidence.</h2><p>Start with the smallest safe test that proves your intended request and approval flow.</p></div><div class="actions"><a class="button" href="/business#pilot">Request a pilot</a><a class="button secondary" href="/support">Preview support</a></div></div></section>
+  </main>
+
+  <footer class="site-footer"><div class="footer-inner">
+    <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a><p>Non-custodial payment requests for people, trusted applications, merchants, and local AI agents.</p></div>
+    <div class="footer-column"><strong>Use VelarumPay</strong><a href="/personal">Personal</a><a href="/preview">Preview</a><a href="/support">Support</a></div>
+    <div class="footer-column"><strong>Build</strong><a href="/business">Business</a><a href="https://docs.velarumpay.com">Developer docs</a><a href="/business#pilot">Request a pilot</a></div>
+    <div class="footer-column"><strong>Trust</strong><a href="/security">Security</a><a href="/support#availability">Availability</a><a href="/support#legal">Legal status</a></div>
+    <div class="footer-bottom"><span>© 2026 VelarumPay. Brand identifiers are separately protected.</span><span>Developer Preview · Test and pilot use only</span></div>
+  </div></footer>
+</body>
+</html>

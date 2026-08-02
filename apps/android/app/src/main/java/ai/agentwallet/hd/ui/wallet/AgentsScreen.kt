@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
@@ -22,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ai.agentwallet.hd.ui.components.VpBadge
 import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpOutlineButton
+import ai.agentwallet.hd.ui.components.VpPrimaryButton
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
@@ -29,16 +33,26 @@ import ai.agentwallet.hd.ui.theme.VelarumTheme
 
 /** 已连接代理列表（原生）。对照 web 的 renderAgents。 */
 @Composable
-fun AgentsScreen(vm: AgentsViewModel, onBack: () -> Unit, onOpen: (String) -> Unit) {
+fun AgentsScreen(vm: AgentsViewModel, onBack: () -> Unit, onOpen: (String) -> Unit, onCreateConnectKey: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        VpSubheader(eyebrow = "Agents", title = "Connected agents", onBack = onBack)
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-        ) {
-            if (ui.agents.isEmpty()) {
-                VpCard(modifier = Modifier.fillMaxWidth()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        item {
+            VpSubheader(eyebrow = "Agents", title = "Connected agents", onBack = onBack)
+        }
+        item {
+            VpPrimaryButton(
+                text = "Create one-time Connect Key",
+                onClick = onCreateConnectKey,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5),
+            )
+        }
+        if (ui.agents.isEmpty()) {
+            item {
+                VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
                     Text("No connected agents", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
                     Text(
                         "Pair an agent to let it request payments that you review and approve here.",
@@ -46,23 +60,23 @@ fun AgentsScreen(vm: AgentsViewModel, onBack: () -> Unit, onOpen: (String) -> Un
                         color = VelarumTheme.colors.textMuted,
                     )
                 }
-            } else {
-                ui.agents.forEach { agent ->
-                    VpCard(modifier = Modifier.fillMaxWidth().clickable { onOpen(agent.id) }) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(agent.name, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                            VpBadge(agent.status.ifBlank { "active" }, if (agent.revoked) VpTone.DANGER else VpTone.SAFE)
-                        }
-                        Text(
-                            listOf(agent.runtime, agent.deviceLabel).filter { it.isNotBlank() }.joinToString(" · "),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = VelarumTheme.colors.textMuted,
-                        )
+            }
+        } else {
+            items(ui.agents) { agent ->
+                VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).clickable { onOpen(agent.id) }) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(agent.name, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                        VpBadge(agent.status.ifBlank { "active" }, if (agent.revoked) VpTone.DANGER else VpTone.SAFE)
                     }
+                    Text(
+                        listOf(agent.runtime, agent.deviceLabel).filter { it.isNotBlank() }.joinToString(" · "),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = VelarumTheme.colors.textMuted,
+                    )
                 }
             }
         }

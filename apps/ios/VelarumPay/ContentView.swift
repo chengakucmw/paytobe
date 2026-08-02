@@ -21,6 +21,14 @@ struct VelarumRootView: View {
     @EnvironmentObject private var app: AppState
 
     var body: some View {
+        if app.isHydrating {
+            VelarumHydratingView()
+        } else {
+            mainContent
+        }
+    }
+
+    private var mainContent: some View {
         TabView(selection: $app.selectedTab) {
             WalletView()
                 .tabItem { Label("Home", systemImage: "wallet.pass") }
@@ -43,6 +51,11 @@ struct VelarumRootView: View {
         .sheet(item: $app.pairingSession) { session in
             PairingReviewView(session: session)
                 .environmentObject(app)
+        }
+        .sheet(isPresented: $app.showingConnectInvitation) {
+            ConnectInvitationView()
+                .environmentObject(app)
+                .presentationDetents([.medium, .large])
         }
         .sheet(item: $app.selectedConnection) { connection in
             ConnectionDetailView(connection: connection)
@@ -74,3 +87,14 @@ struct VelarumRootView: View {
     }
 }
 
+/// Lightweight cold-launch splash shown while AppState.hydrate() loads the wallet +
+/// local stores off the main thread, so an existing user never sees the empty /
+/// "no wallet" tab state flash before hydration completes.
+struct VelarumHydratingView: View {
+    var body: some View {
+        ProgressView()
+            .controlSize(.large)
+            .tint(VPColor.brand)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}

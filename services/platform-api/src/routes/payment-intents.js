@@ -1,10 +1,20 @@
 // Legacy Payment Intent routes. Mounted at "/v1/payment-intents".
 
 import express from "express";
-import { id } from "../crypto.js";
 import { resolveTargetDevice } from "../routing.js";
 import { adaptVelarum } from "../velarum.js";
-import { canTransition, evaluateIntent, shouldRecordSpent } from "../risk.js";
+import {
+  INTENT_STATUS_UPDATES,
+  canTransition,
+  dailyLimitFor,
+  evaluateIntent,
+  shouldRecordSpent,
+  validateIntentStatusUpdate
+} from "../risk.js";
+
+// F1: terminal non-confirmed statuses that must RELEASE a held daily-cap
+// reservation (the payment will never settle).
+const RELEASE_ON_STATUS = new Set(["failed", "expired", "rejected"]);
 
 export function createPaymentIntentsRouter(deps) {
   const {
@@ -15,7 +25,8 @@ export function createPaymentIntentsRouter(deps) {
     verifyAppBody,
     notifyApp,
     notifyOpenClaw,
-    confirmLater
+    confirmLater,
+    platformCore
   } = deps;
   const router = express.Router();
 
@@ -40,12 +51,12 @@ export function createPaymentIntentsRouter(deps) {
       if (existing) return res.status(200).json({ ok: true, duplicate: true, intent: existing });
     }
 
-    const now = new Date();
-    const expires = body.expires_at ? new Date(body.expires_at) : new Date(Date.now() + 5 * 60 * 1000);
+    const now = platformCore.clock.now();
+    const expires = body.expires_at ? new Date(body.expires_at) : new Date(now.getTime() + 5 * 60 * 1000);
     const intent = {
       protocol: "agentwallet.payment_intent.v1",
       ...body,
-      intent_id: body.intent_id || id("pi"),
+      intent_id: body.intent_id || platformCore.random.id("pi"),
       status: "pending",
       created_at: body.created_at || now.toISOString(),
       expires_at: expires.toISOString(),
@@ -66,6 +77,22 @@ export function createPaymentIntentsRouter(deps) {
     if (!risk.ok) {
       return sendApiError(res, 422, "risk_policy_rejected", "Risk policy rejected payment intent", {
         details: { errors: risk.errors }
+      });
+    }
+
+    // F1: atomically reserve this amount against the daily cap BEFORE accepting the
+    // intent. evaluateIntent already did a read-only check, but only reserving and
+    // recording in ONE lock stops N concurrent intents from all passing that check
+    // against the same un-incremented total and then all confirming past the cap.
+    const reservation = store.reserveDailyLimit(
+      intent.intent_id,
+      intent.payment?.asset,
+      intent.payment?.amount,
+      dailyLimitFor(process.env, intent.payment?.asset)
+    );
+    if (!reservation.ok) {
+      return sendApiError(res, 422, "risk_policy_rejected", "Risk policy rejected payment intent", {
+        details: { errors: [`Daily ${String(intent.payment?.asset || "").toUpperCase()} limit exceeded`] }
       });
     }
 
@@ -100,12 +127,28 @@ export function createPaymentIntentsRouter(deps) {
       return sendApiError(res, 404, "payment_intent_not_found", "Payment Intent not found");
     }
     const status = req.body.status;
-    if (!canTransition(status)) return sendApiError(res, 400, "invalid_status", "Invalid status", { field: "status" });
+    if (!INTENT_STATUS_UPDATES.has(status) || !canTransition(status)) {
+      return sendApiError(res, 400, "invalid_status", "Invalid status", { field: "status" });
+    }
+    // M5 (intent parity): block illegal device-reported transitions — pending->confirmed
+    // (skipping signature/broadcast), reviving a failed intent, and re-reporting a
+    // terminal status — so the F1 settle/release side effects never run twice.
+    const transition = validateIntentStatusUpdate(intent, status);
+    if (!transition.ok) {
+      return sendApiError(res, transition.status, transition.code, transition.message, { details: transition.details });
+    }
     const updated = store.updateStatus(intent.intent_id, status, {
       tx_hash: req.body.tx_hash || null,
       error: req.body.error || null
     });
-    if (shouldRecordSpent(status)) store.addDailySpent(intent.payment.asset, intent.payment.amount);
+    // F1: settle the held reservation into confirmed spend on success; release it
+    // back to the cap on a terminal non-confirmed status. (A broadcasted intent is
+    // resolved by confirmLater, which settles/releases there.)
+    if (shouldRecordSpent(status)) {
+      store.settleDailyReservation(intent.intent_id, intent.payment.asset, intent.payment.amount);
+    } else if (RELEASE_ON_STATUS.has(status)) {
+      store.releaseDailyReservation(intent.intent_id);
+    }
     notifyOpenClaw(intent.source?.device_id, {
       type: "payment_status",
       intent_id: intent.intent_id,

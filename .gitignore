@@ -18,6 +18,7 @@ Pods/
 # Build outputs and caches
 build/
 .gradle/
+apps/android/.gradle-cache/
 out/
 dist/
 coverage/
@@ -29,6 +30,12 @@ coverage/
 *.aab
 *.ap_
 *.dex
+
+# Android release signing secrets — never commit private signing keys/passwords
+keystore.properties
+apps/android/keystore.properties
+*.jks
+*.keystore
 
 # iOS/Xcode artifacts
 DerivedData/

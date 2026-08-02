@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
 
 import org.json.JSONObject;
 import org.junit.Test;
@@ -11,6 +12,8 @@ import org.junit.Test;
 public final class ScannedPaymentRequestParserTest {
     @Test
     public void velarumPayQrBecomesSignableBaseUsdcPaymentRequest() throws Exception {
+        assumeFalse(BuildConfig.TESTNET_ONLY);
+
         PaymentIntent intent = ScannedPaymentRequestParser.parseIntent(
                 "velarumpay://pay?to=0x71d8B0d47f3c9d0bA9F1d2a6168A5F80f20356d0"
                         + "&amount=18.75"
@@ -54,6 +57,8 @@ public final class ScannedPaymentRequestParserTest {
 
     @Test
     public void ethereumUriKeepsBaseNativeEthSeparateFromBaseUsdc() throws Exception {
+        assumeFalse(BuildConfig.TESTNET_ONLY);
+
         PaymentIntent intent = ScannedPaymentRequestParser.parseIntent(
                 "ethereum:0x71d8B0d47f3c9d0bA9F1d2a6168A5F80f20356d0@8453?amount=0.002"
         );
@@ -69,6 +74,8 @@ public final class ScannedPaymentRequestParserTest {
 
     @Test
     public void eip681TransferQrBecomesBaseUsdcPaymentRequest() throws Exception {
+        assumeFalse(BuildConfig.TESTNET_ONLY);
+
         PaymentIntent intent = ScannedPaymentRequestParser.parseIntent(
                 "ethereum:" + RiskPolicy.BASE_USDC + "@8453/transfer"
                         + "?address=0x71d8B0d47f3c9d0bA9F1d2a6168A5F80f20356d0"

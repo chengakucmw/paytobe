@@ -1,0 +1,10 @@
+{
+  "vector": "velarumpay.webhook_hmac.v1",
+  "purpose": "Public deterministic verification test only",
+  "production_secret": false,
+  "test_key": "PUBLIC_TEST_VECTOR_KEY_DO_NOT_USE",
+  "timestamp": "1754042400",
+  "raw_body": "{\"event_id\":\"evt_test_0001\",\"type\":\"payment_request.updated\",\"data\":{\"request_id\":\"pr_test_0001\",\"status\":\"confirmed\"}}",
+  "signed_payload": "1754042400.{\"event_id\":\"evt_test_0001\",\"type\":\"payment_request.updated\",\"data\":{\"request_id\":\"pr_test_0001\",\"status\":\"confirmed\"}}",
+  "signature_header": "t=1754042400,v1=b82b82b869fd47f3ed9eb0ecaf98177e1801d5acc3dd9b636f4197d8e674263a"
+}

@@ -5,8 +5,11 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ai.agentwallet.hd.AgentUi
 import ai.agentwallet.hd.AgentsRepository
+import ai.agentwallet.hd.ConnectInvitationRepository
+import ai.agentwallet.hd.ConnectInvitationUi
 import ai.agentwallet.hd.PairingRepository
 import ai.agentwallet.hd.PairingUi
+import ai.agentwallet.hd.RelayClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -113,4 +116,142 @@ class PairingViewModel(app: Application) : AndroidViewModel(app) {
                 .onFailure { e -> _ui.update { it.copy(working = false, error = e.message ?: "Reject failed.") } }
         }
     }
+}
+
+data class ConnectKeyUiState(
+    val loading: Boolean = false,
+    val invitation: ConnectInvitationUi? = null,
+    val error: String? = null,
+    val cancelling: Boolean = false,
+    val review: ConnectIdentityReviewUi? = null,
+    val deciding: Boolean = false,
+    val decisionComplete: Boolean = false,
+)
+
+data class ConnectIdentityReviewUi(
+    val state: String,
+    val approvalAllowed: Boolean,
+    val reasonCode: String,
+    val merchantId: String,
+    val merchantName: String,
+    val merchantStatus: String,
+    val merchantVerificationState: String,
+    val verifiedDomain: String,
+    val agentId: String,
+    val agentName: String,
+    val agentStatus: String,
+    val runtime: String,
+    val credentialId: String,
+    val credentialStatus: String,
+    val credentialExpiresAt: String,
+    val expiresAt: String,
+    val requestedScopes: List<String>,
+    val approvableNow: Boolean,
+)
+
+class ConnectKeyViewModel(app: Application) : AndroidViewModel(app) {
+    private val _ui = MutableStateFlow(ConnectKeyUiState())
+    val ui: StateFlow<ConnectKeyUiState> = _ui.asStateFlow()
+
+    fun reset() = _ui.update { ConnectKeyUiState() }
+
+    fun create() {
+        if (_ui.value.loading) return
+        _ui.update { it.copy(loading = true, error = null, review = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { runCatching { ConnectInvitationRepository.create(getApplication()) } }
+            result.onSuccess { invitation -> _ui.update { it.copy(loading = false, invitation = invitation) } }
+                .onFailure { error -> _ui.update { it.copy(loading = false, error = error.message ?: "Could not create Connect Key.") } }
+        }
+    }
+
+    fun refresh() {
+        val invitation = _ui.value.invitation ?: return
+        if (_ui.value.loading || invitation.terminal) return
+        _ui.update { it.copy(loading = true, error = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val refreshed = ConnectInvitationRepository.refresh(getApplication(), invitation.id, invitation.connectKey)
+                    val review = if (refreshed.claimed) RelayClient.fetchConnectReview(getApplication(), refreshed.id).toUi() else null
+                    refreshed to review
+                }
+            }
+            result.onSuccess { (refreshed, review) -> _ui.update { it.copy(loading = false, invitation = refreshed, review = review) } }
+                .onFailure { _ui.update { it.copy(loading = false, review = null, error = "Live identity review is unavailable. Approval is disabled.") } }
+        }
+    }
+
+    fun approve() {
+        val invitation = _ui.value.invitation ?: return
+        val review = _ui.value.review ?: return
+        if (_ui.value.deciding || !review.approvableNow || invitation.status != "claimed") return
+        _ui.update { it.copy(deciding = true, error = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    RelayClient.approveConnectInvitation(getApplication(), invitation.id)
+                    ConnectInvitationRepository.refresh(getApplication(), invitation.id, invitation.connectKey)
+                }
+            }
+            result.onSuccess { refreshed ->
+                _ui.update { it.copy(deciding = false, invitation = refreshed, review = null, decisionComplete = true) }
+            }.onFailure {
+                _ui.update { it.copy(deciding = false, review = null, error = "Identity changed or approval is no longer available. Refresh before trying again.") }
+            }
+        }
+    }
+
+    fun reject() {
+        val invitation = _ui.value.invitation ?: return
+        if (_ui.value.deciding || invitation.status != "claimed") return
+        _ui.update { it.copy(deciding = true, error = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    RelayClient.rejectConnectInvitation(getApplication(), invitation.id)
+                    ConnectInvitationRepository.refresh(getApplication(), invitation.id, invitation.connectKey)
+                }
+            }
+            result.onSuccess { refreshed ->
+                _ui.update { it.copy(deciding = false, invitation = refreshed, review = null, decisionComplete = true) }
+            }.onFailure {
+                _ui.update { it.copy(deciding = false, review = null, error = "Rejection could not be confirmed. Refresh the invitation state.") }
+            }
+        }
+    }
+
+    fun cancel() {
+        val invitation = _ui.value.invitation ?: return
+        if (_ui.value.cancelling || invitation.terminal) return
+        _ui.update { it.copy(cancelling = true, error = null) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { ConnectInvitationRepository.cancel(getApplication(), invitation.id, invitation.connectKey) }
+            }
+            result.onSuccess { cancelled -> _ui.update { it.copy(cancelling = false, invitation = cancelled) } }
+                .onFailure { error -> _ui.update { it.copy(cancelling = false, error = error.message ?: "Could not cancel Connect Key.") } }
+        }
+    }
+
+    private fun RelayClient.ConnectReview.toUi() = ConnectIdentityReviewUi(
+        state = state,
+        approvalAllowed = approvalAllowed,
+        reasonCode = reasonCode,
+        merchantId = merchantId,
+        merchantName = merchantName,
+        merchantStatus = merchantStatus,
+        merchantVerificationState = merchantVerificationState,
+        verifiedDomain = verifiedDomain,
+        agentId = agentId,
+        agentName = agentName,
+        agentStatus = agentStatus,
+        runtime = runtime,
+        credentialId = credentialId,
+        credentialStatus = credentialStatus,
+        credentialExpiresAt = credentialExpiresAt,
+        expiresAt = expiresAt,
+        requestedScopes = requestedScopes,
+        approvableNow = approvableNow,
+    )
 }

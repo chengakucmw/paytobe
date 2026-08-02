@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.velarumpay.com/velarum.merchant.v1.schema.json",
+  "title": "VelarumPay Merchant v1",
+  "type": "object",
+  "required": ["merchant_id", "display_name", "verification_state", "status", "version", "created_at", "updated_at"],
+  "properties": {
+    "merchant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "display_name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "legal_name": {"type": "string", "minLength": 1, "maxLength": 200},
+    "verification_state": {"type": "string", "enum": ["unverified", "pending", "verified", "reverification_required"]},
+    "status": {"type": "string", "enum": ["pending_verification", "active", "suspended", "closed"]},
+    "version": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false,
+  "x-velarumpay-contract-version": "velarum.control-plane.v1"
+}

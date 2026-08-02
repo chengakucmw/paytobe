@@ -1,5 +1,10 @@
 # Hermes Connector
 
+> **Last modified / 最后修改时间**
+> - **Taipei Time / 台北时间:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-07-21 13:50:07 UTC
+
+
 Local Hermes adapter for VelarumPay Payment Request v1. It lets a Hermes local
 agent create a pairing session, create a Transaction Context, create a Payment
 Request, and read request status through polling or the agent WebSocket URL.
@@ -63,12 +68,12 @@ require mainnet funds.
 ## Check
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/connectors/hermes
+cd /Users/yang/code/VelarumPay/code/connectors/hermes
 npm run check
 npm run pack:dry
 ```
 
 Formal protocol and API references live in the document workspace:
 
-- `/Users/yang/code/VelarumPay/Chinese/Architecture/velarumpay-platform-api-v0-1-engineering-contract-平台APIv0.1工程契约-2026-06-16.md`
-- `/Users/yang/code/VelarumPay/Chinese/Architecture/velarumpay-payment-request-v1-engineering-spec-PaymentRequestv1工程规格-2026-06-16.md`
+- `/Users/yang/code/VelarumPay/docs/Chinese/Architecture/00056-00003-00013-1-velarumpay-platform-api-v0-1-engineering-contract-平台APIv0.1工程契约-2026-06-16.md`
+- `/Users/yang/code/VelarumPay/docs/Chinese/Architecture/00056-00003-00012-1-velarumpay-payment-request-v1-engineering-spec-PaymentRequestv1工程规格-2026-06-16.md`

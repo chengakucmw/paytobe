@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Auth · VelarumPay Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
+</head>
+<body>
+  <div class="preview-bar">Developer Preview · Test and pilot use only</div>
+  <header class="topbar"><div class="inner">
+    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <nav class="nav"><a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a><a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a></nav>
+  </div></header>
+  <main>
+    <span class="pill">Agent Assertion · Ed25519</span>
+    <h1>Authenticate an Agent without exporting its signing key</h1>
+    <p class="lead">The registered Agent signs a short-lived assertion locally, then sends only the compact assertion to <code>POST https://api-testnet.velarumpay.com/v1/agent-auth/token</code>.</p>
+
+    <h2>Protected header and claims</h2>
+    <table>
+      <tr><th>Field</th><th>Rule</th></tr>
+      <tr><td><code>alg</code></td><td>Exactly <code>EdDSA</code>.</td></tr>
+      <tr><td><code>typ</code></td><td>Exactly <code>JWT</code>.</td></tr>
+      <tr><td><code>kid</code></td><td>The active registered credential identifier.</td></tr>
+      <tr><td><code>iss</code></td><td>Registered Agent ID.</td></tr>
+      <tr><td><code>sub</code></td><td>Stable local client ID, recorded into the issued AuthContext.</td></tr>
+      <tr><td><code>aud</code></td><td><code>https://api-testnet.velarumpay.com/v1/agent-auth/token</code>.</td></tr>
+      <tr><td><code>iat</code>, <code>exp</code></td><td>Integer Unix seconds; lifetime is at most five minutes.</td></tr>
+      <tr><td><code>jti</code></td><td>Unique per assertion; replay is rejected.</td></tr>
+      <tr><td><code>scope</code></td><td>A subset of Agent, credential, and client policy.</td></tr>
+    </table>
+
+    <h2>Local signer boundary</h2>
+    <pre><code>const client = createVelarumPayClient({
+  baseUrl: "https://api-testnet.velarumpay.com",
+  agentAuth: {
+    agentId, clientId, kid, scopes,
+    keyHandle: secureKeyHandle,
+    signer: ({ data, keyHandle }) =&gt; secureSigner.sign(data, keyHandle)
+  }
+});</code></pre>
+    <p>The callback receives UTF-8 bytes for <code>base64url(protected header).base64url(claims)</code>. Return the raw Ed25519 signature bytes or base64url signature. Do not return, log, upload, or serialize key material.</p>
+
+    <h2>Secret-free fixed vector</h2>
+    <p><a href="/vectors/agent-assertion.mock.json">Download the deterministic mock serialization vector</a>. It includes the canonical signing input and a deliberately invalid all-zero mock signature. It proves serialization without publishing a signing key and must not be sent to a live API.</p>
+
+    <h2>Failure behavior</h2>
+    <p><code>401</code> may trigger one coordinated refresh. <code>403</code>, revoked/expired credentials, invalid audience, clock skew, malformed signatures, and duplicate JTI fail closed. SDK errors and retries redact the compact assertion and returned token.</p>
+  </main>
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

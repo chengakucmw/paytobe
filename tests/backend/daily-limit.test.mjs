@@ -41,13 +41,19 @@ function stellarIntent(amount, { ttlMs = 3_600_000 } = {}) {
       rail: "stellar_xlm",
       network: "stellar_public",
       asset: "XLM",
-      to: `G${"A".repeat(55)}`,
+      to: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
       amount
     }
   };
 }
 
 const LIMIT_MSG = "Daily XLM limit exceeded";
+const MAINNET_ENV = {
+  STELLAR_PUBLIC_ENABLED: "true",
+  STELLAR_PUBLIC_SINGLE_PAYMENT_MAX_XLM: "1",
+  STELLAR_PUBLIC_HORIZON_URL: "https://horizon.stellar.org",
+  ADDRESS_WHITELIST_STELLAR: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF"
+};
 
 // --- decimal module ---------------------------------------------------------
 
@@ -135,7 +141,7 @@ test("dailySpent tolerates a legacy float total left by the old code", (t) => {
 test("payments are allowed up to the cap and blocked exactly past it", (t) => {
   const { store, dir } = freshStore();
   t.after(() => cleanup(dir));
-  const env = { DAILY_LIMIT_XLM: "1" };
+  const env = { ...MAINNET_ENV, DAILY_LIMIT_XLM: "1" };
 
   // Spend 0.9 across nine 0.1 payments.
   for (let i = 0; i < 9; i++) store.addDailySpent("XLM", "0.1");
@@ -156,7 +162,7 @@ test("payments are allowed up to the cap and blocked exactly past it", (t) => {
 test("accumulated float drift can no longer open phantom headroom under the cap", (t) => {
   const { store, dir } = freshStore();
   t.after(() => cleanup(dir));
-  const env = { DAILY_LIMIT_XLM: "1" };
+  const env = { ...MAINNET_ENV, DAILY_LIMIT_XLM: "1" };
 
   // Ten exact 0.1 payments == 1.0, i.e. the cap is fully used.
   for (let i = 0; i < 10; i++) store.addDailySpent("XLM", "0.1");
@@ -174,10 +180,10 @@ test("checkDailyLimit fails closed on a bad amount or a misconfigured limit", (t
   t.after(() => cleanup(dir));
 
   // Non-decimal amount must be rejected, not coerced to NaN and waved through.
-  const badAmount = evaluateIntent(stellarIntent("not-a-number"), store, { DAILY_LIMIT_XLM: "1" });
+  const badAmount = evaluateIntent(stellarIntent("not-a-number"), store, { ...MAINNET_ENV, DAILY_LIMIT_XLM: "1" });
   assert.equal(badAmount.errors.includes(LIMIT_MSG), true);
 
   // A misconfigured limit must reject rather than silently allow unlimited spend.
-  const badLimit = evaluateIntent(stellarIntent("0.1"), store, { DAILY_LIMIT_XLM: "1,000" });
+  const badLimit = evaluateIntent(stellarIntent("0.1"), store, { ...MAINNET_ENV, DAILY_LIMIT_XLM: "1,000" });
   assert.equal(badLimit.errors.includes(LIMIT_MSG), true);
 });

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Webhook Verification · VelarumPay Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
+</head>
+<body>
+  <div class="preview-bar">Developer Preview · Test and pilot use only</div>
+  <header class="topbar"><div class="inner">
+    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <nav class="nav"><a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a><a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a></nav>
+  </div></header>
+  <main>
+    <span class="pill">Webhook HMAC · SHA-256</span>
+    <h1>Verify the exact raw request body before processing an event</h1>
+    <p class="lead">VelarumPay signs <code>timestamp + "." + rawBody</code>. The signature is carried in <code>x-velarumpay-signature</code> as <code>t=&lt;unix-seconds&gt;,v1=&lt;hex-hmac&gt;</code>.</p>
+    <div class="note">Keep endpoint secrets in a server-side secret manager. Never expose them to browser code, mobile clients, logs, error responses, or documentation. The downloadable vector uses an intentionally public non-production test key.</div>
+
+    <h2>Node.js verification</h2>
+    <pre><code>import { createHmac, timingSafeEqual } from "node:crypto";
+
+function verifyWebhook(publicOrSecretKey, rawBody, signatureHeader, nowSeconds) {
+  const parts = Object.fromEntries(signatureHeader.split(",").map((part) =&gt; {
+    const [name, ...value] = part.trim().split("=");
+    return [name, value.join("=")];
+  }));
+  if (!/^\d{10,16}$/.test(parts.t || "") || !/^[0-9a-f]{64}$/i.test(parts.v1 || "")) return false;
+  if (Math.abs(nowSeconds - Number(parts.t)) &gt; 300) return false;
+
+  const expected = createHmac("sha256", publicOrSecretKey)
+    .update(Buffer.from(`${parts.t}.`, "utf8"))
+    .update(rawBody)
+    .digest();
+  const supplied = Buffer.from(parts.v1, "hex");
+  return expected.length === supplied.length &amp;&amp; timingSafeEqual(expected, supplied);
+}</code></pre>
+    <p>Pass the original bytes from the HTTP framework. Parsing and re-serializing JSON changes the byte sequence and invalidates the signature. Reject stale timestamps before business processing.</p>
+
+    <h2>Headers and replay handling</h2>
+    <table>
+      <tr><th>Header</th><th>Use</th></tr>
+      <tr><td><code>x-velarumpay-signature</code></td><td>Timestamped HMAC described above.</td></tr>
+      <tr><td><code>x-velarumpay-event-id</code></td><td>Stable event identity; deduplicate business processing on this value.</td></tr>
+      <tr><td><code>x-velarumpay-delivery-id</code></td><td>Unique attempt identity for delivery diagnostics.</td></tr>
+    </table>
+    <p>Return a 2xx response only after durable acceptance. Retries and manual replay may produce new delivery IDs for the same event ID. Always reconcile final Payment Request state through the authenticated REST API.</p>
+
+    <h2>Fixed HMAC vector</h2>
+    <p><a href="/vectors/webhook-hmac.json">Download the public deterministic HMAC vector</a>. Its exact raw body, timestamp, signed payload, and expected header are checked during the docs build. The test key is public and must never be used for an endpoint.</p>
+
+    <h2>Endpoint lifecycle</h2>
+    <p>Use <code>createWebhookEndpoint</code>, <code>verifyWebhookEndpoint</code>, <code>rotateWebhookSecret</code>, and <code>revokeWebhookEndpoint</code> through the merchant session boundary. Rotation and revocation require step-up authentication; overlap is bounded and old secrets expire.</p>
+  </main>
+  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+</body>
+</html>

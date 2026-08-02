@@ -13,6 +13,19 @@ struct SignedStellarTransaction {
     let createAccount: Bool
 }
 
+/// Bounded URLSession shared by the Stellar, EVM, and Solana services for all
+/// one-shot Horizon / JSON-RPC calls. Replaces URLSession.shared so a slow or
+/// stuck endpoint can't freeze a payment or balance flow on URLSession's default
+/// 60s timeout. The Stellar submit path still falls back to waitForTransaction,
+/// so a timed-out broadcast is reconciled rather than lost.
+private let horizonSession: URLSession = {
+    let config = URLSessionConfiguration.default
+    config.timeoutIntervalForRequest = 20
+    config.timeoutIntervalForResource = 40
+    config.waitsForConnectivity = false
+    return URLSession(configuration: config)
+}()
+
 actor StellarService {
     private let testnetPassphrase = "Test SDF Network ; September 2015"
     private let publicPassphrase = "Public Global Stellar Network ; September 2015"
@@ -281,6 +294,14 @@ actor StellarService {
     /// broadcast) is always native. Set to false to revert.
     static var useSharedCoreSigning = true
 
+    /// When true (default), XLM→stroops amount parsing is delegated to the shared
+    /// Rust core (`stellarXlmToStroops`) instead of the native Swift `xlmToStroops`
+    /// below. The Rust `xlm_to_stroops` is a documented mirror of this routine (same
+    /// trim / split / ≤7-decimal / amount > 0 rules), and the conformance test
+    /// `testCoreAmountConversionMatchesNative` pins the two to identical results, so
+    /// this preserves behaviour. Set to false to revert to the native path.
+    static var useSharedCoreAmountConversion = true
+
     /// Pure (no network) build-and-sign of a Stellar payment / create-account.
     /// Split out of `signXLM` so the core and native paths can be cross-checked.
     func buildSignedEnvelope(
@@ -357,7 +378,7 @@ actor StellarService {
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         request.httpBody = Data(body.utf8)
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await horizonSession.data(for: request)
             guard let http = response as? HTTPURLResponse else { throw AppError.invalidResponse("Missing Horizon response.") }
             guard (200..<300).contains(http.statusCode) else {
                 throw AppError.invalidResponse(stellarErrorMessage(httpCode: http.statusCode, data: data))
@@ -431,13 +452,30 @@ actor StellarService {
 
     private func fetchAccount(horizonURL: URL, accountId: String) async throws -> [String: Any]? {
         let url = horizonURL.appendingPathComponent("accounts").appendingPathComponent(accountId)
-        let (data, response) = try await URLSession.shared.data(from: url)
+        let (data, response) = try await horizonSession.data(from: url)
         guard let http = response as? HTTPURLResponse else { throw AppError.invalidResponse("Missing Horizon response.") }
         if http.statusCode == 404 { return nil }
         guard (200..<300).contains(http.statusCode) else {
             throw AppError.invalidResponse(stellarErrorMessage(httpCode: http.statusCode, data: data))
         }
         return try jsonObject(data)
+    }
+
+    /// Mainnet XLM (native) balance as a decimal string. Read-only and fail-safe: any error or
+    /// unfunded account returns "0", so a balance refresh can never block or affect a payment.
+    func xlmBalance(horizonURL: String, accountId: String) async -> String {
+        do {
+            let horizon = normalizeHorizonURL(horizonURL, testnet: false)
+            guard let account = try await fetchAccount(horizonURL: horizon, accountId: accountId) else { return "0" }
+            let balances = account["balances"] as? [[String: Any]] ?? []
+            if let native = balances.first(where: { ($0["asset_type"] as? String) == "native" }),
+               let bal = native["balance"] as? String, !bal.isEmpty {
+                return bal
+            }
+            return "0"
+        } catch {
+            return "0"
+        }
     }
 
     private func fetchMinimumCreateAccountBalanceStroops(horizonURL: URL) async -> Int64 {
@@ -448,7 +486,7 @@ actor StellarService {
                 URLQueryItem(name: "limit", value: "1")
             ]
             guard let url = components?.url else { return fallbackMinimumCreateAccountStroops }
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await horizonSession.data(from: url)
             guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
                 return fallbackMinimumCreateAccountStroops
             }
@@ -466,7 +504,7 @@ actor StellarService {
         for _ in 0..<8 {
             try await Task.sleep(nanoseconds: 1_500_000_000)
             let url = horizonURL.appendingPathComponent("transactions").appendingPathComponent(txHash)
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await horizonSession.data(from: url)
             guard let http = response as? HTTPURLResponse else { continue }
             if http.statusCode == 404 { continue }
             guard (200..<300).contains(http.statusCode) else { continue }
@@ -575,23 +613,19 @@ actor StellarService {
         return value.addingPercentEncoding(withAllowedCharacters: allowed) ?? value
     }
 
-    private func xlmToStroops(_ text: String) throws -> Int64 {
-        let clean = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let parts = clean.split(separator: ".", omittingEmptySubsequences: false)
-        guard !parts.isEmpty, (parts.count == 1 || parts.count == 2), let whole = Int64(parts[0]) else {
-            throw AppError.invalidResponse("Invalid XLM amount.")
+    func xlmToStroops(_ text: String) throws -> Int64 {
+        if Self.useSharedCoreAmountConversion {
+            do {
+                return try stellarXlmToStroops(amount: text)
+            } catch let error as FfiWalletError {
+                // Surface the core's reason with the app's error type, matching how
+                // shared-core signing reports failures (see buildSignedEnvelope).
+                throw AppError.invalidResponse(error.localizedDescription)
+            }
         }
-        let fractional = parts.count == 2 ? String(parts[1]) : ""
-        guard fractional.count <= 7, fractional.allSatisfy({ $0.isNumber }) else {
-            throw AppError.invalidResponse("XLM supports at most 7 decimal places.")
-        }
-        let paddedFraction = fractional.padding(toLength: 7, withPad: "0", startingAt: 0)
-        guard let stroopFraction = Int64(paddedFraction) else {
-            throw AppError.invalidResponse("Invalid XLM amount.")
-        }
-        let amount = whole * 10_000_000 + stroopFraction
-        guard amount > 0 else { throw AppError.invalidResponse("XLM amount must be greater than zero.") }
-        return amount
+        // Native fallback — the cross-check oracle for the conformance test. The math
+        // now lives in the shared AmountUnits (D9/Q4); behaviour is unchanged.
+        return try AmountUnits.xlmToStroopsNative(text)
     }
 
     private func stroopsToXLM(_ stroops: Int64) -> String {
@@ -854,5 +888,326 @@ extension Data {
             throw AppError.invalidResponse(
                 "Unsupported Stellar memo type \"\(memoType)\". Use \"text\", \"id\", \"hash\", or \"return\".")
         }
+    }
+}
+
+// MARK: - EVM + Solana send services (iOS gains real sending, via the shared core)
+
+/// Exact decimal → integer base-unit conversion (e.g. ETH → wei, SOL → lamports)
+/// as a decimal string. Never uses floating point — same discipline as the
+/// Stellar `xlmToStroops` path and Android's BigDecimal scaling.
+enum TokenAmount {
+    static func baseUnits(_ amount: String, decimals: Int) throws -> String {
+        // Delegates to the shared AmountUnits (D9/Q4). Behaviour is unchanged.
+        return try AmountUnits.baseUnits(amount, decimals: decimals)
+    }
+
+    /// Inverse of `baseUnits`: an integer base-unit string (e.g. wei / lamports / stroops) →
+    /// a trimmed decimal string. Pure string math — never uses floating point, so it stays exact
+    /// for display of network fees. Used by the live network-fee estimate on the send sheet.
+    static func fromBaseUnits(_ minor: String, decimals: Int) -> String {
+        let trimmed = minor.drop(while: { $0 == "0" })
+        let digits = trimmed.isEmpty ? "0" : String(trimmed)
+        if decimals <= 0 || digits == "0" { return digits }
+        // Left-pad so there is at least one digit before the decimal point.
+        let padded = String(repeating: "0", count: max(0, decimals - digits.count + 1)) + digits
+        let splitIndex = padded.index(padded.endIndex, offsetBy: -decimals)
+        let whole = String(padded[..<splitIndex])
+        var frac = String(padded[splitIndex...])
+        while frac.last == "0" { frac.removeLast() }
+        let wholePart = whole.isEmpty ? "0" : whole
+        return frac.isEmpty ? wholePart : "\(wholePart).\(frac)"
+    }
+}
+
+/// Builds, signs (via the shared Rust core `evmSignTransaction`), and broadcasts
+/// native-coin EVM transfers. Mirrors Android's `EvmTransfer.sendNative`; only the
+/// network I/O (nonce, gas price, broadcast) lives here. This is iOS's first EVM
+/// send path, built directly on the shared core so it is byte-compatible with Android.
+actor EvmService {
+    /// Returns the broadcast transaction hash. `fromAddress` is the sender's 0x
+    /// address (for the nonce); `privateKey` is the 32-byte secp256k1 key from the core.
+    func sendNative(
+        rpcURL: String,
+        chainId: Int64,
+        fromAddress: String,
+        privateKey: Data,
+        toAddress: String,
+        amountEther: String,
+        progress: @escaping (String) async -> Void
+    ) async throws -> String {
+        let url = try endpoint(rpcURL)
+        let nonce = try await quantity(url, method: "eth_getTransactionCount", params: [fromAddress, "pending"])
+        let gasPrice = try await quantity(url, method: "eth_gasPrice", params: [])
+        let valueWei = try TokenAmount.baseUnits(amountEther, decimals: 18)
+
+        let signed: FfiEvmSignedTx
+        do {
+            signed = try evmSignTransaction(
+                privateKey: privateKey,
+                chainId: UInt64(chainId),
+                nonce: nonce,
+                gasPriceWei: String(gasPrice),
+                gasLimit: 21000,
+                toAddress: toAddress,
+                valueWei: valueWei,
+                dataHex: ""
+            )
+        } catch let error as FfiWalletError {
+            throw AppError.invalidResponse(error.localizedDescription)
+        }
+        await progress("Signed EVM transaction")
+
+        let result = try await call(url, method: "eth_sendRawTransaction", params: [signed.rawTxHex])
+        guard let hash = result as? String else {
+            throw AppError.invalidResponse("EVM node did not return a transaction hash.")
+        }
+        return hash
+    }
+
+    /// Builds, signs (shared core `evmSignTransaction`), and broadcasts an ERC-20 `transfer`.
+    /// Mirrors Android `EvmTransfer.sendErc20`: the EVM `value` is 0, the recipient and amount
+    /// live in the calldata, and the transaction is sent TO the token contract. The amount uses
+    /// the token's own decimals (USDC = 6). Gas is a fixed 100000 cap — unused gas isn't charged,
+    /// so this matches Android's fallback without an extra estimate round-trip.
+    func sendErc20(
+        rpcURL: String,
+        chainId: Int64,
+        fromAddress: String,
+        privateKey: Data,
+        tokenContract: String,
+        toAddress: String,
+        amount: String,
+        decimals: Int,
+        progress: @escaping (String) async -> Void
+    ) async throws -> String {
+        let url = try endpoint(rpcURL)
+        let nonce = try await quantity(url, method: "eth_getTransactionCount", params: [fromAddress, "pending"])
+        let gasPrice = try await quantity(url, method: "eth_gasPrice", params: [])
+        let dataHex = try EvmService.erc20TransferData(to: toAddress, amount: amount, decimals: decimals)
+
+        let signed: FfiEvmSignedTx
+        do {
+            signed = try evmSignTransaction(
+                privateKey: privateKey,
+                chainId: UInt64(chainId),
+                nonce: nonce,
+                gasPriceWei: String(gasPrice),
+                gasLimit: 100000,
+                toAddress: tokenContract,
+                valueWei: "0",
+                dataHex: dataHex
+            )
+        } catch let error as FfiWalletError {
+            throw AppError.invalidResponse(error.localizedDescription)
+        }
+        await progress("Signed ERC-20 transaction")
+
+        let result = try await call(url, method: "eth_sendRawTransaction", params: [signed.rawTxHex])
+        guard let hash = result as? String else {
+            throw AppError.invalidResponse("EVM node did not return a transaction hash.")
+        }
+        return hash
+    }
+
+    /// ERC-20 `transfer(address,uint256)` calldata: selector `a9059cbb` + 32-byte recipient +
+    /// 32-byte amount in token base units. Base units come from the exact-decimal `TokenAmount`
+    /// helper (never floating point); 6-decimal tokens such as USDC fit comfortably in UInt64.
+    static func erc20TransferData(to: String, amount: String, decimals: Int) throws -> String {
+        let unitsDecimal = try TokenAmount.baseUnits(amount, decimals: decimals)
+        guard let units = UInt64(unitsDecimal) else {
+            throw AppError.invalidResponse("This amount is too large for an on-device token transfer.")
+        }
+        let lowered = to.lowercased()
+        let cleanTo = lowered.hasPrefix("0x") ? String(lowered.dropFirst(2)) : lowered
+        let paddedTo = String(repeating: "0", count: max(0, 64 - cleanTo.count)) + cleanTo
+        let amountHex = String(units, radix: 16)
+        let paddedAmount = String(repeating: "0", count: max(0, 64 - amountHex.count)) + amountHex
+        return "0x" + "a9059cbb" + paddedTo + paddedAmount
+    }
+
+    /// Native-coin balance as a decimal string (`decimals` places). Read-only, fail-safe → "0".
+    func nativeBalance(rpcURL: String, address: String, decimals: Int = 18) async -> String {
+        do {
+            guard !rpcURL.isEmpty, !address.isEmpty else { return "0" }
+            let url = try endpoint(rpcURL)
+            let wei = try await quantity(url, method: "eth_getBalance", params: [address, "latest"])
+            return TokenAmount.fromBaseUnits(String(wei), decimals: decimals)
+        } catch { return "0" }
+    }
+
+    /// ERC-20 `balanceOf` as a decimal string (token `decimals`). Read-only, fail-safe → "0".
+    /// Calldata: balanceOf selector 70a08231 + 32-byte address.
+    func tokenBalance(rpcURL: String, contract: String, address: String, decimals: Int) async -> String {
+        do {
+            guard !rpcURL.isEmpty, !address.isEmpty else { return "0" }
+            let url = try endpoint(rpcURL)
+            let lowered = address.lowercased()
+            let clean = lowered.hasPrefix("0x") ? String(lowered.dropFirst(2)) : lowered
+            let padded = String(repeating: "0", count: max(0, 64 - clean.count)) + clean
+            let data = "0x70a08231" + padded
+            let result = try await call(url, method: "eth_call", params: [["to": contract, "data": data], "latest"])
+            guard let hex = result as? String else { return "0" }
+            let trimmed = hex.lowercased().hasPrefix("0x") ? String(hex.dropFirst(2)) : hex
+            guard let units = UInt64(trimmed, radix: 16) else { return "0" }
+            return TokenAmount.fromBaseUnits(String(units), decimals: decimals)
+        } catch { return "0" }
+    }
+
+    /// Read-only live fee estimate for a native transfer (no signing, no broadcast):
+    /// `gasPrice × 21000` as an exact ether-decimal string. Returns nil on any RPC error or
+    /// arithmetic overflow so the caller can fall back to the broadcast-time wording.
+    func estimateNativeFeeEther(rpcURL: String) async -> String? {
+        do {
+            let url = try endpoint(rpcURL)
+            let gasPrice = try await quantity(url, method: "eth_gasPrice", params: [])
+            let fee = gasPrice.multipliedReportingOverflow(by: 21000)
+            guard !fee.overflow, fee.partialValue > 0 else { return nil }
+            return TokenAmount.fromBaseUnits(String(fee.partialValue), decimals: 18)
+        } catch {
+            return nil
+        }
+    }
+
+    private func endpoint(_ raw: String) throws -> URL {
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: clean), !clean.isEmpty else {
+            throw AppError.invalidResponse("This network has no usable RPC URL. Add one in Settings first.")
+        }
+        return url
+    }
+
+    private func call(_ url: URL, method: String, params: [Any]) async throws -> Any {
+        let payload: [String: Any] = ["jsonrpc": "2.0", "id": 1, "method": method, "params": params]
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await horizonSession.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw AppError.invalidResponse("EVM RPC HTTP error.")
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AppError.invalidResponse("Invalid EVM RPC response.")
+        }
+        if let error = object["error"] as? [String: Any] {
+            throw AppError.invalidResponse("EVM transaction failed: \(error["message"] as? String ?? "RPC error").")
+        }
+        guard let result = object["result"] else {
+            throw AppError.invalidResponse("EVM RPC response had no result.")
+        }
+        return result
+    }
+
+    private func quantity(_ url: URL, method: String, params: [Any]) async throws -> UInt64 {
+        let result = try await call(url, method: method, params: params)
+        guard let hex = result as? String else {
+            throw AppError.invalidResponse("Expected a quantity from \(method).")
+        }
+        let trimmed = hex.lowercased().hasPrefix("0x") ? String(hex.dropFirst(2)) : hex
+        guard let value = UInt64(trimmed, radix: 16) else {
+            throw AppError.invalidResponse("Could not parse the value returned by \(method).")
+        }
+        return value
+    }
+}
+
+/// Builds, signs (via the shared Rust core `solanaSignTransfer`), and broadcasts
+/// native SOL transfers. Mirrors Android's `SolanaTransfer.sendSol`; only network
+/// I/O (recent blockhash, broadcast) lives here. iOS's first Solana send path.
+actor SolanaService {
+    static let mainnetRPC = "https://api.mainnet-beta.solana.com"
+
+    /// SOL balance as a decimal string (9 decimals). Read-only and fail-safe → "0".
+    func solBalance(rpcURL: String, address: String) async -> String {
+        do {
+            guard !address.isEmpty else { return "0" }
+            let url = try endpoint(rpcURL)
+            let result = try await call(url, method: "getBalance", params: [address])
+            if let root = result as? [String: Any], let lamports = root["value"] as? Int, lamports >= 0 {
+                return TokenAmount.fromBaseUnits(String(lamports), decimals: 9)
+            }
+            return "0"
+        } catch {
+            return "0"
+        }
+    }
+
+    /// Returns the transaction signature (its on-chain id).
+    func sendSol(
+        rpcURL: String,
+        secretSeed: Data,
+        toAddress: String,
+        amountSol: String,
+        progress: @escaping (String) async -> Void
+    ) async throws -> String {
+        let url = try endpoint(rpcURL)
+        let blockhash = try await latestBlockhash(url)
+        let lamportsString = try TokenAmount.baseUnits(amountSol, decimals: 9)
+        guard let lamports = UInt64(lamportsString) else {
+            throw AppError.invalidResponse("SOL amount is out of range.")
+        }
+        let signed: FfiSolanaSignedTx
+        do {
+            signed = try solanaSignTransfer(
+                secretSeed: secretSeed,
+                toAddress: toAddress,
+                lamports: lamports,
+                recentBlockhash: blockhash
+            )
+        } catch let error as FfiWalletError {
+            throw AppError.invalidResponse(error.localizedDescription)
+        }
+        await progress("Signed Solana transaction")
+        return try await send(url, base64: signed.transactionBase64)
+    }
+
+    private func endpoint(_ raw: String) throws -> URL {
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: clean), !clean.isEmpty else {
+            throw AppError.invalidResponse("Missing Solana RPC URL.")
+        }
+        return url
+    }
+
+    private func call(_ url: URL, method: String, params: [Any]) async throws -> Any {
+        let payload: [String: Any] = ["jsonrpc": "2.0", "id": 1, "method": method, "params": params]
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: payload)
+        let (data, response) = try await horizonSession.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            throw AppError.invalidResponse("Solana RPC HTTP error.")
+        }
+        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw AppError.invalidResponse("Invalid Solana RPC response.")
+        }
+        if let error = object["error"] as? [String: Any] {
+            throw AppError.invalidResponse("Solana transaction failed: \(error["message"] as? String ?? "RPC error").")
+        }
+        guard let result = object["result"] else {
+            throw AppError.invalidResponse("Solana RPC response had no result.")
+        }
+        return result
+    }
+
+    private func latestBlockhash(_ url: URL) async throws -> String {
+        let result = try await call(url, method: "getLatestBlockhash", params: [["commitment": "finalized"]])
+        guard let root = result as? [String: Any],
+              let value = root["value"] as? [String: Any],
+              let blockhash = value["blockhash"] as? String else {
+            throw AppError.invalidResponse("Solana node did not return a recent blockhash.")
+        }
+        return blockhash
+    }
+
+    private func send(_ url: URL, base64: String) async throws -> String {
+        let options: [String: Any] = ["encoding": "base64", "skipPreflight": false]
+        let result = try await call(url, method: "sendTransaction", params: [base64, options])
+        guard let signature = result as? String else {
+            throw AppError.invalidResponse("Solana node did not return a transaction signature.")
+        }
+        return signature
     }
 }

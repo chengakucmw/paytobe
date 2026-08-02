@@ -11,7 +11,7 @@ object InboxRepository {
 
     /** 列表（按 filter：pending / all / final）。读取失败返回空。 */
     fun load(context: Context, filter: String): List<InboxItem> {
-        val intents = try { PaymentInboxStore.list(context) } catch (e: Exception) { emptyList<PaymentIntent>() }
+        val intents = try { PaymentInboxStore.list(context) } catch (e: Exception) { VpLog.w("InboxRepository", "list inbox failed", e); emptyList<PaymentIntent>() }
         val out = ArrayList<InboxItem>()
         for (intent in intents) {
             val req = intent.request
@@ -38,7 +38,7 @@ object InboxRepository {
     }
 
     fun detail(context: Context, intentId: String): InboxDetail? {
-        val intent = try { PaymentInboxStore.find(context, intentId) } catch (e: Exception) { null } ?: return null
+        val intent = try { PaymentInboxStore.find(context, intentId) } catch (e: Exception) { VpLog.w("InboxRepository", "inbox detail lookup failed", e); null } ?: return null
         val req = intent.request
         val dossier = TransactionDossier.from(intent)
         val state = PaymentInboxFilter.effectiveState(intent.status, req.reviewState, req.riskReviewStatus, req.riskLevel, intent.isExpired)
@@ -69,6 +69,21 @@ object InboxRepository {
                 if (remote != null) PaymentInboxStore.upsert(context, remote)
             }
         } catch (e: Exception) {
+            VpLog.w("InboxRepository", "ensure intent from relay failed", e)
+        }
+    }
+
+    /**
+     * 主动从 relay 拉取收件箱并 upsert 到本地存储。打开/刷新收件箱即可见新请求——
+     * 在常驻 WS 推送服务（RelayPushService）尚未启动时，这是用户在前台收到代理付款请求的
+     * 唯一途径（否则列表只读本地、永远为空）。失败静默：离线或未配置 relay 时退回本地数据。
+     * 含网络 IO，必须在后台线程（Dispatchers.IO）调用。
+     */
+    fun syncFromRelay(context: Context) {
+        try {
+            RelayClient.sync(context)
+        } catch (e: Exception) {
+            VpLog.w("InboxRepository", "sync inbox from relay failed", e)
         }
     }
 

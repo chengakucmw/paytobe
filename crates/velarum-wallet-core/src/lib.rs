@@ -29,18 +29,17 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use ed25519_dalek::{Signer, SigningKey, Verifier};
 use hmac::{Hmac, Mac};
+use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256, Sha512};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 use stellar_strkey::ed25519::PublicKey as StrkeyPublic;
 use stellar_xdr::{
     AccountId, Asset, BytesM, CreateAccountOp, DecoratedSignature, Hash, Limits, Memo,
     MuxedAccount, Operation, OperationBody, PaymentOp, Preconditions, PublicKey as XdrPublicKey,
-    SequenceNumber, Signature as XdrSignature, SignatureHint, Transaction,
-    TransactionEnvelope, TransactionExt, TransactionSignaturePayload,
-    TransactionSignaturePayloadTaggedTransaction, TransactionV1Envelope, Uint256, WriteXdr,
+    SequenceNumber, Signature as XdrSignature, SignatureHint, Transaction, TransactionEnvelope,
+    TransactionExt, TransactionSignaturePayload, TransactionSignaturePayloadTaggedTransaction,
+    TransactionV1Envelope, Uint256, WriteXdr,
 };
-
-// Wires up the UniFFI scaffolding for every `#[uniffi::export]` item below.
-uniffi::setup_scaffolding!();
 
 type HmacSha512 = Hmac<Sha512>;
 
@@ -146,9 +145,10 @@ pub fn derive_stellar(
     // BIP-39 validation (wordlist + checksum) and the PBKDF2-HMAC-SHA512 seed.
     let parsed = bip39::Mnemonic::parse_in_normalized(bip39::Language::English, &phrase)
         .map_err(|e| WalletError::InvalidMnemonic(format!("{e}")))?;
-    let seed = parsed.to_seed(passphrase);
+    let mut seed = parsed.to_seed(passphrase);
 
     let secret_seed = slip10_ed25519(&seed, &[44, STELLAR_COIN_TYPE, account]);
+    wipe(&mut seed); // the 64-byte BIP-39 seed is no longer needed once derived
     let signing = SigningKey::from_bytes(&secret_seed);
     let public_key = signing.verifying_key().to_bytes();
     // stellar-strkey's `to_string()` returns a no_std `heapless::String`; convert
@@ -210,6 +210,21 @@ fn to_hex(bytes: &[u8]) -> String {
     s
 }
 
+/// Best-effort wipe of secret bytes from memory. Uses volatile writes plus a
+/// compiler fence so the zeroing is not optimized away before the buffer drops.
+///
+/// Defence in depth: it limits how long a derived BIP-39 seed or a private key
+/// copy lingers in this process's RAM. It cannot scrub copies the OS may have
+/// paged to disk, nor the separate copies the platform (Kotlin/Swift) holds —
+/// those stay the platform's responsibility.
+fn wipe(bytes: &mut [u8]) {
+    for b in bytes.iter_mut() {
+        // SAFETY: `b` is a valid, aligned `&mut u8`; a volatile write of 0 is sound.
+        unsafe { core::ptr::write_volatile(b, 0u8) };
+    }
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+}
+
 // ---------------------------------------------------------------------------
 // EVM + Solana derivation (fills the iOS gap; Android already derives these)
 // ---------------------------------------------------------------------------
@@ -269,7 +284,11 @@ fn eip55(addr20: &[u8]) -> String {
             out.push(c);
         } else {
             let nibble = (hash[i / 2] >> (if i % 2 == 0 { 4 } else { 0 })) & 0x0f;
-            out.push(if nibble >= 8 { c.to_ascii_uppercase() } else { c });
+            out.push(if nibble >= 8 {
+                c.to_ascii_uppercase()
+            } else {
+                c
+            });
         }
     }
     out
@@ -277,14 +296,14 @@ fn eip55(addr20: &[u8]) -> String {
 
 /// Derive the EVM account at `m/44'/60'/0'/0/0` (BIP-44 secp256k1) from a mnemonic.
 pub fn derive_evm(mnemonic: &str, passphrase: &str) -> Result<EvmKeys, WalletError> {
-    use k256::elliptic_curve::sec1::ToEncodedPoint;
-    let seed = validated_seed(mnemonic, passphrase)?;
+    let mut seed = validated_seed(mnemonic, passphrase)?;
     let path = "m/44'/60'/0'/0/0";
     let dpath: bip32::DerivationPath = path
         .parse()
         .map_err(|e| WalletError::Internal(format!("bad derivation path: {e}")))?;
-    let xprv = bip32::XPrv::derive_from_path(seed, &dpath)
+    let xprv = bip32::XPrv::derive_from_path(&seed, &dpath)
         .map_err(|e| WalletError::Internal(format!("BIP-32 derivation failed: {e}")))?;
+    wipe(&mut seed);
     let point = xprv.private_key().verifying_key().to_encoded_point(false); // 0x04 || x || y
     let address = eip55(&keccak256(&point.as_bytes()[1..65])[12..32]);
     let mut private_key = [0u8; 32];
@@ -298,8 +317,9 @@ pub fn derive_evm(mnemonic: &str, passphrase: &str) -> Result<EvmKeys, WalletErr
 
 /// Derive the Solana account at `m/44'/501'/0'/0'` (SLIP-0010 ed25519) from a mnemonic.
 pub fn derive_solana(mnemonic: &str, passphrase: &str) -> Result<SolanaKeys, WalletError> {
-    let seed = validated_seed(mnemonic, passphrase)?;
+    let mut seed = validated_seed(mnemonic, passphrase)?;
     let secret_seed = slip10_ed25519(&seed, &[44, SOLANA_COIN_TYPE, 0, 0]);
+    wipe(&mut seed);
     let signing = SigningKey::from_bytes(&secret_seed);
     let public_key = signing.verifying_key().to_bytes();
     let address = bs58::encode(public_key).into_string();
@@ -386,7 +406,9 @@ pub fn assert_stellar_network_consistency(host: &str, testnet: bool) -> Result<(
 fn decode_destination(addr: &str) -> Result<[u8; 32], WalletError> {
     let trimmed = addr.trim();
     if trimmed.to_uppercase().starts_with('M') {
-        return Err(WalletError::InvalidDestination(MUXED_UNSUPPORTED_MESSAGE.into()));
+        return Err(WalletError::InvalidDestination(
+            MUXED_UNSUPPORTED_MESSAGE.into(),
+        ));
     }
     let pk = StrkeyPublic::from_string(trimmed)
         .map_err(|_| WalletError::InvalidDestination("Invalid Stellar public address.".into()))?;
@@ -524,7 +546,9 @@ pub fn sign_stellar_payment(
         seq_num: SequenceNumber(sequence),
         cond: Preconditions::None,
         memo: memo_x,
-        operations: vec![operation].try_into().expect("exactly one operation fits"),
+        operations: vec![operation]
+            .try_into()
+            .expect("exactly one operation fits"),
         ext: TransactionExt::V0,
     };
 
@@ -542,7 +566,9 @@ pub fn sign_stellar_payment(
     signing
         .verifying_key()
         .verify(&tx_hash, &signature)
-        .map_err(|_| WalletError::Internal("Produced signature failed self-verification.".into()))?;
+        .map_err(|_| {
+            WalletError::Internal("Produced signature failed self-verification.".into())
+        })?;
 
     let hint = SignatureHint([
         source_public[28],
@@ -550,18 +576,21 @@ pub fn sign_stellar_payment(
         source_public[30],
         source_public[31],
     ]);
-    let sig_xdr = XdrSignature(
-        BytesM::<64>::try_from(&signature.to_bytes()[..]).map_err(xdr_internal)?,
-    );
+    let sig_xdr =
+        XdrSignature(BytesM::<64>::try_from(&signature.to_bytes()[..]).map_err(xdr_internal)?);
     let decorated = DecoratedSignature {
         hint,
         signature: sig_xdr,
     };
     let envelope = TransactionEnvelope::Tx(TransactionV1Envelope {
         tx,
-        signatures: vec![decorated].try_into().expect("exactly one signature fits"),
+        signatures: vec![decorated]
+            .try_into()
+            .expect("exactly one signature fits"),
     });
-    let envelope_base64 = envelope.to_xdr_base64(Limits::none()).map_err(xdr_internal)?;
+    let envelope_base64 = envelope
+        .to_xdr_base64(Limits::none())
+        .map_err(xdr_internal)?;
 
     Ok(SignedStellarTransaction {
         envelope_base64,
@@ -603,7 +632,9 @@ fn parse_evm_address(addr: &str) -> Result<[u8; 20], WalletError> {
     let bytes = hex_to_bytes(hex)
         .ok_or_else(|| WalletError::InvalidDestination("Invalid EVM address.".into()))?;
     if bytes.len() != 20 {
-        return Err(WalletError::InvalidDestination("Invalid EVM address.".into()));
+        return Err(WalletError::InvalidDestination(
+            "Invalid EVM address.".into(),
+        ));
     }
     let mut a = [0u8; 20];
     a.copy_from_slice(&bytes);
@@ -660,7 +691,10 @@ pub fn sign_evm_transaction(
     let value = parse_u128_dec(value_wei)?;
     let to = parse_evm_address(to_address)?;
     let data = {
-        let h = data_hex.trim().strip_prefix("0x").unwrap_or(data_hex.trim());
+        let h = data_hex
+            .trim()
+            .strip_prefix("0x")
+            .unwrap_or(data_hex.trim());
         if h.is_empty() {
             Vec::new()
         } else {
@@ -785,230 +819,520 @@ pub fn sign_solana_transfer(
 }
 
 // ---------------------------------------------------------------------------
-// UniFFI layer — exactly what Kotlin (Android) and Swift (iOS) call. Kept as a
-// thin wrapper of FFI-friendly types (Vec<u8>, String) so the pure core API
-// above stays clean and independently testable.
+// SPL token transfer (transferChecked, with optional associated-token-account
+// creation). Mirrors Android `SolanaTransfer.buildSplMessage` byte-for-byte.
+//
+// The associated token accounts (ATAs) are PDAs whose derivation depends on an
+// ed25519 on-curve check whose exact semantics vary between libraries. To avoid
+// any risk there, the ATAs are derived by the caller (the apps' existing, tested
+// PDA code) and passed in; this function is pure message-build + ed25519 sign —
+// fully deterministic, and cross-checked byte-for-byte against the native path.
 // ---------------------------------------------------------------------------
 
-/// FFI mirror of [`StellarKeys`] (fixed-size arrays become byte vectors).
-#[derive(Debug, uniffi::Record)]
-pub struct FfiStellarKeys {
-    pub address: String,
-    pub public_key: Vec<u8>,
-    pub secret_seed: Vec<u8>,
-    pub derivation_path: String,
+fn spl_program(s: &str) -> [u8; 32] {
+    let v = bs58::decode(s).into_vec().expect("valid base58 program id");
+    let mut a = [0u8; 32];
+    a.copy_from_slice(&v);
+    a
 }
 
-/// FFI mirror of [`SignedStellarTransaction`].
-#[derive(Debug, uniffi::Record)]
-pub struct FfiSignedStellarTransaction {
-    pub envelope_base64: String,
-    pub tx_hash_hex: String,
-    pub create_account: bool,
+fn transfer_checked_data(amount: u64, decimals: u8) -> Vec<u8> {
+    let mut d = Vec::with_capacity(10);
+    d.push(12u8); // SPL TokenInstruction::TransferChecked
+    d.extend_from_slice(&amount.to_le_bytes());
+    d.push(decimals);
+    d
 }
 
-/// Flat error carried across the FFI boundary. The platform adapters surface
-/// `message` to the user — it is the same English text the apps already show.
-#[derive(Debug, uniffi::Error)]
-pub enum FfiWalletError {
-    Message(String),
+fn write_spl_instruction(out: &mut Vec<u8>, program_index: u8, accounts: &[u8], data: &[u8]) {
+    out.push(program_index);
+    write_compact(out, accounts.len() as u16);
+    out.extend_from_slice(accounts);
+    write_compact(out, data.len() as u16);
+    out.extend_from_slice(data);
 }
 
-impl std::fmt::Display for FfiWalletError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FfiWalletError::Message(m) => write!(f, "{m}"),
+#[allow(clippy::too_many_arguments)]
+fn build_spl_message(
+    owner: &[u8; 32],
+    source_ata: &[u8; 32],
+    destination_ata: &[u8; 32],
+    recipient_wallet: &[u8; 32],
+    mint: &[u8; 32],
+    blockhash: &[u8; 32],
+    amount: u64,
+    decimals: u8,
+    create_destination_ata: bool,
+) -> Vec<u8> {
+    let token_program = spl_program("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+    let ata_program = spl_program("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+    let rent_sysvar = spl_program("SysvarRent111111111111111111111111111111111");
+    let system_program = [0u8; 32];
+
+    let mut out = Vec::new();
+    out.push(1u8); // numRequiredSignatures
+    out.push(0u8); // numReadonlySignedAccounts
+    out.push(if create_destination_ata { 6u8 } else { 2u8 }); // numReadonlyUnsignedAccounts
+    if create_destination_ata {
+        write_compact(&mut out, 9);
+        out.extend_from_slice(owner);
+        out.extend_from_slice(source_ata);
+        out.extend_from_slice(destination_ata);
+        out.extend_from_slice(mint);
+        out.extend_from_slice(recipient_wallet);
+        out.extend_from_slice(&system_program);
+        out.extend_from_slice(&token_program);
+        out.extend_from_slice(&ata_program);
+        out.extend_from_slice(&rent_sysvar);
+        out.extend_from_slice(blockhash);
+        write_compact(&mut out, 2);
+        write_spl_instruction(&mut out, 7, &[0, 2, 4, 3, 5, 6, 8], &[]);
+        write_spl_instruction(
+            &mut out,
+            6,
+            &[1, 3, 2, 0],
+            &transfer_checked_data(amount, decimals),
+        );
+    } else {
+        write_compact(&mut out, 5);
+        out.extend_from_slice(owner);
+        out.extend_from_slice(source_ata);
+        out.extend_from_slice(destination_ata);
+        out.extend_from_slice(mint);
+        out.extend_from_slice(&token_program);
+        out.extend_from_slice(blockhash);
+        write_compact(&mut out, 1);
+        write_spl_instruction(
+            &mut out,
+            4,
+            &[1, 3, 2, 0],
+            &transfer_checked_data(amount, decimals),
+        );
+    }
+    out
+}
+
+/// Build and sign an SPL `transferChecked` (optionally preceded by an
+/// associated-token-account creation). The caller supplies the already-derived
+/// source/destination ATAs (base58). Mirrors Android `SolanaTransfer.sendSplToken`.
+#[allow(clippy::too_many_arguments)]
+pub fn sign_spl_token_transfer(
+    secret_seed: &[u8; 32],
+    source_token_account: &str,
+    destination_token_account: &str,
+    mint_address: &str,
+    recipient_wallet: &str,
+    amount_base_units: u64,
+    decimals: u8,
+    recent_blockhash: &str,
+    create_destination_ata: bool,
+) -> Result<SolanaSignedTx, WalletError> {
+    let signing = SigningKey::from_bytes(secret_seed);
+    let owner = signing.verifying_key().to_bytes();
+    let source_ata = decode_base58_32(source_token_account, "source token account")?;
+    let destination_ata = decode_base58_32(destination_token_account, "destination token account")?;
+    let mint = decode_base58_32(mint_address, "SPL token mint")?;
+    let recipient = decode_base58_32(recipient_wallet, "recipient wallet")?;
+    let blockhash = decode_base58_32(recent_blockhash, "blockhash")?;
+    let message = build_spl_message(
+        &owner,
+        &source_ata,
+        &destination_ata,
+        &recipient,
+        &mint,
+        &blockhash,
+        amount_base_units,
+        decimals,
+        create_destination_ata,
+    );
+    let signature = signing.sign(&message);
+    let mut tx = Vec::new();
+    write_compact(&mut tx, 1);
+    tx.extend_from_slice(&signature.to_bytes());
+    tx.extend_from_slice(&message);
+    Ok(SolanaSignedTx {
+        transaction_base64: STANDARD.encode(&tx),
+        signature_base58: bs58::encode(signature.to_bytes()).into_string(),
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Stable C ABI — Kotlin (Android) and Swift (iOS) use this versioned boundary.
+// The ABI intentionally exposes only an opaque result handle and byte slices;
+// Rust-specific layouts and allocator-owned memory never cross the boundary.
+// ---------------------------------------------------------------------------
+
+pub const C_ABI_VERSION: u32 = 1;
+const MAX_FFI_INPUT_BYTES: usize = 1024 * 1024;
+
+/// Opaque result allocated and freed by this library.
+pub struct VelarumWalletCoreResult {
+    bytes: Vec<u8>,
+}
+
+fn wallet_error_code(error: &WalletError) -> &'static str {
+    match error {
+        WalletError::InvalidWordCount(_) => "invalid_word_count",
+        WalletError::InvalidMnemonic(_) => "invalid_mnemonic",
+        WalletError::InvalidAmount(_) => "invalid_amount",
+        WalletError::InvalidDestination(_) => "invalid_destination",
+        WalletError::InvalidMemo(_) => "invalid_memo",
+        WalletError::NetworkMismatch(_) => "network_mismatch",
+        WalletError::Internal(_) => "internal",
+    }
+}
+
+fn ffi_error(code: &str, message: impl Into<String>) -> Value {
+    json!({"ok": false, "error": {"code": code, "message": message.into()}})
+}
+
+fn required_string<'a>(request: &'a Map<String, Value>, name: &str) -> Result<&'a str, Value> {
+    request
+        .get(name)
+        .and_then(Value::as_str)
+        .ok_or_else(|| ffi_error("invalid_request", format!("Missing or invalid '{name}'.")))
+}
+
+fn optional_string<'a>(request: &'a Map<String, Value>, name: &str) -> &'a str {
+    request.get(name).and_then(Value::as_str).unwrap_or("")
+}
+
+fn required_bool(request: &Map<String, Value>, name: &str) -> Result<bool, Value> {
+    request
+        .get(name)
+        .and_then(Value::as_bool)
+        .ok_or_else(|| ffi_error("invalid_request", format!("Missing or invalid '{name}'.")))
+}
+
+fn required_u64(request: &Map<String, Value>, name: &str) -> Result<u64, Value> {
+    request
+        .get(name)
+        .and_then(|value| value.as_u64().or_else(|| value.as_str()?.parse().ok()))
+        .ok_or_else(|| ffi_error("invalid_request", format!("Missing or invalid '{name}'.")))
+}
+
+fn required_i64(request: &Map<String, Value>, name: &str) -> Result<i64, Value> {
+    request
+        .get(name)
+        .and_then(|value| value.as_i64().or_else(|| value.as_str()?.parse().ok()))
+        .ok_or_else(|| ffi_error("invalid_request", format!("Missing or invalid '{name}'.")))
+}
+
+fn required_u8(request: &Map<String, Value>, name: &str) -> Result<u8, Value> {
+    required_u64(request, name).and_then(|value| {
+        u8::try_from(value)
+            .map_err(|_| ffi_error("invalid_request", format!("'{name}' is out of range.")))
+    })
+}
+
+fn required_u32(request: &Map<String, Value>, name: &str) -> Result<u32, Value> {
+    required_u64(request, name).and_then(|value| {
+        u32::try_from(value)
+            .map_err(|_| ffi_error("invalid_request", format!("'{name}' is out of range.")))
+    })
+}
+
+fn required_secret(
+    request: &Map<String, Value>,
+    name: &str,
+    label: &str,
+) -> Result<[u8; 32], Value> {
+    let encoded = required_string(request, name)?;
+    let mut decoded = STANDARD
+        .decode(encoded)
+        .map_err(|_| ffi_error("invalid_request", format!("{label} must be valid base64.")))?;
+    if decoded.len() != 32 {
+        wipe(&mut decoded);
+        return Err(ffi_error(
+            "invalid_request",
+            format!("{label} must be exactly 32 bytes."),
+        ));
+    }
+    let mut secret = [0u8; 32];
+    secret.copy_from_slice(&decoded);
+    wipe(&mut decoded);
+    Ok(secret)
+}
+
+fn core_result<T>(
+    result: Result<T, WalletError>,
+    map: impl FnOnce(T) -> Value,
+) -> Result<Value, Value> {
+    result
+        .map(map)
+        .map_err(|error| ffi_error(wallet_error_code(&error), error.to_string()))
+}
+
+fn dispatch_ffi(method: &str, request_bytes: &[u8]) -> Value {
+    let parsed: Value = match serde_json::from_slice(request_bytes) {
+        Ok(value) => value,
+        Err(error) => return ffi_error("invalid_json", format!("Invalid request JSON: {error}")),
+    };
+    let request = match parsed.as_object() {
+        Some(value) => value,
+        None => return ffi_error("invalid_request", "Request JSON must be an object."),
+    };
+
+    let value = (|| -> Result<Value, Value> {
+        match method {
+            "stellar_derive" => {
+                let mnemonic = required_string(request, "mnemonic")?;
+                let account = required_u32(request, "account")?;
+                core_result(
+                    derive_stellar(mnemonic, optional_string(request, "passphrase"), account),
+                    |mut keys| {
+                        let value = json!({
+                            "address": keys.address,
+                            "publicKey": STANDARD.encode(keys.public_key),
+                            "secretSeed": STANDARD.encode(keys.secret_seed),
+                            "derivationPath": keys.derivation_path
+                        });
+                        wipe(&mut keys.secret_seed);
+                        value
+                    },
+                )
+            }
+            "stellar_sign_payment" => {
+                let network_passphrase = required_string(request, "networkPassphrase")?;
+                let sequence = required_i64(request, "sequence")?;
+                let destination_address = required_string(request, "destinationAddress")?;
+                let amount_xlm = required_string(request, "amountXlm")?;
+                let memo = optional_string(request, "memo");
+                let memo_type = optional_string(request, "memoType");
+                let create_account = required_bool(request, "createAccount")?;
+                let mut seed = required_secret(request, "secretSeed", "Stellar secret seed")?;
+                let result = sign_stellar_payment(
+                    &seed,
+                    network_passphrase,
+                    sequence,
+                    destination_address,
+                    amount_xlm,
+                    memo,
+                    memo_type,
+                    create_account,
+                );
+                wipe(&mut seed);
+                core_result(result, |signed| {
+                    json!({
+                        "envelopeBase64": signed.envelope_base64,
+                        "txHashHex": signed.tx_hash_hex,
+                        "createAccount": signed.create_account
+                    })
+                })
+            }
+            "stellar_xlm_to_stroops" => core_result(
+                xlm_to_stroops(required_string(request, "amount")?),
+                |stroops| json!({"stroops": stroops.to_string()}),
+            ),
+            "stellar_assert_network_consistency" => core_result(
+                assert_stellar_network_consistency(
+                    required_string(request, "host")?,
+                    required_bool(request, "testnet")?,
+                ),
+                |_| json!({}),
+            ),
+            "evm_derive" => core_result(
+                derive_evm(
+                    required_string(request, "mnemonic")?,
+                    optional_string(request, "passphrase"),
+                ),
+                |mut keys| {
+                    let value = json!({
+                        "address": keys.address,
+                        "privateKey": STANDARD.encode(keys.private_key),
+                        "derivationPath": keys.derivation_path
+                    });
+                    wipe(&mut keys.private_key);
+                    value
+                },
+            ),
+            "solana_derive" => core_result(
+                derive_solana(
+                    required_string(request, "mnemonic")?,
+                    optional_string(request, "passphrase"),
+                ),
+                |mut keys| {
+                    let value = json!({
+                        "address": keys.address,
+                        "publicKey": STANDARD.encode(keys.public_key),
+                        "secretSeed": STANDARD.encode(keys.secret_seed),
+                        "derivationPath": keys.derivation_path
+                    });
+                    wipe(&mut keys.secret_seed);
+                    value
+                },
+            ),
+            "evm_sign_transaction" => {
+                let chain_id = required_u64(request, "chainId")?;
+                let nonce = required_u64(request, "nonce")?;
+                let gas_price_wei = required_string(request, "gasPriceWei")?;
+                let gas_limit = required_u64(request, "gasLimit")?;
+                let to_address = required_string(request, "toAddress")?;
+                let value_wei = required_string(request, "valueWei")?;
+                let data_hex = optional_string(request, "dataHex");
+                let mut private_key = required_secret(request, "privateKey", "EVM private key")?;
+                let result = sign_evm_transaction(
+                    &private_key,
+                    chain_id,
+                    nonce,
+                    gas_price_wei,
+                    gas_limit,
+                    to_address,
+                    value_wei,
+                    data_hex,
+                );
+                wipe(&mut private_key);
+                core_result(result, |signed| {
+                    json!({
+                        "rawTxHex": signed.raw_tx_hex,
+                        "txHashHex": signed.tx_hash_hex
+                    })
+                })
+            }
+            "solana_sign_transfer" => {
+                let to_address = required_string(request, "toAddress")?;
+                let lamports = required_u64(request, "lamports")?;
+                let recent_blockhash = required_string(request, "recentBlockhash")?;
+                let mut seed = required_secret(request, "secretSeed", "Solana secret seed")?;
+                let result = sign_solana_transfer(&seed, to_address, lamports, recent_blockhash);
+                wipe(&mut seed);
+                core_result(result, |signed| {
+                    json!({
+                        "transactionBase64": signed.transaction_base64,
+                        "signatureBase58": signed.signature_base58
+                    })
+                })
+            }
+            "solana_sign_spl_transfer" => {
+                let source_token_account = required_string(request, "sourceTokenAccount")?;
+                let destination_token_account =
+                    required_string(request, "destinationTokenAccount")?;
+                let mint_address = required_string(request, "mintAddress")?;
+                let recipient_wallet = required_string(request, "recipientWallet")?;
+                let amount = required_string(request, "amountBaseUnits")?
+                    .trim()
+                    .parse::<u64>()
+                    .map_err(|_| ffi_error("invalid_amount", "Invalid SPL token amount."))?;
+                let decimals = required_u8(request, "decimals")?;
+                let recent_blockhash = required_string(request, "recentBlockhash")?;
+                let create_destination_ata = required_bool(request, "createDestinationAta")?;
+                let mut seed = required_secret(request, "secretSeed", "Solana secret seed")?;
+                let result = sign_spl_token_transfer(
+                    &seed,
+                    source_token_account,
+                    destination_token_account,
+                    mint_address,
+                    recipient_wallet,
+                    amount,
+                    decimals,
+                    recent_blockhash,
+                    create_destination_ata,
+                );
+                wipe(&mut seed);
+                core_result(result, |signed| {
+                    json!({
+                        "transactionBase64": signed.transaction_base64,
+                        "signatureBase58": signed.signature_base58
+                    })
+                })
+            }
+            _ => Err(ffi_error(
+                "unknown_method",
+                format!("Unknown wallet-core method '{method}'."),
+            )),
         }
+    })();
+
+    match value {
+        Ok(value) => json!({"ok": true, "value": value}),
+        Err(error) => error,
     }
 }
 
-impl From<WalletError> for FfiWalletError {
-    fn from(e: WalletError) -> Self {
-        FfiWalletError::Message(e.to_string())
+fn serialize_ffi_response(value: Value) -> Vec<u8> {
+    serde_json::to_vec(&value).unwrap_or_else(|_| {
+        br#"{"ok":false,"error":{"code":"internal","message":"Could not serialize wallet-core response."}}"#.to_vec()
+    })
+}
+
+/// Returns the stable ABI revision implemented by this native library.
+#[no_mangle]
+pub extern "C" fn velarum_wallet_core_abi_version() -> u32 {
+    C_ABI_VERSION
+}
+
+/// Dispatch a UTF-8 method name and JSON object request. The returned opaque
+/// handle must be released with [`velarum_wallet_core_result_free`].
+#[no_mangle]
+pub unsafe extern "C" fn velarum_wallet_core_call(
+    method: *const u8,
+    method_len: usize,
+    request: *const u8,
+    request_len: usize,
+) -> *mut VelarumWalletCoreResult {
+    let response = catch_unwind(AssertUnwindSafe(|| {
+        if method_len > MAX_FFI_INPUT_BYTES || request_len > MAX_FFI_INPUT_BYTES {
+            return ffi_error(
+                "input_too_large",
+                "Wallet-core input exceeds the 1 MiB limit.",
+            );
+        }
+        if (method.is_null() && method_len != 0) || (request.is_null() && request_len != 0) {
+            return ffi_error(
+                "invalid_pointer",
+                "Wallet-core received a null input pointer.",
+            );
+        }
+        let method_bytes = if method_len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(method, method_len)
+        };
+        let request_bytes = if request_len == 0 {
+            &[]
+        } else {
+            std::slice::from_raw_parts(request, request_len)
+        };
+        let method_name = match std::str::from_utf8(method_bytes) {
+            Ok(value) => value,
+            Err(_) => return ffi_error("invalid_utf8", "Wallet-core method name must be UTF-8."),
+        };
+        dispatch_ffi(method_name, request_bytes)
+    }))
+    .unwrap_or_else(|_| {
+        ffi_error(
+            "panic",
+            "Wallet-core stopped an internal panic at the C ABI boundary.",
+        )
+    });
+
+    Box::into_raw(Box::new(VelarumWalletCoreResult {
+        bytes: serialize_ffi_response(response),
+    }))
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn velarum_wallet_core_result_data(
+    result: *const VelarumWalletCoreResult,
+) -> *const u8 {
+    result
+        .as_ref()
+        .map_or(std::ptr::null(), |value| value.bytes.as_ptr())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn velarum_wallet_core_result_len(
+    result: *const VelarumWalletCoreResult,
+) -> usize {
+    result.as_ref().map_or(0, |value| value.bytes.len())
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn velarum_wallet_core_result_free(result: *mut VelarumWalletCoreResult) {
+    if !result.is_null() {
+        let mut owned = Box::from_raw(result);
+        wipe(&mut owned.bytes);
     }
-}
-
-/// Derive the Stellar account at `m/44'/148'/account'` from a mnemonic.
-#[uniffi::export]
-pub fn stellar_derive(
-    mnemonic: String,
-    passphrase: String,
-    account: u32,
-) -> Result<FfiStellarKeys, FfiWalletError> {
-    let k = derive_stellar(&mnemonic, &passphrase, account)?;
-    Ok(FfiStellarKeys {
-        address: k.address,
-        public_key: k.public_key.to_vec(),
-        secret_seed: k.secret_seed.to_vec(),
-        derivation_path: k.derivation_path,
-    })
-}
-
-/// Build and sign a Stellar payment / create-account transaction.
-#[uniffi::export]
-pub fn stellar_sign_payment(
-    secret_seed: Vec<u8>,
-    network_passphrase: String,
-    sequence: i64,
-    destination_address: String,
-    amount_xlm: String,
-    memo: String,
-    memo_type: String,
-    create_account: bool,
-) -> Result<FfiSignedStellarTransaction, FfiWalletError> {
-    if secret_seed.len() != 32 {
-        return Err(FfiWalletError::Message(
-            "Stellar secret seed must be exactly 32 bytes.".into(),
-        ));
-    }
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&secret_seed);
-    let s = sign_stellar_payment(
-        &seed,
-        &network_passphrase,
-        sequence,
-        &destination_address,
-        &amount_xlm,
-        &memo,
-        &memo_type,
-        create_account,
-    )?;
-    Ok(FfiSignedStellarTransaction {
-        envelope_base64: s.envelope_base64,
-        tx_hash_hex: s.tx_hash_hex,
-        create_account: s.create_account,
-    })
-}
-
-/// Parse an XLM amount string into exact integer stroops.
-#[uniffi::export]
-pub fn stellar_xlm_to_stroops(amount: String) -> Result<i64, FfiWalletError> {
-    Ok(xlm_to_stroops(&amount)?)
-}
-
-/// M-3: refuse if a recognized Horizon host contradicts the declared network.
-#[uniffi::export]
-pub fn stellar_assert_network_consistency(
-    host: String,
-    testnet: bool,
-) -> Result<(), FfiWalletError> {
-    assert_stellar_network_consistency(&host, testnet)?;
-    Ok(())
-}
-
-/// FFI mirror of [`EvmKeys`].
-#[derive(Debug, uniffi::Record)]
-pub struct FfiEvmKeys {
-    pub address: String,
-    pub private_key: Vec<u8>,
-    pub derivation_path: String,
-}
-
-/// FFI mirror of [`SolanaKeys`].
-#[derive(Debug, uniffi::Record)]
-pub struct FfiSolanaKeys {
-    pub address: String,
-    pub public_key: Vec<u8>,
-    pub secret_seed: Vec<u8>,
-    pub derivation_path: String,
-}
-
-/// Derive the EVM account at m/44'/60'/0'/0/0.
-#[uniffi::export]
-pub fn evm_derive(mnemonic: String, passphrase: String) -> Result<FfiEvmKeys, FfiWalletError> {
-    let k = derive_evm(&mnemonic, &passphrase)?;
-    Ok(FfiEvmKeys {
-        address: k.address,
-        private_key: k.private_key.to_vec(),
-        derivation_path: k.derivation_path,
-    })
-}
-
-/// Derive the Solana account at m/44'/501'/0'/0'.
-#[uniffi::export]
-pub fn solana_derive(
-    mnemonic: String,
-    passphrase: String,
-) -> Result<FfiSolanaKeys, FfiWalletError> {
-    let k = derive_solana(&mnemonic, &passphrase)?;
-    Ok(FfiSolanaKeys {
-        address: k.address,
-        public_key: k.public_key.to_vec(),
-        secret_seed: k.secret_seed.to_vec(),
-        derivation_path: k.derivation_path,
-    })
-}
-
-/// FFI mirror of [`EvmSignedTx`].
-#[derive(Debug, uniffi::Record)]
-pub struct FfiEvmSignedTx {
-    pub raw_tx_hex: String,
-    pub tx_hash_hex: String,
-}
-
-/// FFI mirror of [`SolanaSignedTx`].
-#[derive(Debug, uniffi::Record)]
-pub struct FfiSolanaSignedTx {
-    pub transaction_base64: String,
-    pub signature_base58: String,
-}
-
-/// Build + sign a legacy EVM transaction (caller supplies nonce/gas; resolved
-/// via network). `data_hex` empty = native transfer; otherwise ERC-20 call data.
-#[uniffi::export]
-pub fn evm_sign_transaction(
-    private_key: Vec<u8>,
-    chain_id: u64,
-    nonce: u64,
-    gas_price_wei: String,
-    gas_limit: u64,
-    to_address: String,
-    value_wei: String,
-    data_hex: String,
-) -> Result<FfiEvmSignedTx, FfiWalletError> {
-    if private_key.len() != 32 {
-        return Err(FfiWalletError::Message(
-            "EVM private key must be 32 bytes.".into(),
-        ));
-    }
-    let mut pk = [0u8; 32];
-    pk.copy_from_slice(&private_key);
-    let s = sign_evm_transaction(
-        &pk,
-        chain_id,
-        nonce,
-        &gas_price_wei,
-        gas_limit,
-        &to_address,
-        &value_wei,
-        &data_hex,
-    )?;
-    Ok(FfiEvmSignedTx {
-        raw_tx_hex: s.raw_tx_hex,
-        tx_hash_hex: s.tx_hash_hex,
-    })
-}
-
-/// Build + sign a native SOL transfer (caller supplies the recent blockhash).
-#[uniffi::export]
-pub fn solana_sign_transfer(
-    secret_seed: Vec<u8>,
-    to_address: String,
-    lamports: u64,
-    recent_blockhash: String,
-) -> Result<FfiSolanaSignedTx, FfiWalletError> {
-    if secret_seed.len() != 32 {
-        return Err(FfiWalletError::Message(
-            "Solana secret seed must be 32 bytes.".into(),
-        ));
-    }
-    let mut seed = [0u8; 32];
-    seed.copy_from_slice(&secret_seed);
-    let s = sign_solana_transfer(&seed, &to_address, lamports, &recent_blockhash)?;
-    Ok(FfiSolanaSignedTx {
-        transaction_base64: s.transaction_base64,
-        signature_base58: s.signature_base58,
-    })
 }
 
 #[cfg(test)]
@@ -1023,7 +1347,10 @@ mod tests {
     #[test]
     fn stellar_matches_cross_platform_golden_vector() {
         let keys = derive_stellar(GOLDEN_MNEMONIC, "", 0).unwrap();
-        assert_eq!(keys.address, GOLDEN_ADDRESS, "Rust core drifted from golden vector");
+        assert_eq!(
+            keys.address, GOLDEN_ADDRESS,
+            "Rust core drifted from golden vector"
+        );
         assert_eq!(keys.derivation_path, "m/44'/148'/0'");
         assert_eq!(keys.public_key.len(), 32);
         assert_eq!(keys.secret_seed.len(), 32);
@@ -1045,7 +1372,10 @@ mod tests {
     #[test]
     fn rejects_bad_checksum() {
         let bad = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon";
-        assert!(matches!(derive_stellar(bad, "", 0), Err(WalletError::InvalidMnemonic(_))));
+        assert!(matches!(
+            derive_stellar(bad, "", 0),
+            Err(WalletError::InvalidMnemonic(_))
+        ));
     }
 
     #[test]
@@ -1100,8 +1430,14 @@ mod tests {
         // Independent reference: ethers.js wallet.signTransaction (legacy EIP-155).
         let keys = derive_evm(GOLDEN_MNEMONIC, "").unwrap();
         let signed = sign_evm_transaction(
-            &keys.private_key, 1, 0, "20000000000", 21000,
-            "0x000000000000000000000000000000000000dEaD", "1000000000000000000", "",
+            &keys.private_key,
+            1,
+            0,
+            "20000000000",
+            21000,
+            "0x000000000000000000000000000000000000dEaD",
+            "1000000000000000000",
+            "",
         )
         .unwrap();
         assert_eq!(signed.raw_tx_hex, "0xf86c808504a817c80082520894000000000000000000000000000000000000dead880de0b6b3a76400008026a0d752eab9909ac7da6e7058d003b2c4f694cd8d28ce736a23eacbcd92eddb5b2ba07464ea202ccd1d049e2b3af256472775f0fbfa0a90fdeea357fa11785ac9de0f");
@@ -1112,8 +1448,10 @@ mod tests {
         // Independent reference: @solana/web3.js Transaction.sign + serialize.
         let keys = derive_solana(GOLDEN_MNEMONIC, "").unwrap();
         let signed = sign_solana_transfer(
-            &keys.secret_seed, "11111111111111111111111111111112",
-            1_000_000_000, "11111111111111111111111111111111",
+            &keys.secret_seed,
+            "11111111111111111111111111111112",
+            1_000_000_000,
+            "11111111111111111111111111111111",
         )
         .unwrap();
         assert_eq!(signed.transaction_base64, "AdsnJKZOPWLXxXIeke6MNGmbU1VlIgYcnybb9pOtZODM6oaDOKa77LS0VXh4Zx1FgRDNWF5W32QRbnsElyCefAMBAAED8DYnYkanW53jNJ7UKxXiMvZRj8IPX81PHWToH5vSWPcAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAgIAAQwCAAAAAMqaOwAAAAA=");
@@ -1156,8 +1494,28 @@ mod tests {
     #[test]
     fn signing_is_deterministic() {
         let keys = derive_stellar(GOLDEN_MNEMONIC, "", 0).unwrap();
-        let a = sign_stellar_payment(&keys.secret_seed, STELLAR_TESTNET_PASSPHRASE, 1, &keys.address, "2.5", "", "", false).unwrap();
-        let b = sign_stellar_payment(&keys.secret_seed, STELLAR_TESTNET_PASSPHRASE, 1, &keys.address, "2.5", "", "", false).unwrap();
+        let a = sign_stellar_payment(
+            &keys.secret_seed,
+            STELLAR_TESTNET_PASSPHRASE,
+            1,
+            &keys.address,
+            "2.5",
+            "",
+            "",
+            false,
+        )
+        .unwrap();
+        let b = sign_stellar_payment(
+            &keys.secret_seed,
+            STELLAR_TESTNET_PASSPHRASE,
+            1,
+            &keys.address,
+            "2.5",
+            "",
+            "",
+            false,
+        )
+        .unwrap();
         assert_eq!(a.envelope_base64, b.envelope_base64);
         assert_eq!(a.tx_hash_hex, b.tx_hash_hex);
     }
@@ -1166,7 +1524,17 @@ mod tests {
     fn rejects_muxed_destination_h3() {
         let keys = derive_stellar(GOLDEN_MNEMONIC, "", 0).unwrap();
         let muxed = "MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAAAJLK";
-        let err = sign_stellar_payment(&keys.secret_seed, STELLAR_TESTNET_PASSPHRASE, 1, muxed, "1", "", "", false).unwrap_err();
+        let err = sign_stellar_payment(
+            &keys.secret_seed,
+            STELLAR_TESTNET_PASSPHRASE,
+            1,
+            muxed,
+            "1",
+            "",
+            "",
+            false,
+        )
+        .unwrap_err();
         assert!(matches!(err, WalletError::InvalidDestination(_)));
     }
 
@@ -1192,11 +1560,141 @@ mod tests {
     #[test]
     fn memo_id_is_not_downgraded_to_text_c1() {
         let keys = derive_stellar(GOLDEN_MNEMONIC, "", 0).unwrap();
-        let signed = sign_stellar_payment(&keys.secret_seed, STELLAR_TESTNET_PASSPHRASE, 7, &keys.address, "1", "100200300", "id", false).unwrap();
-        let env = TransactionEnvelope::from_xdr_base64(signed.envelope_base64.as_bytes(), Limits::none()).unwrap();
-        let v1 = match env { TransactionEnvelope::Tx(v) => v, _ => panic!() };
+        let signed = sign_stellar_payment(
+            &keys.secret_seed,
+            STELLAR_TESTNET_PASSPHRASE,
+            7,
+            &keys.address,
+            "1",
+            "100200300",
+            "id",
+            false,
+        )
+        .unwrap();
+        let env =
+            TransactionEnvelope::from_xdr_base64(signed.envelope_base64.as_bytes(), Limits::none())
+                .unwrap();
+        let v1 = match env {
+            TransactionEnvelope::Tx(v) => v,
+            _ => panic!(),
+        };
         assert_eq!(v1.tx.memo, Memo::Id(100200300));
         // A non-numeric "id" memo must fail closed, not become text.
-        assert!(sign_stellar_payment(&keys.secret_seed, STELLAR_TESTNET_PASSPHRASE, 7, &keys.address, "1", "not-a-number", "id", false).is_err());
+        assert!(sign_stellar_payment(
+            &keys.secret_seed,
+            STELLAR_TESTNET_PASSPHRASE,
+            7,
+            &keys.address,
+            "1",
+            "not-a-number",
+            "id",
+            false
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn spl_transfer_signs_both_variants() {
+        // Byte-equality vs the native path is asserted on the Android side; here we
+        // just guard against panics / gross structural errors in cargo test.
+        let keys = derive_solana(GOLDEN_MNEMONIC, "").unwrap();
+        let any = "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"; // a valid 32-byte base58 key
+        let blockhash = "11111111111111111111111111111111";
+        let no_create = sign_spl_token_transfer(
+            &keys.secret_seed,
+            any,
+            any,
+            any,
+            any,
+            1_500_000,
+            6,
+            blockhash,
+            false,
+        )
+        .unwrap();
+        let create = sign_spl_token_transfer(
+            &keys.secret_seed,
+            any,
+            any,
+            any,
+            any,
+            1_500_000,
+            6,
+            blockhash,
+            true,
+        )
+        .unwrap();
+        assert!(!no_create.transaction_base64.is_empty());
+        // The create variant adds accounts + an extra instruction, so it serializes larger.
+        assert!(create.transaction_base64.len() > no_create.transaction_base64.len());
+        // A 64-byte ed25519 signature is ~88 base58 chars.
+        assert!(no_create.signature_base58.len() >= 86);
+        // A bad base58 input must fail closed, not panic.
+        assert!(sign_spl_token_transfer(
+            &keys.secret_seed,
+            "not base58!",
+            any,
+            any,
+            any,
+            1,
+            6,
+            blockhash,
+            false
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn c_abi_dispatches_and_versions_the_contract() {
+        assert_eq!(velarum_wallet_core_abi_version(), 1);
+        let request = serde_json::to_vec(&json!({
+            "mnemonic": GOLDEN_MNEMONIC,
+            "passphrase": "",
+            "account": 0
+        }))
+        .unwrap();
+        let response = dispatch_ffi("stellar_derive", &request);
+        assert_eq!(response["ok"], true);
+        assert_eq!(response["value"]["address"], GOLDEN_ADDRESS);
+        assert_eq!(
+            STANDARD
+                .decode(response["value"]["secretSeed"].as_str().unwrap())
+                .unwrap()
+                .len(),
+            32
+        );
+    }
+
+    #[test]
+    fn c_abi_returns_structured_errors() {
+        let malformed = dispatch_ffi("stellar_derive", br#"{"mnemonic":42}"#);
+        assert_eq!(malformed["ok"], false);
+        assert_eq!(malformed["error"]["code"], "invalid_request");
+
+        let unknown = dispatch_ffi("not_a_method", b"{}");
+        assert_eq!(unknown["ok"], false);
+        assert_eq!(unknown["error"]["code"], "unknown_method");
+    }
+
+    #[test]
+    fn c_abi_opaque_result_round_trips_and_frees() {
+        let method = b"stellar_xlm_to_stroops";
+        let request = br#"{"amount":"1.5"}"#;
+        let result = unsafe {
+            velarum_wallet_core_call(
+                method.as_ptr(),
+                method.len(),
+                request.as_ptr(),
+                request.len(),
+            )
+        };
+        assert!(!result.is_null());
+        let response = unsafe {
+            let data = velarum_wallet_core_result_data(result);
+            let len = velarum_wallet_core_result_len(result);
+            serde_json::from_slice::<Value>(std::slice::from_raw_parts(data, len)).unwrap()
+        };
+        assert_eq!(response["value"]["stroops"], "15000000");
+        unsafe { velarum_wallet_core_result_free(result) };
     }
 }

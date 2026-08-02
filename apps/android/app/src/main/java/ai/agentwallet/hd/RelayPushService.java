@@ -9,11 +9,19 @@ import android.os.Looper;
 import androidx.annotation.Nullable;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RelayPushService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final ExecutorService syncExecutor = Executors.newSingleThreadExecutor();
+    private final AtomicBoolean syncRunning = new AtomicBoolean(false);
+    private final AtomicBoolean syncRequested = new AtomicBoolean(false);
     private RelayClient relayClient;
-    private boolean stopped;
+    private volatile boolean stopped;
+    private volatile boolean reconnectScheduled;
+    private int reconnectAttempts;
 
     @Override
     public void onCreate() {
@@ -34,6 +42,7 @@ public class RelayPushService extends Service {
         stopped = true;
         if (relayClient != null) relayClient.close();
         handler.removeCallbacksAndMessages(null);
+        syncExecutor.shutdownNow();
         super.onDestroy();
     }
 
@@ -49,6 +58,8 @@ public class RelayPushService extends Service {
         relayClient.connect(this, new RelayClient.Listener() {
             @Override
             public void onConnected() {
+                reconnectAttempts = 0;
+                reconnectScheduled = false;
                 syncMissedIntents();
             }
 
@@ -69,23 +80,39 @@ public class RelayPushService extends Service {
     }
 
     private void scheduleReconnect() {
-        if (stopped) return;
+        if (stopped || reconnectScheduled) return;
+        reconnectScheduled = true;
+        // Exponential backoff capped at 60s (5s, 10s, 20s, 40s, 60s…) instead of
+        // hammering a down/misconfigured relay every 5s forever — which, for a
+        // foreground dataSync service, drains battery and network in a tight loop.
+        // reconnectAttempts resets to 0 on a successful connect (onConnected).
+        long delay = Math.min(60_000L, 5_000L * (1L << Math.min(reconnectAttempts, 4)));
+        reconnectAttempts++;
         handler.postDelayed(() -> {
+            reconnectScheduled = false;
             if (!stopped) connectRelay();
-        }, 5000);
+        }, delay);
     }
 
     private void syncMissedIntents() {
-        new Thread(() -> {
+        syncRequested.set(true);
+        if (!syncRunning.compareAndSet(false, true)) return;
+        syncExecutor.execute(() -> {
             try {
-                List<PaymentIntent> items = RelayClient.sync(this);
-                for (PaymentIntent intent : items) {
-                    if (PaymentIntent.STATUS_PENDING.equals(intent.status)) {
-                        PaymentNotifications.notifyPaymentIntent(this, intent);
+                while (!stopped && syncRequested.getAndSet(false)) {
+                    try {
+                        List<PaymentIntent> items = RelayClient.sync(this);
+                        for (PaymentIntent intent : items) {
+                            PaymentNotifications.notifyPaymentIntent(this, intent);
+                        }
+                    } catch (Exception error) {
+                        VpLog.w("RelayPushService", "authenticated REST recovery sync failed", error);
                     }
                 }
-            } catch (Exception ignored) {
+            } finally {
+                syncRunning.set(false);
+                if (!stopped && syncRequested.get()) syncMissedIntents();
             }
-        }).start();
+        });
     }
 }

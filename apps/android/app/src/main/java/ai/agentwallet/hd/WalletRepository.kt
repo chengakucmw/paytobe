@@ -3,6 +3,10 @@ package ai.agentwallet.hd
 import android.content.Context
 import org.json.JSONObject
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * 原生 UI 唯一的「门面 / Repository」：把界面需要的钱包操作集中在此，内部调用
@@ -18,11 +22,23 @@ import java.util.Locale
  */
 object WalletRepository {
 
+    // App-lifetime scope for best-effort, fire-and-forget relay status reports. These must
+    // outlive a screen's viewModelScope (which is cancelled when the user navigates away
+    // right after a successful pay/reject), so they run here. The on-chain tx and the local
+    // store are already updated before any report is launched, so a dropped report never
+    // affects local correctness — it only delays the relay/agent's view of the status.
+    private val reportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     /** 对应 NativeBridge.hasWallet() */
     fun hasWallet(context: Context): Boolean = SecureWalletStore.hasWallet(context)
 
     /** 是否已确认备份助记词（发送的前置条件之一）。 */
     fun isBackupVerified(context: Context): Boolean = SecureWalletStore.isBackupVerified(context)
+
+    /** relay 是否已配置（启动常驻推送服务 RelayPushService 的前置条件之一）。 */
+    fun isRelayConfigured(context: Context): Boolean =
+        PlatformServiceConfig.supportsWebSocket() &&
+            !PaymentInboxStore.relayUrl(context).isNullOrBlank()
 
     /**
      * 对应 NativeBridge.walletData()：地址 / 身份 / 缓存余额。
@@ -81,9 +97,12 @@ object WalletRepository {
 
     // ---------------- 发送（最关键管线，逐字照搬 WalletWebActivity.send / buildLocalSendIntent）----------------
 
-    private const val STELLAR_HORIZON = "https://horizon.stellar.org"
+    private val STELLAR_HORIZON = if (BuildConfig.TESTNET_ONLY) {
+        BuildNetworkPolicy.STELLAR_TESTNET_HORIZON
+    } else {
+        BuildConfig.STELLAR_MAINNET_HORIZON_URL
+    }
     private const val SOLANA_RPC = "https://api.mainnet-beta.solana.com"
-    private const val BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
 
     /**
      * 第一段（生物识别之前）：前置校验 → 组装 PaymentIntent → RiskPolicy 评估。
@@ -99,7 +118,7 @@ object WalletRepository {
         }
         if (to.isEmpty() || amount.isEmpty()) return SendPreparation.blocked(form, listOf("Enter a recipient and amount."))
         val root = try {
-            buildSendPaymentRoot(form.symbol, form.network, to, amount, form.memo)
+            buildSendPaymentRoot(form, to, amount, form.memo)
         } catch (e: Exception) {
             return SendPreparation.blocked(form, listOf(e.message ?: "Unsupported transfer."))
         }
@@ -141,36 +160,144 @@ object WalletRepository {
                 tx,
             )
         } catch (ignored: Exception) {
+            VpLog.w("WalletRepository", "history record write failed after broadcast", ignored)
         }
         return tx
     }
 
-    /** 逐字照搬 buildLocalSendIntent：严格 (symbol, network) 白名单，未知组合抛错。 */
+    /**
+     * 只读估算当前发送的真实网络费用（供 CONFIRM 展示）。复用 confirmSend 同一份 intentJson，与
+     * [PaymentExecutor] 相同的分链路由，但只做只读 RPC（不签名、不广播）。
+     * 失败或链不支持时返回 null，UI 回退到「Calculated at broadcast」。请在 IO 线程调用。
+     */
+    fun estimateNetworkFee(context: Context, prep: SendPreparation): String? {
+        if (prep.intentJson.isBlank()) return null
+        return try {
+            val intent = PaymentIntent.parse(prep.intentJson)
+            val wallet = loadWallet(context) ?: return null
+            NetworkFeeEstimator.estimateDisplayFee(context, wallet, intent)
+        } catch (e: Exception) {
+            VpLog.w("WalletRepository", "network fee estimate failed", e)
+            null
+        }
+    }
+
+    // ---------------- 资产目录（驱动 Send 选链 UI + 扫码地址校验）----------------
+    //
+    // 单一事实来源是包内私有的 TransferAssetRegistry（全 30 条链）。门面把它映射成 UI 可见的
+    // public 类型，从而 UI 层不直接接触包内私有 Java 类型（铁律 1）。
+    // sendable = 该链已具备设备端直签（direct_broadcast）；其余（prepared_payload）在 UI 上显示
+    // “Feature is under development”，并在路由层兜底拒绝（绝不盲签）。
+
+    /** UI 可见的可转账资产（一条链一项）。 */
+    fun transferAssets(): List<TransferAssetOption> = if (BuildConfig.TESTNET_ONLY) {
+        listOf(
+            TransferAssetOption(
+                rail = "stellar_xlm",
+                symbol = "XLM",
+                chain = "Stellar Testnet",
+                network = BuildNetworkPolicy.STELLAR_TESTNET_NETWORK,
+                family = "stellar",
+                chainId = 0,
+                sendable = true,
+            ),
+        )
+    } else {
+        TransferAssetRegistry.ASSETS.map { it.toOption() }
+    }
+
+    /**
+     * 扫码/粘贴地址的「提前校验地址类型」：返回该地址在注册表里可能匹配的所有链。
+     * 0 个 → 不是受支持的地址；1 个 → 可直接预选；多个（如所有 EVM 链共用 0x…）→ 让用户选链。
+     */
+    fun chainsForAddress(address: String): List<TransferAssetOption> {
+        val a = address.trim()
+        if (a.isEmpty()) return emptyList()
+        return transferAssets().filter { option ->
+            TransferAssetRegistry.ASSETS.firstOrNull { it.rail == option.rail }
+                ?.recipient
+                ?.matcher(a)
+                ?.matches() == true
+        }
+    }
+
+    /** 给定 rail，判断收款地址是否符合该链的地址格式（用于发送页的实时校验）。 */
+    fun addressMatchesChain(address: String, rail: String): Boolean {
+        val asset = TransferAssetRegistry.ASSETS.firstOrNull { it.rail == rail } ?: return false
+        return asset.recipient.matcher(address.trim()).matches()
+    }
+
+    private fun TransferAssetRegistry.Asset.toOption(): TransferAssetOption = TransferAssetOption(
+        rail = rail,
+        symbol = symbol,
+        chain = chain,
+        network = network,
+        family = family,
+        chainId = chainId,
+        // direct_broadcast = 设备端可直签直广播；prepared_payload = 尚无链族签名器 → under development
+        sendable = !requiresPreparedPayload(),
+    )
+
+    /** 把 (rail | symbol+chain) 解析为注册表里的资产；找不到返回 null。 */
+    private fun resolveSendAsset(form: SendForm): TransferAssetRegistry.Asset? {
+        val rail = form.rail.trim()
+        if (rail.isNotEmpty()) {
+            TransferAssetRegistry.ASSETS.firstOrNull { it.rail == rail }?.let { return it }
+        }
+        val sym = form.symbol.trim().uppercase(Locale.US)
+        val chain = form.network.trim()
+        // 资产的 chain 展示名在注册表里唯一（如 ETH 分别落在 Ethereum / Arbitrum One / …），
+        // 因此 symbol + chain 足以唯一确定一条链。
+        TransferAssetRegistry.ASSETS.firstOrNull {
+            it.symbol.equals(sym, ignoreCase = true) && it.chain.equals(chain, ignoreCase = true)
+        }?.let { return it }
+        // 兜底：老调用方可能传 network id（如 ethereum_mainnet）。
+        return TransferAssetRegistry.find("", chain, sym, 0L)
+    }
+
+    /**
+     * 由注册表驱动的发送 intent 组装（取代旧的 5 条硬编码白名单）：
+     *  - direct_broadcast：Stellar / Solana / Base USDC（ERC-20）/ 任意已注册 EVM 原生币。
+     *  - prepared_payload：抛 “Feature is under development”（UI 也会提前拦下，这里是纵深防御）。
+     */
     @Throws(Exception::class)
-    private fun buildSendPaymentRoot(symbol: String, network: String, to: String, amount: String, memo: String): JSONObject {
-        val sym = symbol.trim().uppercase(Locale.US)
-        val net = network.trim().lowercase(Locale.US)
+    private fun buildSendPaymentRoot(form: SendForm, to: String, amount: String, memo: String): JSONObject {
+        val asset = resolveSendAsset(form)
+            ?: throw IllegalStateException(form.symbol + " on " + form.network + " is not supported for sending.")
+        if (asset.requiresPreparedPayload()) {
+            throw IllegalStateException(
+                asset.symbol + " on " + asset.chain +
+                    " — Feature is under development. On-device signing for this chain isn't available yet.",
+            )
+        }
         val payment = JSONObject()
         payment.put("amount", amount)
         payment.put("to", to)
         if (memo.trim().isNotEmpty()) payment.put("memo", memo.trim())
-        if (sym == "XLM" && net.contains("stellar")) {
-            payment.put("rail", "stellar_xlm"); payment.put("network", "stellar"); payment.put("asset", "XLM"); payment.put("horizon_url", STELLAR_HORIZON)
-        } else if (sym == "SOL" && net.contains("solana")) {
-            payment.put("rail", "solana_sol"); payment.put("network", "solana_mainnet"); payment.put("asset", "SOL"); payment.put("decimals", 9); payment.put("rpc_url", SOLANA_RPC)
-        } else if (sym == "USDC" && net == "base") {
-            payment.put("rail", "base_usdc"); payment.put("network", "base_mainnet"); payment.put("asset", "USDC"); payment.put("chain_id", 8453L); payment.put("token_contract", BASE_USDC); payment.put("decimals", 6)
-        } else if (sym == "ETH" && net == "base") {
-            evmNativePayment(payment, "base_mainnet", "ETH", 8453L)
-        } else if (sym == "ETH" && net == "ethereum") {
-            evmNativePayment(payment, "ethereum", "ETH", 1L)
-        } else if ((sym == "POL" || sym == "MATIC") && (net == "polygon" || net.contains("polygon pos"))) {
-            evmNativePayment(payment, "polygon", sym, 137L)
-        } else {
-            throw IllegalStateException(
-                symbol + " on " + network +
-                    " is not supported for sending in this build. Supported: XLM on Stellar, " +
-                    "SOL on Solana, ETH on Ethereum or Base, USDC on Base, POL on Polygon.",
+        when {
+            asset.rail == "stellar_xlm" -> {
+                payment.put("rail", "stellar_xlm")
+                payment.put("network", if (BuildConfig.TESTNET_ONLY) BuildNetworkPolicy.STELLAR_TESTNET_NETWORK else "stellar_public")
+                payment.put("asset", "XLM")
+                payment.put("horizon_url", STELLAR_HORIZON)
+                payment.put("stellar_testnet", BuildConfig.TESTNET_ONLY)
+            }
+            asset.rail == "solana_sol" -> {
+                payment.put("rail", "solana_sol"); payment.put("network", "solana_mainnet"); payment.put("asset", "SOL"); payment.put("decimals", 9); payment.put("rpc_url", SOLANA_RPC)
+            }
+            asset.family == "evm" && asset.tokenContract.isNotEmpty() -> {
+                // ERC-20（当前仅 Base USDC）。token_contract / decimals 取自注册表（权威），不再硬编码。
+                payment.put("rail", asset.rail); payment.put("network", asset.network); payment.put("asset", asset.symbol)
+                payment.put("chain_id", asset.chainId); payment.put("token_contract", asset.tokenContract); payment.put("decimals", asset.decimals)
+            }
+            asset.family == "evm" -> {
+                // 任意已注册 EVM 链的原生币。chain_id 是 RPC/网络解析的键（WalletNetworkConfig.matches）。
+                // decimals 取自注册表（EVM 原生币=18），保持 intent 自洽（原生广播按 ETHER 计，不依赖该值）。
+                payment.put("rail", "evm_native"); payment.put("network", asset.network); payment.put("asset", asset.symbol); payment.put("chain_id", asset.chainId); payment.put("decimals", asset.decimals)
+            }
+            else -> throw IllegalStateException(
+                asset.symbol + " on " + asset.chain +
+                    " — Feature is under development. On-device signing for this chain isn't available yet.",
             )
         }
         val root = JSONObject()
@@ -178,13 +305,6 @@ object WalletRepository {
         root.put("status", PaymentIntent.STATUS_PENDING)
         root.put("payment", payment)
         return root
-    }
-
-    private fun evmNativePayment(payment: JSONObject, network: String, asset: String, chainId: Long) {
-        payment.put("rail", "evm_native")
-        payment.put("network", network)
-        payment.put("asset", asset)
-        payment.put("chain_id", chainId)
     }
 
     // ---------------- 收件箱支付（复用同一条 RiskPolicy→生物→PaymentExecutor→记账 管线）----------------
@@ -219,8 +339,7 @@ object WalletRepository {
         val wallet = loadWallet(context) ?: throw IllegalStateException("No wallet loaded.")
         val tx = PaymentExecutor.execute(context, wallet, intent)
         RiskPolicy.recordSuccessfulPayment(context, intent)
-        try { PaymentInboxStore.updateStatus(context, intent.id, "broadcasted", tx, null) } catch (ignored: Exception) {}
-        try { RelayClient.updateStatus(context, intent, "broadcasted", tx, null) } catch (ignored: Exception) {}
+        try { PaymentInboxStore.updateStatus(context, intent.id, "broadcasted", tx, null) } catch (ignored: Exception) { VpLog.w("WalletRepository", "inbox status write failed after broadcast", ignored) }
         try {
             TransactionHistoryStore.record(
                 context,
@@ -233,17 +352,29 @@ object WalletRepository {
                 "broadcasted",
                 tx,
             )
-        } catch (ignored: Exception) {}
+        } catch (ignored: Exception) { VpLog.w("WalletRepository", "history record write failed after inbox pay", ignored) }
+        // Relay status report is best-effort and must NOT gate the success UI: the tx is
+        // already on-chain and the local store already reflects "broadcasted". Fire it on the
+        // app-lifetime scope so it still completes if the user leaves the detail screen (the
+        // caller's viewModelScope is cancelled on navigation). Failure is logged only.
+        reportScope.launch {
+            try { RelayClient.updateStatus(context, intent, "broadcasted", tx, null) } catch (e: Exception) { VpLog.w("WalletRepository", "relay status sync failed after broadcast", e) }
+        }
         return tx
     }
 
     /** 拒绝收件箱请求：本地状态置 rejected，并尽力同步到 relay。 */
     fun rejectInbox(context: Context, intentId: String) {
-        try { PaymentInboxStore.updateStatus(context, intentId, "rejected", null, null) } catch (ignored: Exception) {}
-        try {
-            val intent = PaymentInboxStore.find(context, intentId)
-            if (intent != null) RelayClient.updateStatus(context, intent, "rejected", null, null)
-        } catch (ignored: Exception) {}
+        try { PaymentInboxStore.updateStatus(context, intentId, "rejected", null, null) } catch (ignored: Exception) { VpLog.w("WalletRepository", "inbox status write failed on reject", ignored) }
+        // Local state is set above; report to the relay off the caller's thread so the reject
+        // UI doesn't wait on a network round-trip, on the app-lifetime scope so it survives the
+        // screen popping after reject. Best-effort; failure is logged only.
+        val intent = try { PaymentInboxStore.find(context, intentId) } catch (e: Exception) { VpLog.w("WalletRepository", "inbox lookup failed on reject", e); null }
+        if (intent != null) {
+            reportScope.launch {
+                try { RelayClient.updateStatus(context, intent, "rejected", null, null) } catch (e: Exception) { VpLog.w("WalletRepository", "relay status sync failed on reject", e) }
+            }
+        }
     }
 
     // ---------------- 内部 ----------------
@@ -268,16 +399,15 @@ object WalletRepository {
             out[key] = AssetBalance(
                 balance = obj.optString("balance", ""),
                 status = obj.optString("status", ""),
+                error = obj.optString("error", ""),
             )
         }
         return out
     }
 
-    private fun shorten(address: String?): String {
-        if (address == null) return ""
-        if (address.length <= 12) return address
-        return address.substring(0, 6) + "..." + address.substring(address.length - 4)
-    }
+    // Delegates to the shared AddressFormat (D9/Q5) — unified 6…4 form (was a local
+    // copy using the ASCII "..." separator; now standardised on the "…" ellipsis).
+    private fun shorten(address: String?): String = AddressFormat.shortAddress(address)
 }
 
 /** 钱包对外快照（public，UI 层用）。 */
@@ -297,15 +427,31 @@ data class WalletState(
 data class AssetBalance(
     val balance: String,
     val status: String,
+    val error: String = "",
 )
 
-/** 发送表单输入。 */
+/** 发送表单输入。rail 由选链 UI 透传，使路由免于符号歧义（如 ETH 跨多条链）。 */
 data class SendForm(
     val symbol: String,
     val network: String,
     val recipient: String,
     val amount: String,
     val memo: String,
+    val rail: String = "",
+)
+
+/**
+ * UI 可见的可转账资产（一条链一项），由 [WalletRepository.transferAssets] 从注册表映射而来。
+ * sendable=false 表示该链尚无设备端签名器 → 在选链页显示 “Feature is under development”。
+ */
+data class TransferAssetOption(
+    val rail: String,
+    val symbol: String,
+    val chain: String,
+    val network: String,
+    val family: String,
+    val chainId: Long,
+    val sendable: Boolean,
 )
 
 /**

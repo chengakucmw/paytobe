@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,7 +28,13 @@ import ai.agentwallet.hd.ui.theme.VelarumTheme
 
 /** 首页顶部栏：Logo + 品牌名 + 副标题 + 搜索/扫码（对照原型 04-home 的品牌头）。 */
 @Composable
-fun VpHomeTopBar(onSearch: () -> Unit, onScan: () -> Unit, modifier: Modifier = Modifier) {
+fun VpHomeTopBar(
+    onSearch: () -> Unit,
+    onScan: () -> Unit,
+    onRefresh: () -> Unit,
+    refreshing: Boolean,
+    modifier: Modifier = Modifier,
+) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -45,6 +52,9 @@ fun VpHomeTopBar(onSearch: () -> Unit, onScan: () -> Unit, modifier: Modifier = 
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s3)) {
             Text("VelarumPay", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
             Text("Self-custody wallet", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+        }
+        IconButton(onClick = onRefresh, enabled = !refreshing) {
+            Icon(Icons.Filled.Refresh, contentDescription = "Refresh balances", tint = VelarumTheme.colors.textStrong)
         }
         IconButton(onClick = onSearch) {
             Icon(Icons.Filled.Search, contentDescription = "Search", tint = VelarumTheme.colors.textStrong)

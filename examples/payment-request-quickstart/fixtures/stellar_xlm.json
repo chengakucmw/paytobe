@@ -70,7 +70,7 @@
       },
       {
         "field": "payment.to",
-        "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "value": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
         "source_type": "payment_request_fact",
         "verification_status": "observed_only",
         "confidence": "medium",
@@ -105,7 +105,7 @@
       "network": "stellar_testnet",
       "asset": "XLM",
       "amount": "32.50",
-      "to": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "to": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
       "memo": "book-order-1001",
       "estimated_fee": "0.00001"
     },
@@ -123,8 +123,8 @@
   },
   "expected": {
     "lifecycle_status": "pending",
-    "review_state": "pending",
-    "risk_level": "safe",
+    "review_state": "source_review_required",
+    "risk_level": "caution",
     "signing_allowed": true
   }
 }

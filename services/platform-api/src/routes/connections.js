@@ -1,11 +1,10 @@
 // Connection management routes. Mounted at "/v1/connections".
 
 import express from "express";
-import { id } from "../crypto.js";
 import { connectionPublicResponse, connectionResponse } from "../domain/projections.js";
 
 export function createConnectionsRouter(deps) {
-  const { store, observability, sendApiError, verifyAppQuery, verifyAppBody, notifyOpenClaw } = deps;
+  const { store, observability, sendApiError, verifyAppQuery, verifyAppBody, notifyOpenClaw, platformCore } = deps;
   const router = express.Router();
 
   router.get("/", (req, res) => {
@@ -55,7 +54,7 @@ export function createConnectionsRouter(deps) {
     if (!connection || connection.approved_by_device_id !== body.device_id) {
       return sendApiError(res, 404, "connection_not_found", "Connection not found");
     }
-    const revokedAt = new Date().toISOString();
+    const revokedAt = platformCore.clock.nowIso();
     const updated = store.updateConnectionStatus(connection.connection_id, "revoked", {
       revoked_at: revokedAt,
       revoked_by_device_id: body.device_id
@@ -89,7 +88,7 @@ export function createConnectionsRouter(deps) {
     if (connection.status === "revoked") {
       return sendApiError(res, 409, "connection_revoked", "Revoked connection tokens cannot be rotated");
     }
-    const rotated = store.rotateConnectionToken(connection.connection_id, id("conn_tok"));
+    const rotated = store.rotateConnectionToken(connection.connection_id, platformCore.random.opaqueToken("conn_tok", 32));
     notifyOpenClaw(connection.connection_id, {
       type: "connection.token_rotated",
       connection_id: connection.connection_id,

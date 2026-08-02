@@ -4,7 +4,13 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 final class PaymentRequest {
     static final String PROTOCOL_PAYMENT_REQUEST = "velarum.payment_request.v1";
@@ -52,6 +58,7 @@ final class PaymentRequest {
     final String amount;
     final String recipient;
     final String memo;
+    final String memoType;
     final String rpcUrl;
     final String horizonUrl;
     final boolean stellarTestnet;
@@ -162,6 +169,10 @@ final class PaymentRequest {
         amount = firstNonEmpty(payment.optString("amount", ""), paymentFacts.optString("amount", ""));
         recipient = firstNonEmpty(payment.optString("to", ""), payment.optString("recipient", ""), paymentFacts.optString("recipient", ""));
         memo = payment.optString("memo", "");
+        // C-1: carry the memo TYPE (text / id / hash / return) so a numeric exchange
+        // deposit tag is sent as MEMO_ID, not silently downgraded to MEMO_TEXT.
+        // Field name mirrors iOS (Models.swift reads "memo_type" / "memoType").
+        memoType = firstNonEmpty(payment.optString("memo_type", ""), payment.optString("memoType", ""));
         rpcUrl = payment.optString("rpc_url", "");
         stellarTestnet = payment.optBoolean("stellar_testnet", network.toLowerCase().contains("test"));
         horizonUrl = stellarHorizonUrl(payment.optString("horizon_url", ""), stellarTestnet);
@@ -364,15 +375,55 @@ final class PaymentRequest {
             if (value.matches("^\\d+$")) return Long.parseLong(value);
             return java.time.Instant.parse(value).toEpochMilli();
         } catch (Exception ignored) {
+            VpLog.d("PaymentRequest", "parse time failed; using fallback: " + ignored);
             return fallback;
         }
     }
 
-    private static String normalizeLifecycleStatus(String value) {
+    static String normalizeLifecycleStatus(String value) {
         if ("pending_user_approval".equals(value) || value == null || value.length() == 0) return STATUS_PENDING;
         if ("broadcasting".equals(value)) return STATUS_BROADCASTED;
         if ("signed_locally".equals(value)) return STATUS_SIGNED;
         return value;
+    }
+
+    // Client-side lifecycle guard. Mirrors the backend's PAYMENT_REQUEST_STATUS_TRANSITIONS
+    // (services/platform-api/src/domain/payment-request.js) and iOS's H12 lifecycle-rank
+    // downgrade protection. Each key lists the ONLY statuses it may advance to; terminal
+    // statuses advance to nothing. Used when a relay snapshot is merged into local state so
+    // a stale or tampered snapshot cannot revive a completed payment or undo a local advance.
+    private static final Map<String, Set<String>> STATUS_TRANSITIONS = buildStatusTransitions();
+
+    private static Map<String, Set<String>> buildStatusTransitions() {
+        Map<String, Set<String>> transitions = new HashMap<>();
+        transitions.put(STATUS_PENDING, new HashSet<>(Arrays.asList(
+                STATUS_SIGNED, STATUS_BROADCASTED, STATUS_FAILED, STATUS_EXPIRED, STATUS_REJECTED)));
+        transitions.put(STATUS_SIGNED, new HashSet<>(Arrays.asList(
+                STATUS_BROADCASTED, STATUS_FAILED, STATUS_EXPIRED, STATUS_REJECTED)));
+        transitions.put(STATUS_BROADCASTED, new HashSet<>(Arrays.asList(
+                STATUS_CONFIRMED, STATUS_FAILED)));
+        transitions.put(STATUS_CONFIRMED, Collections.<String>emptySet());
+        transitions.put(STATUS_FAILED, Collections.<String>emptySet());
+        transitions.put(STATUS_EXPIRED, Collections.<String>emptySet());
+        transitions.put(STATUS_REJECTED, Collections.<String>emptySet());
+        return Collections.unmodifiableMap(transitions);
+    }
+
+    /**
+     * Whether a stored Payment Request in {@code from} status may be replaced by an
+     * incoming relay snapshot in {@code to} status. Idempotent refreshes (same status)
+     * and legal forward transitions are allowed; downgrades (e.g. broadcasted -> pending),
+     * illegal jumps (e.g. pending -> confirmed, skipping the signature step), and any
+     * mutation of a terminal status are rejected, so a stale or out-of-order relay snapshot
+     * cannot make a paid request look actionable again (risking a duplicate payment) or drop
+     * a known tx hash. Mirrors the backend transition table and iOS's downgrade guard.
+     */
+    static boolean canApplyStatusUpdate(String from, String to) {
+        String normalizedFrom = normalizeLifecycleStatus(from);
+        String normalizedTo = normalizeLifecycleStatus(to);
+        if (normalizedFrom.equals(normalizedTo)) return true;
+        Set<String> allowed = STATUS_TRANSITIONS.get(normalizedFrom);
+        return allowed != null && allowed.contains(normalizedTo);
     }
 
     private static String normalizeRail(String value) {
@@ -418,6 +469,7 @@ final class PaymentRequest {
             fraction = fraction.replaceFirst("0+$", "");
             return fraction.length() == 0 ? whole : whole + "." + fraction;
         } catch (Exception ignored) {
+            VpLog.d("PaymentRequest", "decimal sum parse failed; returning empty: " + ignored);
             return "";
         }
     }

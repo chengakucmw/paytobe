@@ -15,9 +15,19 @@ const nodeOnly = args.has("--node-only") || process.env.RELEASE_GATE_NODE_ONLY =
 
 const steps = [
   {
+    name: "license policy",
+    command: "npm",
+    args: ["run", "license:check"]
+  },
+  {
     name: "workspace checks",
     command: "npm",
     args: ["run", "check"]
+  },
+  {
+    name: "cross-tenant security matrix",
+    command: "node",
+    args: ["--test", "tests/security/cross-tenant-matrix.test.mjs"]
   },
   {
     name: "unit tests",
@@ -37,25 +47,24 @@ const steps = [
   {
     name: "Android unit tests and debug build",
     command: platformCommand("./gradlew"),
-    args: ["testDebugUnitTest", "assembleDebug"],
+    args: [
+      "testStandardDebugUnitTest",
+      "assembleStandardDebug",
+      "testStellarTestnetDebugUnitTest",
+      "assembleStellarTestnetDebug"
+    ],
     cwd: path.join(repoRoot, "apps/android"),
     env: androidEnv(),
     skip: nodeOnly || skipAndroid
   },
   {
-    name: "iOS simulator build",
+    // Run the iOS UNIT TESTS, not just a build — this is what CI's ios job does
+    // (xcodebuild test), so the local gate must not be weaker. The concrete
+    // simulator destination is resolved in assertRunnable (only when this step
+    // actually runs, i.e. on macOS and not skipped).
+    name: "iOS simulator unit tests",
     command: "xcodebuild",
-    args: [
-      "-project",
-      path.join(repoRoot, "apps/ios/VelarumPay.xcodeproj"),
-      "-scheme",
-      "VelarumPay",
-      "-configuration",
-      "Debug",
-      "-sdk",
-      "iphonesimulator",
-      "build"
-    ],
+    args: [],
     skip: nodeOnly || skipIos
   }
 ];
@@ -68,8 +77,8 @@ Default behavior runs every v0.1 release gate:
 - unit tests
 - quickstart smoke
 - cross-component smoke
-- Android testDebugUnitTest + assembleDebug
-- iOS simulator build
+- Android standard and stellarTestnet Debug unit tests + builds
+- iOS simulator unit tests (xcodebuild test)
 `);
   process.exit(0);
 }
@@ -108,7 +117,50 @@ function assertRunnable(step) {
     if (!commandExists("xcodebuild")) {
       throw new Error("xcodebuild was not found. Install Xcode command line tools or use --skip-ios for local checks.");
     }
+    // Resolve a concrete simulator here (not at module load) so non-macOS and
+    // --skip-ios runs never shell out to simctl. `xcodebuild test` needs a real
+    // destination, unlike a plain build.
+    step.args = iosTestArgs(resolveIosSimulatorDestination());
   }
+}
+
+function iosTestArgs(destination) {
+  return [
+    "test",
+    "-project",
+    path.join(repoRoot, "apps/ios/VelarumPay.xcodeproj"),
+    "-scheme",
+    "VelarumPay",
+    "-sdk",
+    "iphonesimulator",
+    "-destination",
+    destination,
+    "CODE_SIGNING_ALLOWED=NO"
+  ];
+}
+
+// Pick the first available iPhone simulator, mirroring the CI ios job's selection
+// step. Throws a clear, actionable error when none is installed (the gate fails
+// loudly rather than silently skipping the iOS tests).
+function resolveIosSimulatorDestination() {
+  const result = spawnSync("xcrun", ["simctl", "list", "devices", "available", "-j"], { encoding: "utf8" });
+  if (result.status !== 0) {
+    throw new Error("Could not list iOS simulators (xcrun simctl). Install Xcode, or use --skip-ios for local checks.");
+  }
+  let data;
+  try {
+    data = JSON.parse(result.stdout);
+  } catch {
+    throw new Error("Could not parse the iOS simulator list from simctl.");
+  }
+  for (const runtime of Object.keys(data.devices || {})) {
+    for (const device of data.devices[runtime] || []) {
+      if (device.isAvailable && /iPhone/.test(device.name || "")) {
+        return `id=${device.udid}`;
+      }
+    }
+  }
+  throw new Error("No available iPhone simulator was found. Create one in Xcode, or use --skip-ios for local checks.");
 }
 
 function run(step) {

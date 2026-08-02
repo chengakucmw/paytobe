@@ -1,0 +1,14 @@
+{
+  "name": "@velarumpay/connect-platform-edge-testnet",
+  "version": "0.2.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build-site.mjs",
+    "check": "node --check src/worker.mjs && node --check scripts/build-site.mjs",
+    "smoke:live": "node scripts/live-smoke.mjs",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs"
+  }
+}

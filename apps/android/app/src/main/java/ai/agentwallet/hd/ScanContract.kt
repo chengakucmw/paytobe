@@ -27,8 +27,6 @@ object ScanContract {
 
     fun payloadOf(data: Intent?): String? = data?.getStringExtra(QrScannerActivity.EXTRA_PAYLOAD)
 
-    private val SENDABLE = setOf("XLM", "SOL", "ETH", "USDC")
-
     fun classify(raw: String?): ScanOutcome {
         val s = raw?.trim().orEmpty()
         if (s.isEmpty()) return ScanOutcome.Unknown
@@ -36,28 +34,23 @@ object ScanContract {
         if (lower.startsWith("velarumpay://pair") || lower.startsWith("velarumpay:pair")) {
             return ScanOutcome.Pairing(extractPairingCode(s))
         }
-        val draft = try { ScannedPaymentRequestParser.parseDraft(s) } catch (e: Exception) { null }
+        val draft = try { ScannedPaymentRequestParser.parseDraft(s) } catch (e: Exception) { VpLog.d("ScanContract", "parse draft failed; not a payment request: $e"); null }
         if (draft != null && !draft.to.isNullOrBlank()) {
-            val symbol = (draft.asset ?: "").trim().uppercase(Locale.US)
-            val known = if (symbol in SENDABLE) symbol else ""
+            // Pass the asset symbol straight through (all 30 chains are now valid). The Send
+            // ViewModel resolves the exact chain + runs the authoritative address-type check.
             return ScanOutcome.Transfer(
-                symbol = known,
-                network = networkFor(known),
+                symbol = (draft.asset ?: "").trim().uppercase(Locale.US),
+                network = "",
                 recipient = draft.to.trim(),
                 amount = (draft.amount ?: "").trim(),
                 memo = (draft.memo ?: "").trim(),
             )
         }
-        if (looksLikeAddress(s)) return ScanOutcome.Transfer("", "", s, "", "")
+        // Raw address: accept it as a transfer iff it matches a supported chain's address format
+        // (the "validate address type up front" requirement). The Send screen then detects the
+        // candidate chain(s) and asks the user to confirm when an address fits several chains.
+        if (WalletRepository.chainsForAddress(s).isNotEmpty()) return ScanOutcome.Transfer("", "", s, "", "")
         return ScanOutcome.Unknown
-    }
-
-    private fun networkFor(symbol: String): String = when (symbol) {
-        "XLM" -> "Stellar"
-        "SOL" -> "Solana"
-        "ETH" -> "Ethereum"
-        "USDC" -> "Base"
-        else -> ""
     }
 
     private fun extractPairingCode(raw: String): String {
@@ -65,12 +58,5 @@ object ScanContract {
         val q = raw.substringAfter("code=", "")
         if (q.isNotBlank()) return q.substringBefore('&').trim()
         return afterScheme.trim('/', ':', '?').trim()
-    }
-
-    private fun looksLikeAddress(s: String): Boolean {
-        if (s.matches(Regex("^0x[0-9a-fA-F]{40}$"))) return true
-        if (s.startsWith("G") && s.length == 56) return true
-        if (s.matches(Regex("^[1-9A-HJ-NP-Za-km-z]{32,44}$"))) return true
-        return false
     }
 }

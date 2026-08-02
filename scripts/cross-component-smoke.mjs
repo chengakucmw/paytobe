@@ -383,7 +383,8 @@ async function main() {
     await step(results, "negative.fixture_schema_expired", "schema", async () => {
       const invalid = clone(fixtures.expired.payment_request);
       invalid.connection_id = auth.connection.connection_id;
-      invalid.status = "expired";
+      invalid.status = "pending";
+      invalid.created_at = "2026-06-17T09:00:00.000Z";
       invalid.expires_at = "2026-06-17T09:59:00.000Z";
       const validation = validatePaymentRequest(invalid, { now: STATIC_VALIDATION_NOW });
       assert(!validation.ok, "expired schema negative fixture unexpectedly passed validation");

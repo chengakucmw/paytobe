@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation
+        android:name="ai.agentwallet.hd.SecureCredentialInstrumentation"
+        android:functionalTest="false"
+        android:handleProfiling="false"
+        android:label="VelarumPay secure credential tests"
+        android:targetPackage="com.velarumpay.wallet" />
+</manifest>

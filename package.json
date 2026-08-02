@@ -2,6 +2,7 @@
   "name": "velarumpay-code",
   "version": "0.1.0",
   "private": true,
+  "license": "Apache-2.0",
   "workspaces": [
     "packages/protocol",
     "packages/sdk-js",
@@ -11,14 +12,16 @@
     "connectors/hermes"
   ],
   "scripts": {
-    "check": "npm run check:protocol && npm run check:sdk-js && npm run check:platform-api && npm run check:openclaw-telegram && npm run check:mcp-server && npm run check:hermes",
+    "check": "npm run check:protocol && npm run check:sdk-js && npm run check:platform-api && npm run check:agentfood && npm run check:openclaw-telegram && npm run check:mcp-server && npm run check:hermes",
     "check:protocol": "npm --prefix packages/protocol run check",
     "check:sdk-js": "npm --prefix packages/sdk-js run check",
     "check:platform-api": "npm --prefix services/platform-api run check",
+    "check:agentfood": "npm --prefix services/agentfood run check",
     "check:openclaw-telegram": "npm --prefix connectors/openclaw-telegram run check",
     "check:mcp-server": "npm --prefix connectors/mcp-server run check",
     "check:hermes": "npm --prefix connectors/hermes run check",
-    "test": "npm --prefix services/platform-api test && npm run test:sdk-js && npm run test:mcp-server && npm run test:hermes",
+    "test": "npm --prefix services/platform-api test && npm run test:agentfood && npm run test:sdk-js && npm run test:mcp-server && npm run test:hermes",
+    "test:agentfood": "npm --prefix services/agentfood test",
     "test:sdk-js": "npm --prefix packages/sdk-js test",
     "test:mcp-server": "npm --prefix connectors/mcp-server test",
     "test:hermes": "npm --prefix connectors/hermes test",
@@ -27,6 +30,10 @@
     "package:integrations": "npm --prefix packages/protocol run pack:dry && npm --prefix packages/sdk-js run pack:dry && npm --prefix connectors/mcp-server run pack:dry && npm --prefix connectors/hermes run pack:dry",
     "android:build": "cd apps/android && ./gradlew testDebugUnitTest assembleDebug",
     "ios:build": "xcodebuild -project apps/ios/VelarumPay.xcodeproj -scheme VelarumPay -configuration Debug -sdk iphonesimulator build",
+    "wallet-core:test": "cd crates/velarum-wallet-core && cargo test",
+    "license:check": "node scripts/check-license-policy.mjs",
+    "contract:hd": "node --test tests/protocol/hd-derivation-contract.test.mjs",
+    "test:all": "bash scripts/test-all.sh",
     "release:gate": "node scripts/release-gate.mjs"
   }
 }

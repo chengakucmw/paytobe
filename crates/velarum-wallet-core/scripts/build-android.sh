@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Cross-compiles the wallet-core to Android .so's (all ABIs) into the app's
-# jniLibs, and (re)generates the Kotlin bindings + host lib for JVM unit tests.
+# jniLibs, and builds the host library for JVM unit tests.
 #
 # Requires: rustup Android targets, cargo-ndk, and an installed NDK
 # (ANDROID_NDK_HOME, or auto-picked from ~/Library/Android/sdk/ndk).
@@ -16,7 +16,7 @@ if [ -z "${ANDROID_NDK_HOME:-}" ]; then
 fi
 echo "Using NDK: $ANDROID_NDK_HOME"
 
-echo "==> Kotlin bindings + host lib (for JVM unit tests)"
+echo "==> host C ABI library (for JVM unit tests)"
 "$CRATE_DIR/scripts/build-android-host.sh" >/dev/null
 
 echo "==> device .so (arm64-v8a, armeabi-v7a, x86_64, x86)"

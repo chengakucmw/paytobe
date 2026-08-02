@@ -2,11 +2,30 @@ import fs from "fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "path";
 import { timingSafeTextEqual, tokenHash, verifyTokenHash } from "./crypto.js";
-import { addDecimalStrings, normalizeDecimalString } from "./decimal.js";
+import { createConnectionBinding } from "./application/connections/binding.js";
+import { addDecimalStrings, compareDecimalStrings, normalizeDecimalString } from "./decimal.js";
+import {
+  applySqliteMerchantSchema,
+  SQLITE_MERCHANT_SCHEMA_VERSION,
+  sqliteMerchantMigrationReport
+} from "./adapters/sqlite/merchant-schema.js";
 
 const LEGACY_JSON_DATA_PATH = path.resolve("data/relay-store.json");
 const DEFAULT_SQLITE_DATA_PATH = path.resolve("data/relay-store.sqlite");
-const SQLITE_SCHEMA_VERSION = 2;
+const NORMALIZED_RELAY_SCHEMA_VERSION = 2;
+const SQLITE_SCHEMA_VERSION = SQLITE_MERCHANT_SCHEMA_VERSION;
+
+// Terminal payment lifecycle states — no further transitions, so records in these
+// states are safe to retention-prune once old (mirrors the protocol's terminal set).
+const TERMINAL_STATUSES = Object.freeze(new Set(["confirmed", "failed", "expired", "rejected", "cancelled"]));
+
+// Default retention for terminal records before pruning. Generous so historical
+// status reads / idempotency replays keep working for a long time. Override with the
+// RELAY_RETENTION_MS env var; set it to 0 to disable retention pruning entirely.
+const DEFAULT_RETENTION_MS = (() => {
+  const raw = Number(process.env.RELAY_RETENTION_MS);
+  return Number.isFinite(raw) && raw >= 0 ? raw : 7 * 24 * 60 * 60 * 1000;
+})();
 
 // Schema v2 persists the relay state as one normalized table per in-memory
 // collection instead of a single JSON blob. Each row is (k, json): the
@@ -18,6 +37,9 @@ const OBJECT_COLLECTIONS = Object.freeze([
   { state: "devices", table: "devices" },
   { state: "pairingSessions", table: "pairing_sessions" },
   { state: "pairingCodes", table: "pairing_codes" },
+  { state: "connectInvitations", table: "connect_invitations" },
+  { state: "connectKeys", table: "connect_keys" },
+  { state: "connectClaimTokens", table: "connect_claim_tokens" },
   { state: "connections", table: "connections" },
   { state: "connectionTokens", table: "connection_tokens" },
   { state: "paymentRequests", table: "payment_requests" },
@@ -25,7 +47,10 @@ const OBJECT_COLLECTIONS = Object.freeze([
   { state: "intents", table: "intents" },
   { state: "transactionContexts", table: "transaction_contexts" },
   { state: "idempotency", table: "idempotency" },
-  { state: "dailySpent", table: "daily_spent" }
+  { state: "dailySpent", table: "daily_spent" },
+  // F1: in-flight daily-cap reservations (held -> settled/released). Persisted so
+  // a restart does not lose committed-but-unconfirmed headroom.
+  { state: "reservations", table: "reservations" }
 ]);
 
 function initialState() {
@@ -33,6 +58,9 @@ function initialState() {
     devices: {},
     pairingSessions: {},
     pairingCodes: {},
+    connectInvitations: {},
+    connectKeys: {},
+    connectClaimTokens: {},
     connections: {},
     connectionTokens: {},
     paymentRequests: {},
@@ -42,7 +70,8 @@ function initialState() {
     idempotency: {},
     events: [],
     eventSeq: 0,
-    dailySpent: {}
+    dailySpent: {},
+    reservations: {}
   };
 }
 
@@ -119,30 +148,31 @@ export class Store {
     this.applySqlitePragmas();
     this.ensureSchema();
 
-    // Already on the normalized schema: the per-collection tables are the source
-    // of truth.
-    if (this.schemaVersion() >= SQLITE_SCHEMA_VERSION) {
+    // Already on the normalized relay schema: the per-collection tables are the
+    // source of truth. Merchant schema migration runs after the v1/v2 import so
+    // the migration can account for and attribute every imported row.
+    if (this.schemaVersion() >= NORMALIZED_RELAY_SCHEMA_VERSION) {
       this.loadStateFromTables();
-      return;
+    } else {
+      // First open under the normalized schema. Import from the best available
+      // source exactly once, write it into the tables, then stamp v2 so we never
+      // re-import. No source data is dropped.
+      const legacy = this.db.prepare("SELECT state_json FROM relay_state WHERE id = 1").get();
+      if (legacy?.state_json) {
+        this.state = { ...initialState(), ...JSON.parse(legacy.state_json) };
+        this.importStateAndStamp();
+      } else if (this.legacyJsonFile && fs.existsSync(this.legacyJsonFile)) {
+        this.state = { ...initialState(), ...JSON.parse(fs.readFileSync(this.legacyJsonFile, "utf8")) };
+        this.importStateAndStamp();
+        this.writeMigrationMarker();
+      } else {
+        this.importStateAndStamp();
+      }
     }
-
-    // First open under the normalized schema. Import from the best available
-    // source exactly once, write it into the tables, then stamp the version so
-    // we never re-import. No source data is dropped: the legacy relay_state blob
-    // row is left intact (just no longer read).
-    const legacy = this.db.prepare("SELECT state_json FROM relay_state WHERE id = 1").get();
-    if (legacy?.state_json) {
-      this.state = { ...initialState(), ...JSON.parse(legacy.state_json) };
-      this.importStateAndStamp();
-      return;
+    this.lastMerchantMigration = applySqliteMerchantSchema(this.db);
+    if (this.schemaVersion() < SQLITE_SCHEMA_VERSION) {
+      throw new Error("SQLite merchant schema migration did not reach the expected version");
     }
-    if (this.legacyJsonFile && fs.existsSync(this.legacyJsonFile)) {
-      this.state = { ...initialState(), ...JSON.parse(fs.readFileSync(this.legacyJsonFile, "utf8")) };
-      this.importStateAndStamp();
-      this.writeMigrationMarker();
-      return;
-    }
-    this.importStateAndStamp();
   }
 
   save() {
@@ -178,7 +208,7 @@ export class Store {
     this.db.exec("BEGIN IMMEDIATE");
     try {
       this.persistFullRows();
-      this.stampSchemaVersion();
+      this.stampSchemaVersion(NORMALIZED_RELAY_SCHEMA_VERSION);
       this.db.exec("COMMIT");
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
@@ -326,10 +356,16 @@ export class Store {
   }
 
   applySqlitePragmas() {
+    // busy_timeout MUST be set first. Switching to WAL momentarily needs an
+    // exclusive lock; if another connection (a second API instance or the
+    // backup/maintenance script — the exact multi-writer case the H4 fix
+    // supports) holds the file, this would otherwise fail immediately with
+    // "database is locked" instead of waiting. Setting the timeout up front lets
+    // every subsequent pragma and transaction wait out contention.
+    this.db.exec("PRAGMA busy_timeout = 5000");
     this.db.exec("PRAGMA journal_mode = WAL");
     this.db.exec("PRAGMA synchronous = NORMAL");
     this.db.exec("PRAGMA foreign_keys = ON");
-    this.db.exec("PRAGMA busy_timeout = 5000");
   }
 
   ensureSchema() {
@@ -352,10 +388,10 @@ export class Store {
     return Number(row?.version) || 0;
   }
 
-  stampSchemaVersion() {
+  stampSchemaVersion(targetVersion = NORMALIZED_RELAY_SCHEMA_VERSION) {
     const now = new Date().toISOString();
     const insert = this.db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)");
-    for (let version = 1; version <= SQLITE_SCHEMA_VERSION; version++) insert.run(version, now);
+    for (let version = 1; version <= targetVersion; version++) insert.run(version, now);
   }
 
   writeMigrationMarker() {
@@ -377,6 +413,7 @@ export class Store {
       driver: this.driver,
       file: this.file,
       schema_version: this.driver === "sqlite" ? SQLITE_SCHEMA_VERSION : null,
+      merchant_migration: this.driver === "sqlite" && this.db ? sqliteMerchantMigrationReport(this.db) : null,
       legacy_json_file: this.legacyJsonFile || null
     };
   }
@@ -441,6 +478,41 @@ export class Store {
     });
   }
 
+  setDevicePushToken(deviceId, record) {
+    return this.mutate(() => {
+      const device = this.device(deviceId);
+      if (!device) return null;
+      const now = new Date().toISOString();
+      device.push = {
+        provider: "fcm",
+        status: "active",
+        token_hash: record.token_hash,
+        token_ciphertext: record.token_ciphertext,
+        updated_at: now
+      };
+      device.last_seen_at = now;
+      this.event("app_device.push_token_registered", deviceId, { device_id: deviceId, provider: "fcm" });
+      return device;
+    });
+  }
+
+  clearDevicePushToken(deviceId, expectedTokenHash = "") {
+    return this.mutate(() => {
+      const device = this.device(deviceId);
+      if (!device?.push) return null;
+      if (expectedTokenHash && device.push.token_hash !== expectedTokenHash) return null;
+      const now = new Date().toISOString();
+      device.push = {
+        provider: "fcm",
+        status: "inactive",
+        updated_at: now
+      };
+      device.last_seen_at = now;
+      this.event("app_device.push_token_cleared", deviceId, { device_id: deviceId, provider: "fcm" });
+      return device;
+    });
+  }
+
   migrateDeviceToken(deviceId, token) {
     return this.mutate(() => {
       const device = this.device(deviceId);
@@ -452,6 +524,161 @@ export class Store {
     });
   }
 
+  createConnectInvitation(invitationId, connectKey, data = {}) {
+    return this.mutate(() => {
+      const connectKeyHash = tokenHash(connectKey);
+      if (this.state.connectKeys[connectKeyHash]) return null;
+      const now = new Date().toISOString();
+      const invitation = {
+        connect_invitation_id: invitationId,
+        connect_key_hash: connectKeyHash,
+        target_app_device_id: data.target_app_device_id || "",
+        status: "waiting",
+        created_at: now,
+        updated_at: now,
+        expires_at: data.expires_at
+      };
+      this.state.connectInvitations[invitationId] = invitation;
+      this.state.connectKeys[connectKeyHash] = invitationId;
+      this.event("connect_invitation.created", invitationId, { status: invitation.status });
+      return { ...invitation, connect_key: connectKey };
+    });
+  }
+
+  connectInvitation(invitationId) {
+    return this.state.connectInvitations[invitationId] || null;
+  }
+
+  connectInvitationByKey(connectKey) {
+    if (!connectKey) return null;
+    const invitationId = this.state.connectKeys[tokenHash(connectKey)];
+    return invitationId ? this.connectInvitation(invitationId) : null;
+  }
+
+  connectInvitationByClaimToken(claimToken) {
+    if (!claimToken) return null;
+    const invitationId = this.state.connectClaimTokens[tokenHash(claimToken)];
+    return invitationId ? this.connectInvitation(invitationId) : null;
+  }
+
+  claimConnectInvitationAndCreatePairingSession(connectKey, claimToken, pairingSessionId, data = {}) {
+    return this.mutate(() => {
+      const invitationId = this.state.connectKeys[tokenHash(connectKey)];
+      const invitation = invitationId ? this.state.connectInvitations[invitationId] : null;
+      const nowMs = Date.now();
+      const now = new Date(nowMs).toISOString();
+      if (!invitation || invitation.status !== "waiting") return null;
+      if (!invitation.expires_at || Date.parse(invitation.expires_at) <= nowMs) {
+        invitation.status = "expired";
+        invitation.updated_at = now;
+        invitation.expired_at = now;
+        this.event("connect_invitation.status", invitation.connect_invitation_id, { status: "expired" });
+        return null;
+      }
+
+      const claimTokenHash = tokenHash(claimToken);
+      const session = {
+        pairing_session_id: pairingSessionId,
+        pairing_code: "",
+        pairing_uri: "",
+        agent_identity: data.agent_identity || {},
+        identity_assurance: data.identity_assurance || "unverified",
+        requested_scopes: data.requested_scopes || [],
+        target_app_device_id: invitation.target_app_device_id,
+        connect_invitation_id: invitation.connect_invitation_id,
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+        expires_at: invitation.expires_at
+      };
+      if (data.auth_binding) session.auth_binding = { ...data.auth_binding };
+
+      invitation.status = "claimed";
+      invitation.updated_at = now;
+      invitation.claimed_at = now;
+      invitation.claim_token_hash = claimTokenHash;
+      invitation.pairing_session_id = pairingSessionId;
+      invitation.agent_identity = session.agent_identity;
+      invitation.identity_assurance = session.identity_assurance;
+      invitation.requested_scopes = session.requested_scopes;
+      if (data.auth_binding) invitation.auth_binding = { ...data.auth_binding };
+      this.state.connectClaimTokens[claimTokenHash] = invitation.connect_invitation_id;
+      this.state.pairingSessions[pairingSessionId] = session;
+      this.event("connect_invitation.status", invitation.connect_invitation_id, { status: invitation.status });
+      this.event("pairing_session.created", pairingSessionId, { status: session.status });
+      return {
+        connect_invitation: { ...invitation },
+        pairing_session: { ...session },
+        claim_token: claimToken
+      };
+    });
+  }
+
+  updateConnectInvitation(invitationId, patch = {}) {
+    return this.mutate(() => {
+      const invitation = this.state.connectInvitations[invitationId];
+      if (!invitation) return null;
+      Object.assign(invitation, patch, { updated_at: new Date().toISOString() });
+      this.event("connect_invitation.status", invitationId, { status: invitation.status });
+      return invitation;
+    });
+  }
+
+  cancelConnectInvitation(invitationId, deviceId) {
+    return this.mutate(() => {
+      const invitation = this.state.connectInvitations[invitationId];
+      if (!invitation || invitation.target_app_device_id !== deviceId) return null;
+      if (!["waiting", "claimed"].includes(invitation.status)) return { ...invitation, unchanged: true };
+      const now = new Date().toISOString();
+      invitation.status = "cancelled";
+      invitation.cancelled_at = now;
+      invitation.updated_at = now;
+      const session = invitation.pairing_session_id
+        ? this.state.pairingSessions[invitation.pairing_session_id]
+        : null;
+      if (session?.status === "pending") {
+        session.status = "rejected";
+        session.rejected_at = now;
+        session.rejected_by_device_id = deviceId;
+        session.updated_at = now;
+        this.event("pairing_session.status", session.pairing_session_id, { status: session.status });
+      }
+      this.event("connect_invitation.status", invitationId, { status: invitation.status });
+      return invitation;
+    });
+  }
+
+  expireConnectInvitations(nowMs = Date.now()) {
+    const expirable = Object.values(this.state.connectInvitations).some((invitation) => (
+      ["waiting", "claimed"].includes(invitation.status)
+      && invitation.expires_at
+      && Date.parse(invitation.expires_at) <= nowMs
+    ));
+    if (!expirable) return false;
+    return this.mutate(() => {
+      let changed = false;
+      const now = new Date(nowMs).toISOString();
+      for (const invitation of Object.values(this.state.connectInvitations)) {
+        if (!["waiting", "claimed"].includes(invitation.status)) continue;
+        if (!invitation.expires_at || Date.parse(invitation.expires_at) > nowMs) continue;
+        invitation.status = "expired";
+        invitation.expired_at = now;
+        invitation.updated_at = now;
+        const session = invitation.pairing_session_id
+          ? this.state.pairingSessions[invitation.pairing_session_id]
+          : null;
+        if (session?.status === "pending") {
+          session.status = "expired";
+          session.updated_at = now;
+          this.event("pairing_session.status", session.pairing_session_id, { status: session.status });
+        }
+        this.event("connect_invitation.status", invitation.connect_invitation_id, { status: invitation.status });
+        changed = true;
+      }
+      return changed;
+    });
+  }
+
   createPairingSession(sessionId, pairingCode, data = {}) {
     return this.mutate(() => {
       const now = new Date().toISOString();
@@ -460,7 +687,10 @@ export class Store {
         pairing_code: pairingCode,
         pairing_uri: data.pairing_uri || "",
         agent_identity: data.agent_identity || {},
+        identity_assurance: data.identity_assurance || "unverified",
         requested_scopes: data.requested_scopes || [],
+        target_app_device_id: data.target_app_device_id || "",
+        connect_invitation_id: data.connect_invitation_id || "",
         status: "pending",
         created_at: now,
         updated_at: now,
@@ -528,6 +758,7 @@ export class Store {
     return this.mutate(() => {
       const now = new Date().toISOString();
       const scopes = data.scopes || data.approved_scopes || [];
+      const binding = createConnectionBinding(connectionId, data);
       const connection = {
         connection_id: connectionId,
         connection_token_hash: tokenHash(token),
@@ -543,6 +774,7 @@ export class Store {
         last_activity_at: now,
         expires_at: data.expires_at
       };
+      if (binding) Object.assign(connection, binding, { token_generation: 1 });
       this.state.connections[connectionId] = connection;
       this.state.connectionTokens[connection.connection_token_hash] = connectionId;
       this.event("connection.created", connectionId, { status: connection.status });
@@ -578,6 +810,10 @@ export class Store {
       const connection = this.connection(connectionId);
       if (!connection) return null;
       connection.status = status;
+      if (status === "revoked") {
+        this.deleteConnectionTokenIndexes(connectionId);
+        connection.connection_token_hash = "";
+      }
       connection.updated_at = new Date().toISOString();
       if (data.revoked_by_device_id) connection.revoked_by_device_id = data.revoked_by_device_id;
       if (data.revoked_at) connection.revoked_at = data.revoked_at;
@@ -595,6 +831,7 @@ export class Store {
       delete connection.connection_token;
       connection.updated_at = new Date().toISOString();
       connection.token_rotated_at = connection.updated_at;
+      connection.token_generation = Number(connection.token_generation || 0) + 1;
       this.state.connectionTokens[connection.connection_token_hash] = connectionId;
       this.event("connection.token_rotated", connectionId, { status: connection.status });
       return { ...connection, connection_token: token };
@@ -810,6 +1047,8 @@ export class Store {
         intent.status = "expired";
         intent.updated_at = new Date(nowMs).toISOString();
         intent.error = intent.error || "Payment request expired";
+        // F1: an expired intent never settles — give its reserved cap headroom back.
+        this._releaseReservationLocked(intent.intent_id);
         intent.history = intent.history || [];
         intent.history.push({
           status: "expired",
@@ -830,6 +1069,8 @@ export class Store {
         request.status = "expired";
         request.updated_at = new Date(nowMs).toISOString();
         request.error = request.error || "Payment request expired";
+        // F1: an expired request never settles — give its reserved cap headroom back.
+        this._releaseReservationLocked(request.request_id);
         request.history = request.history || [];
         request.history.push({
           status: "expired",
@@ -861,6 +1102,84 @@ export class Store {
     return false;
   }
 
+  // Retention prune: drop terminal payment requests / intents (plus their idempotency
+  // back-references and any stray reservation) whose last update is older than ttlMs,
+  // and transaction contexts no surviving request/intent still references. This bounds
+  // the store so the per-write reload+snapshot cost (and memory) stays small as history
+  // accumulates — a terminal record is never read by the hot path again. Runs in ONE
+  // mutate() so it is atomic and multi-writer safe, exactly like every other write.
+  // Returns the number of pruned records. Intended to be called from the background
+  // maintenance loop, NOT the request path.
+  pruneTerminal(nowMs = Date.now(), ttlMs = DEFAULT_RETENTION_MS) {
+    if (!(ttlMs > 0)) return 0;
+    const cutoff = nowMs - ttlMs;
+    // Cheap read-only probe: never take the write lock when nothing is prunable.
+    if (!this.hasPrunableRecords(cutoff)) return 0;
+    return this.mutate(() => {
+      let pruned = 0;
+      for (const [requestId, request] of Object.entries(this.state.paymentRequests)) {
+        if (!this._isPrunable(request, cutoff)) continue;
+        delete this.state.paymentRequests[requestId];
+        this._deleteIdempotencyPointingTo(this.state.paymentRequestIdempotency, requestId);
+        this._releaseReservationLocked(requestId);
+        pruned += 1;
+      }
+      for (const [intentId, intent] of Object.entries(this.state.intents)) {
+        if (!this._isPrunable(intent, cutoff)) continue;
+        delete this.state.intents[intentId];
+        this._deleteIdempotencyPointingTo(this.state.idempotency, intentId);
+        this._releaseReservationLocked(intentId);
+        pruned += 1;
+      }
+      // Drop transaction contexts that are old AND unreferenced by any surviving
+      // request/intent — never one a live record still points at.
+      const referenced = new Set();
+      for (const request of Object.values(this.state.paymentRequests)) {
+        if (request.transaction_id) referenced.add(request.transaction_id);
+      }
+      for (const intent of Object.values(this.state.intents)) {
+        if (intent.transaction_id) referenced.add(intent.transaction_id);
+      }
+      for (const [txId, context] of Object.entries(this.state.transactionContexts)) {
+        if (referenced.has(txId)) continue;
+        if (!this._olderThan(context, cutoff)) continue;
+        delete this.state.transactionContexts[txId];
+        pruned += 1;
+      }
+      return pruned;
+    });
+  }
+
+  // Cheap, read-only probe mirroring pruneTerminal's conditions, so the fast path can
+  // skip the write lock when there is nothing to prune.
+  hasPrunableRecords(cutoff) {
+    for (const request of Object.values(this.state.paymentRequests)) {
+      if (this._isPrunable(request, cutoff)) return true;
+    }
+    for (const intent of Object.values(this.state.intents)) {
+      if (this._isPrunable(intent, cutoff)) return true;
+    }
+    return false;
+  }
+
+  _isPrunable(record, cutoff) {
+    return !!record
+      && TERMINAL_STATUSES.has(String(record.status || ""))
+      && this._olderThan(record, cutoff);
+  }
+
+  _olderThan(record, cutoff) {
+    const ts = Date.parse(record?.updated_at || record?.created_at || "");
+    return Number.isFinite(ts) && ts <= cutoff;
+  }
+
+  _deleteIdempotencyPointingTo(map, id) {
+    if (!map) return;
+    for (const [key, value] of Object.entries(map)) {
+      if (value === id) delete map[key];
+    }
+  }
+
   updateStatus(id, status, patch = {}) {
     return this.mutate(() => {
       const intent = this.state.intents[id];
@@ -881,33 +1200,141 @@ export class Store {
     });
   }
 
-  // Daily spend is tracked as an EXACT decimal string, never a float64
-  // Number. Accumulating money with `+` on Numbers (the old code) drifts a
-  // little with every payment, so the stored total slowly diverges from the
-  // real sum — enough to make the cap inaccurate and let spend slip past it
-  // (H3). All arithmetic now goes through BigInt minor units in decimal.js.
+  // Daily spend is tracked as an EXACT decimal string, never a float64 Number.
+  // Accumulating money with `+` on Numbers (the old code) drifts a little with
+  // every payment, so the stored total slowly diverges from the real sum — enough
+  // to make the cap inaccurate and let spend slip past it (H3). All arithmetic
+  // goes through BigInt minor units in decimal.js.
+  //
+  // F1 (check-to-record gap): the cap used to be CHECKED at request/intent
+  // creation but only RECORDED at on-chain `confirmed`. Between those two moments
+  // an unbounded number of payments could each pass the check against the same
+  // un-incremented total, then all confirm — blowing the cap under concurrent
+  // fan-out. Fix: a reservation ledger. A payment atomically RESERVES its amount
+  // against the cap at commit time (reserveDailyLimit); the reservation is
+  // RELEASED if it never settles (failed/expired/rejected) and SETTLED into
+  // confirmed spend on `confirmed`. The cap is therefore checked against
+  // "committed" = confirmed spend PLUS live reservations, so two concurrent
+  // payments can never both fit into headroom only one of them has.
+
+  // The daily-cap bucket key. The "day" is the UTC calendar date (toISOString) — the
+  // cap resets at 00:00 UTC, not local midnight. Documented for operators in
+  // services/platform-api/.env.example next to DAILY_LIMIT_*.
+  dayKey(asset, day = new Date().toISOString().slice(0, 10)) {
+    return `${day}:${String(asset || "").toUpperCase()}`;
+  }
+
+  // Confirmed (settled) spend for `asset` today as a canonical decimal string
+  // ("0" when nothing recorded, or a legacy value cannot be parsed).
+  dailySpent(asset) {
+    return normalizeDecimalString(this.state.dailySpent[this.dayKey(asset)]) ?? "0";
+  }
+
+  // Sum of today's LIVE reservations for `asset`, derived from the reservation
+  // ledger so it can never drift from the per-payment records. Exact decimals.
+  dailyReserved(asset) {
+    return this._reservedTotalLocked(new Date().toISOString().slice(0, 10), String(asset || "").toUpperCase());
+  }
+
+  // What the daily cap is actually checked against: confirmed spend + everything
+  // currently reserved (in-flight) for today. Exact decimal string.
+  dailyCommitted(asset) {
+    return addDecimalStrings(this.dailySpent(asset), this.dailyReserved(asset));
+  }
+
+  // Record confirmed spend with no reservation involved. The low-level primitive;
+  // settleDailyReservation falls back to it for payments that were never reserved
+  // (legacy data, or a device that confirmed an already-blocked payment).
   addDailySpent(asset, amount) {
     // Validate before locking: a bad amount must never poison the cap, and we
     // must not take a write lock for a no-op.
     const addend = normalizeDecimalString(amount);
     if (addend === null) return; // never poison the cap with a bad amount
-    this.mutate(() => {
+    this.mutate(() => this._addSpentLocked(asset, addend));
+  }
+
+  // --- locked helpers: mutate this.state directly. The caller already holds the
+  // write lock, so these compose inside mutate() and inside expireStale. ---
+
+  _addSpentLocked(asset, addend) {
+    const key = this.dayKey(asset);
+    // Read INSIDE the lock so concurrent writers accumulate exactly instead of
+    // clobbering each other (H4). `?? "0"` still tolerates a legacy float total.
+    const before = normalizeDecimalString(this.state.dailySpent[key]) ?? "0";
+    this.state.dailySpent[key] = addDecimalStrings(before, addend);
+  }
+
+  _reservedTotalLocked(day, symbol) {
+    let total = "0";
+    for (const reservation of Object.values(this.state.reservations || {})) {
+      if (reservation && reservation.state === "held" && reservation.day === day && reservation.asset === symbol) {
+        total = addDecimalStrings(total, reservation.amount);
+      }
+    }
+    return total;
+  }
+
+  _releaseReservationLocked(id) {
+    const reservation = id ? this.state.reservations[id] : null;
+    if (!reservation || reservation.state !== "held") return false;
+    delete this.state.reservations[id];
+    return true;
+  }
+
+  // Atomically reserve `amount` of `asset` against today's cap for payment `id`.
+  // Returns { ok, reason?, duplicate? }. Fails CLOSED on a bad amount/limit and
+  // when confirmed+reserved+amount would exceed the cap — WITHOUT recording, so a
+  // rejected reservation never consumes headroom. The check and the record happen
+  // in ONE lock, which is what actually closes the concurrent-bypass window:
+  // among N racing reservations, only those that still fit are recorded.
+  // Idempotent per id: a second reserve for an already-held id is a no-op success
+  // (tolerates a create retried with the same payment id).
+  reserveDailyLimit(id, asset, amount, limit) {
+    const addend = normalizeDecimalString(amount);
+    const cap = normalizeDecimalString(limit);
+    if (!id || addend === null || cap === null) return { ok: false, reason: "invalid_input" };
+    const symbol = String(asset || "").toUpperCase();
+    if (!symbol) return { ok: false, reason: "invalid_asset" };
+    return this.mutate(() => {
+      const existing = this.state.reservations[id];
+      if (existing && existing.state === "held") return { ok: true, duplicate: true };
       const day = new Date().toISOString().slice(0, 10);
-      const key = `${day}:${asset.toUpperCase()}`;
-      // `before` is read INSIDE the locked read-modify-write, so concurrent
-      // writers accumulate exactly instead of clobbering each other (H4) — the
-      // bug that let parallel confirmations under-count the daily cap. `?? "0"`
-      // still tolerates a legacy float total written by the old code.
-      const before = normalizeDecimalString(this.state.dailySpent[key]) ?? "0";
-      this.state.dailySpent[key] = addDecimalStrings(before, addend);
+      const spent = normalizeDecimalString(this.state.dailySpent[this.dayKey(asset, day)]) ?? "0";
+      const committed = addDecimalStrings(spent, this._reservedTotalLocked(day, symbol));
+      const next = addDecimalStrings(committed, addend);
+      if (compareDecimalStrings(next, cap) > 0) return { ok: false, reason: "over_limit" };
+      this.state.reservations[id] = { asset: symbol, amount: addend, day, state: "held" };
+      return { ok: true, reserved: addend };
     });
   }
 
-  // Returns today's spend for `asset` as a canonical decimal string ("0"
-  // when nothing has been recorded, or when a legacy value can't be parsed).
-  dailySpent(asset) {
-    const day = new Date().toISOString().slice(0, 10);
-    return normalizeDecimalString(this.state.dailySpent[`${day}:${asset.toUpperCase()}`]) ?? "0";
+  // Release a held reservation (the payment failed / expired / was rejected before
+  // it settled). Idempotent: releasing an unknown or already-resolved id is a no-op.
+  releaseDailyReservation(id) {
+    if (!id) return false;
+    return this.mutate(() => this._releaseReservationLocked(id));
+  }
+
+  // Settle a payment's spend on `confirmed`: move its held reservation into the
+  // confirmed bucket so the cap total is conserved across the transition (no
+  // flicker where it briefly counts neither). If the payment was never reserved
+  // (legacy data, or a device that confirmed an already-blocked payment), fall
+  // back to recording the spend directly so confirmed money is always accounted.
+  settleDailyReservation(id, asset, amount) {
+    return this.mutate(() => {
+      const reservation = id ? this.state.reservations[id] : null;
+      if (reservation && reservation.state === "held") {
+        const key = this.dayKey(reservation.asset, reservation.day);
+        const before = normalizeDecimalString(this.state.dailySpent[key]) ?? "0";
+        this.state.dailySpent[key] = addDecimalStrings(before, reservation.amount);
+        delete this.state.reservations[id];
+        return true;
+      }
+      const addend = normalizeDecimalString(amount);
+      if (addend === null) return false;
+      this._addSpentLocked(asset, addend);
+      return true;
+    });
   }
 
   // Generate the next event sequence number from a persistent, monotonic
@@ -954,5 +1381,26 @@ export class Store {
       const request = requestId ? this.paymentRequest(requestId) : null;
       return request?.connection_id === connectionId;
     });
+  }
+
+  paymentRequestEventsForDevice(deviceId, seq = 0) {
+    return this.eventsSince(seq).filter((event) => {
+      if (!String(event.type || "").startsWith("payment_request.")) return false;
+      if (event.data?.target_app_device_id) return event.data.target_app_device_id === deviceId;
+      const requestId = event.data?.request_id || event.request_id || event.intent_id;
+      const request = requestId ? this.paymentRequest(requestId) : null;
+      return request?.target_app_device_id === deviceId;
+    });
+  }
+
+  eventWindow(seq = 0) {
+    const since = Number.isSafeInteger(Number(seq)) && Number(seq) >= 0 ? Number(seq) : 0;
+    const latest = Number(this.state.eventSeq) || 0;
+    const oldest = this.state.events.length ? Number(this.state.events[0].seq) || 0 : latest;
+    return {
+      latest_seq: latest,
+      oldest_retained_seq: oldest,
+      reset_required: since > 0 && this.state.events.length > 0 && since < oldest - 1
+    };
   }
 }

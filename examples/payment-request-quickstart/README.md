@@ -1,5 +1,9 @@
 # Payment Request Quickstart Fixtures
 
+> **Last modified**
+> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-07-21 13:50:07 UTC
+
 Copyable Payment Request and Transaction Context examples for local developer preview.
 
 These fixtures are for validation, local routing, and smoke checks. They do not contain private keys, real user data, or mainnet funds. Base USDC examples use mainnet chain identifiers because the validator checks the production Base USDC contract, but the smoke check only creates requests and writes local status callbacks.
@@ -84,7 +88,7 @@ The SDK and connector packages have typed entry points and dry-run tarball
 checks:
 
 ```bash
-cd /Users/yang/code/VelarumPayCode
+cd /Users/yang/code/VelarumPay/code
 npm run package:integrations
 ```
 
@@ -100,7 +104,7 @@ This verifies the packable file lists for:
 Start the local Platform API first:
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/services/platform-api
+cd /Users/yang/code/VelarumPay/code/services/platform-api
 npm install
 OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
 ```
@@ -108,7 +112,7 @@ OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
 In another terminal, create and approve a local dev pairing. The dev approval uses wallet device credentials only; it does not grant signing permission and does not touch private keys:
 
 ```bash
-cd /Users/yang/code/VelarumPayCode
+cd /Users/yang/code/VelarumPay/code
 node examples/payment-request-quickstart/cli.mjs pair --approve-dev-wallet
 ```
 

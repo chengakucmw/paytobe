@@ -17,7 +17,13 @@ export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
         tx_hash: txHash,
         error: confirmed.error || null
       });
-      if (status === "confirmed") store.addDailySpent(intent.payment.asset, intent.payment.amount);
+      // F1: settle the held reservation into confirmed spend, or release it back to
+      // the cap when the broadcast did not confirm.
+      if (status === "confirmed") {
+        store.settleDailyReservation(intent.intent_id, intent.payment.asset, intent.payment.amount);
+      } else {
+        store.releaseDailyReservation(intent.intent_id);
+      }
       notifyOpenClaw(intent.source?.device_id, {
         type: "payment_status",
         intent_id: intent.intent_id,
@@ -41,6 +47,8 @@ export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
         tx_hash: txHash,
         error: error.message
       });
+      // F1: the broadcast errored out — release the held cap reservation.
+      store.releaseDailyReservation(intent.intent_id);
       notifyOpenClaw(intent.source?.device_id, {
         type: "payment_status",
         intent_id: intent.intent_id,

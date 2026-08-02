@@ -4,8 +4,17 @@
 import express from "express";
 import { resolveTargetDevice } from "../routing.js";
 import { normalizePaymentRequestV1 } from "../velarum.js";
-import { canTransition, evaluatePaymentRequest, shouldRecordSpent } from "../risk.js";
+import { canTransition, dailyLimitFor, evaluatePaymentRequest, shouldRecordSpent } from "../risk.js";
 import { buildPaymentRequestPayload } from "../domain/payloads.js";
+import { bindRecipientPaymentRequest } from "../application/payment-requests/recipient-binding.js";
+import { createTenantScope } from "../ports/tenant-repository.js";
+import {
+  canonicalPaymentRequestHash,
+  decidePaymentStatusTransition,
+  PAYMENT_REQUEST_ROUTE,
+  StorePaymentTenantRepository
+} from "../application/payment-requests/tenant-state.js";
+import { paymentTenantEventProjection } from "../domain/projections.js";
 import {
   PAYMENT_REQUEST_STATUS_UPDATES,
   paymentRequestEventProjection,
@@ -14,6 +23,34 @@ import {
   paymentRequestStatusMessage,
   validatePaymentRequestStatusUpdate
 } from "../domain/payment-request.js";
+
+// F1: terminal non-confirmed statuses that must RELEASE a held daily-cap reservation.
+const RELEASE_ON_STATUS = new Set(["failed", "expired", "rejected"]);
+
+function riskHasCode(risk, code) {
+  return Array.isArray(risk?.errors) && risk.errors.some((item) => item?.code === code);
+}
+
+// Flip an otherwise-allowed risk result to a daily-cap block. Used when the atomic
+// reservation loses a race the read-only cap check did not see (a concurrent request
+// took the last of the headroom first).
+function blockRiskOnDailyLimit(risk, asset, amount, limit) {
+  const blocker = {
+    code: "daily_limit_exceeded",
+    message: `Daily ${asset} limit exceeded.`,
+    severity: "blocker",
+    field: "payment.amount",
+    details: { asset, amount: amount ?? null, limit }
+  };
+  return {
+    ...risk,
+    ok: false,
+    level: "danger",
+    review_status: "blocked",
+    signing_allowed: false,
+    errors: [...(risk?.errors || []), blocker]
+  };
+}
 
 export function createPaymentRequestsRouter(deps) {
   const {
@@ -27,17 +64,21 @@ export function createPaymentRequestsRouter(deps) {
     auditActorFromAuth,
     buildTransactionContextProjection,
     notifyApp,
-    notifyOpenClaw
+    notifyOpenClaw,
+    pushService,
+    platformCore,
+    recipientService
   } = deps;
   const router = express.Router();
+  const tenantRepository = new StorePaymentTenantRepository(store);
 
-  router.post("/", (req, res) => {
+  router.post("/", async (req, res) => {
     const auth = authorizeConnection(req, "payment.requests.create", { allowLegacyOpenClaw: true });
     if (!auth.ok) return sendAuthFailure(res, auth);
 
     const body = req.body || {};
     const idempotencyKey = req.get("x-idempotency-key") || body.idempotency_key || "";
-    if (idempotencyKey) {
+    if (idempotencyKey && auth.connection?.binding_version !== "velarum.connection_binding.v1") {
       const existing = store.findPaymentRequestByIdempotency(idempotencyKey, auth.connection?.connection_id || body.connection_id || "");
       if (existing) {
         observability.recordAuditEvent("payment_request.idempotency_duplicate", "success", {
@@ -59,7 +100,43 @@ export function createPaymentRequestsRouter(deps) {
     }
     const target = targetResolution.target;
 
-    const payload = buildPaymentRequestPayload(body, auth.connection, idempotencyKey);
+    let acceptedBody = body;
+    let recipientBinding = null;
+    let tenantScope = null;
+    let idempotencyRequestHash = "";
+    if (auth.connection?.binding_version === "velarum.connection_binding.v1") {
+      const scope = createTenantScope(Object.freeze({
+        merchant_id: auth.connection.merchant_id,
+        actor_id: auth.connection.agent_id,
+        request_id: String(req.request_id || req.id || platformCore.random.id("request"))
+      }));
+      recipientBinding = await bindRecipientPaymentRequest({ recipientService, scope, input: body });
+      if (!recipientBinding.ok) {
+        return sendApiError(res, recipientBinding.status, recipientBinding.code, recipientBinding.message, {
+          details: recipientBinding.details
+        });
+      }
+      acceptedBody = recipientBinding.value;
+      tenantScope = scope;
+      idempotencyRequestHash = canonicalPaymentRequestHash(acceptedBody);
+      if (idempotencyKey) {
+        const existing = tenantRepository.findIdempotency(scope, PAYMENT_REQUEST_ROUTE, idempotencyKey);
+        if (existing) {
+          if (existing.idempotency_request_hash !== idempotencyRequestHash) {
+            return sendApiError(res, 409, "idempotency_conflict", "Idempotency key was already used with a different canonical Payment Request");
+          }
+          observability.recordAuditEvent("payment_request.idempotency_duplicate", "success", {
+            actor: auditActorFromAuth(auth),
+            resource: { type: "payment_request", id: existing.request_id },
+            labels: paymentRequestMetricLabels(existing),
+            details: { merchant_id: scope.merchant_id, actor_id: scope.actor_id, route: PAYMENT_REQUEST_ROUTE }
+          });
+          return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(existing) });
+        }
+      }
+    }
+
+    const payload = buildPaymentRequestPayload(acceptedBody, auth.connection, idempotencyKey, platformCore);
     const normalized = normalizePaymentRequestV1(payload);
     if (!normalized.ok) {
       return res.status(400).json({
@@ -73,10 +150,36 @@ export function createPaymentRequestsRouter(deps) {
     const context = buildTransactionContextProjection(normalized.value);
     // M-1: pass the store + env so daily-limit and whitelist gates are enforced
     // on this (main) path, not only on the legacy payment-intent path.
-    const risk = evaluatePaymentRequest(normalized.value, context, store, process.env);
+    let risk = evaluatePaymentRequest(normalized.value, context, store, process.env);
+    // F1: for an otherwise-allowed request, hold an ATOMIC reservation against the
+    // daily cap so concurrent creations can't all pass the read-only check and then
+    // all confirm. If the reservation loses a race, flip this request to blocked.
+    // Settled on confirm, released on failed/expired/rejected (status route +
+    // expireStale). An already-blocked request reserves nothing.
+    if (store && risk.ok && !riskHasCode(risk, "daily_limit_exceeded")) {
+      const reserveAsset = String(normalized.value.payment?.asset || "").toUpperCase();
+      if (reserveAsset) {
+        const limit = dailyLimitFor(process.env, reserveAsset);
+        const reservation = store.reserveDailyLimit(
+          normalized.value.request_id,
+          reserveAsset,
+          normalized.value.payment?.amount,
+          limit
+        );
+        if (!reservation.ok) {
+          risk = blockRiskOnDailyLimit(risk, reserveAsset, normalized.value.payment?.amount, limit);
+        }
+      }
+    }
     const warnings = [...(normalized.warnings || []), ...context.warnings, ...risk.warnings];
     const request = store.putPaymentRequest({
       ...normalized.value,
+      ...(tenantScope ? {
+        merchant_id: tenantScope.merchant_id,
+        actor_id: tenantScope.actor_id,
+        idempotency_route: PAYMENT_REQUEST_ROUTE,
+        idempotency_request_hash: idempotencyRequestHash
+      } : {}),
       target_app_device_id: target,
       transaction_context_ref: context.ref,
       transaction_context_snapshot: context.snapshot || null,
@@ -84,7 +187,9 @@ export function createPaymentRequestsRouter(deps) {
       warnings
     });
     if (auth.connection) store.touchConnection(auth.connection.connection_id);
-    notifyApp(target, { type: "payment_request", request_id: request.request_id, status: request.status });
+    const eventSeq = store.eventWindow().latest_seq;
+    notifyApp(target, { type: "payment_request", request_id: request.request_id, status: request.status, event_seq: eventSeq });
+    pushService?.notifyPaymentRequest(target, { request_id: request.request_id, event_seq: eventSeq });
     observability.recordAuditEvent("payment_request.created", "success", {
       actor: auditActorFromAuth(auth),
       resource: { type: "payment_request", id: request.request_id },
@@ -94,7 +199,10 @@ export function createPaymentRequestsRouter(deps) {
         transaction_id: request.transaction_id || null,
         target_app_device_id: target,
         warning_count: warnings.length,
-        risk_error_count: Array.isArray(risk.errors) ? risk.errors.length : 0
+        risk_error_count: Array.isArray(risk.errors) ? risk.errors.length : 0,
+        recipient_id: request.recipient_id || null,
+        recipient_version_id: request.recipient_version_id || null,
+        recipient_facts_hash: request.recipient_facts_hash || null
       }
     });
     observability.incrementCounter("velarumpay_payment_requests_total", paymentRequestMetricLabels(request));
@@ -107,18 +215,27 @@ export function createPaymentRequestsRouter(deps) {
 
   router.get("/", (req, res) => {
     store.expireStale();
-    if (req.query.device_id || req.query.token) {
+    if (hasAppCredentials(req)) {
       const auth = verifyAppQuery(req);
       if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
       return res.json({
         ok: true,
-        items: store.listPaymentRequestsForDevice(req.query.device_id).map(paymentRequestProjection)
+        items: store.listPaymentRequestsForDevice(auth.device_id).map(paymentRequestProjection)
       });
     }
 
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
     store.touchConnection(auth.connection.connection_id);
+    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+      try {
+        const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
+        const page = tenantRepository.listForConnection(scope, auth.connection.connection_id, req.query || {});
+        return res.json({ ok: true, items: page.items.map(paymentRequestProjection), next_cursor: page.next_cursor });
+      } catch (error) {
+        return sendApiError(res, error.status || 400, error.code || "invalid_tenant_cursor", error.message);
+      }
+    }
     res.json({
       ok: true,
       items: store.listPaymentRequestsForConnection(auth.connection.connection_id).map(paymentRequestProjection)
@@ -126,25 +243,60 @@ export function createPaymentRequestsRouter(deps) {
   });
 
   router.get("/events", (req, res) => {
+    const since = parseEventCursor(req.query.since);
+    if (hasAppCredentials(req)) {
+      const auth = verifyAppQuery(req);
+      if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
+      const window = store.eventWindow(since);
+      return res.json({
+        ok: true,
+        ...window,
+        items: window.reset_required
+          ? []
+        : store.paymentRequestEventsForDevice(auth.device_id, since).map((event) => paymentRequestEventProjection(
+          event,
+          store.paymentRequest(event.data?.request_id || event.request_id || event.intent_id)
+        ))
+      });
+    }
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
-    const since = Number(req.query.since || 0);
     store.touchConnection(auth.connection.connection_id);
+    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+      try {
+        const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
+        const window = tenantRepository.eventsForConnection(scope, auth.connection.connection_id, req.query.cursor || "");
+        return res.json({
+          ok: true,
+          latest_seq: window.latest_seq,
+          next_cursor: window.next_cursor,
+          reset_required: window.reset_required,
+          items: window.items.map((event) => paymentTenantEventProjection(event, paymentRequestEventProjection))
+        });
+      } catch (error) {
+        return sendApiError(res, error.status || 400, error.code || "invalid_tenant_cursor", error.message);
+      }
+    }
+    const window = store.eventWindow(since);
     res.json({
       ok: true,
-      items: store
-        .paymentRequestEventsForConnection(auth.connection.connection_id, Number.isFinite(since) ? since : 0)
-        .map(paymentRequestEventProjection)
+      ...window,
+      items: window.reset_required
+        ? []
+        : store.paymentRequestEventsForConnection(auth.connection.connection_id, since).map((event) => paymentRequestEventProjection(
+          event,
+          store.paymentRequest(event.data?.request_id || event.request_id || event.intent_id)
+        ))
     });
   });
 
   router.get("/:id", (req, res) => {
     store.expireStale();
-    const request = store.paymentRequest(req.params.id);
-    if (req.query.device_id || req.query.token) {
+    let request = store.paymentRequest(req.params.id);
+    if (hasAppCredentials(req)) {
       const auth = verifyAppQuery(req);
       if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
-      if (!request || request.target_app_device_id !== req.query.device_id) {
+      if (!request || request.target_app_device_id !== auth.device_id) {
         return sendApiError(res, 404, "payment_request_not_found", "Payment Request not found");
       }
       return res.json({ ok: true, payment_request: paymentRequestProjection(request) });
@@ -152,6 +304,10 @@ export function createPaymentRequestsRouter(deps) {
 
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
+    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+      const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
+      request = tenantRepository.get(scope, req.params.id);
+    }
     if (!request) return sendApiError(res, 404, "payment_request_not_found", "Payment Request not found");
     if (request.connection_id !== auth.connection.connection_id) {
       return sendApiError(res, 403, "scope_denied", "Connection cannot read this Payment Request");
@@ -180,28 +336,53 @@ export function createPaymentRequestsRouter(deps) {
       });
     }
 
-    const transition = validatePaymentRequestStatusUpdate(request, status);
+    const transition = decidePaymentStatusTransition(request, status);
     if (!transition.ok) {
       return sendApiError(res, transition.status, transition.code, transition.message, {
         details: transition.details
       });
     }
 
-    const updated = store.updatePaymentRequestStatus(request.request_id, status, {
+    if (transition.duplicate) {
+      return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(request) });
+    }
+
+    const statusScope = request.merchant_id ? createTenantScope(Object.freeze({
+      merchant_id: request.merchant_id,
+      actor_id: `wallet:${req.body.device_id}`,
+      request_id: String(req.request_id || req.id || request.request_id)
+    })) : null;
+    const updated = statusScope ? tenantRepository.updateStatus(statusScope, request.request_id, status, {
+      tx_hash: req.body.tx_hash || null,
+      error: req.body.error || null
+    }) : store.updatePaymentRequestStatus(request.request_id, status, {
       tx_hash: req.body.tx_hash || null,
       error: req.body.error || null
     });
-    if (shouldRecordSpent(status)) store.addDailySpent(updated.payment.asset, updated.payment.amount);
+    // F1: settle the reservation into confirmed spend on success, release it back to
+    // the cap on a terminal non-confirmed status. The M5 transition guard above
+    // blocks re-reporting a terminal status, so this runs at most once.
+    if (shouldRecordSpent(status)) {
+      store.settleDailyReservation(request.request_id, updated.payment.asset, updated.payment.amount);
+    } else if (RELEASE_ON_STATUS.has(status)) {
+      store.releaseDailyReservation(request.request_id);
+    }
 
     const message = paymentRequestStatusMessage(updated, {
       tx_hash: req.body.tx_hash || null,
       error: req.body.error || null
     });
     notifyOpenClaw(updated.connection_id || updated.source?.device_id, message);
+    const eventSeq = store.eventWindow().latest_seq;
     notifyApp(updated.target_app_device_id, {
       type: "payment_request",
       request_id: updated.request_id,
-      status: updated.status
+      status: updated.status,
+      event_seq: eventSeq
+    });
+    pushService?.notifyPaymentRequest(updated.target_app_device_id, {
+      request_id: updated.request_id,
+      event_seq: eventSeq
     });
     observability.recordAuditEvent("payment_request.status_updated", "success", {
       actor: { type: "wallet_device", id: req.body.device_id },
@@ -220,4 +401,18 @@ export function createPaymentRequestsRouter(deps) {
   });
 
   return router;
+}
+
+function parseEventCursor(value) {
+  const cursor = Number(value || 0);
+  return Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : 0;
+}
+
+function hasAppCredentials(req) {
+  return Boolean(
+    req.query.device_id
+    || req.query.token
+    || req.get?.("x-app-device-id")
+    || req.get?.("x-app-device-token")
+  );
 }

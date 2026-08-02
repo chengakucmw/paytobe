@@ -2,13 +2,13 @@ package ai.agentwallet.hd.ui.wallet
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,24 +25,33 @@ import ai.agentwallet.hd.ui.components.vpToneOf
 import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumTheme
 
-/** 收件箱列表（原生）。对照 web 的 renderInbox：Pending/All/Final 分段 + 请求卡片/空态。 */
+/** 收件箱列表（原生）。对照 web 的 renderInbox：Pending/All/Final 分段 + 请求卡片/空态。
+ *  列表用 LazyColumn：只渲染可见请求卡片并回收，请求变多时滚动依旧顺滑。 */
 @Composable
 fun InboxScreen(vm: InboxViewModel, onOpen: (String) -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        VpSubheader(eyebrow = "Inbox", title = "Requests to review")
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        item {
+            VpSubheader(eyebrow = "Inbox", title = "Requests to review")
+        }
+        item {
+            Row(
+                modifier = Modifier.padding(horizontal = Spacing.s5),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            ) {
                 VpChip("All", ui.filter == "all") { vm.setFilter("all") }
                 VpChip("Pending", ui.filter == "pending") { vm.setFilter("pending") }
                 VpChip("Signed", ui.filter == "signed") { vm.setFilter("signed") }
                 VpChip("Completed", ui.filter == "completed") { vm.setFilter("completed") }
             }
-            if (ui.items.isEmpty()) {
-                VpCard(modifier = Modifier.fillMaxWidth()) {
+        }
+        if (ui.items.isEmpty()) {
+            item {
+                VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
                     Text("No payment requests", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
                     Text(
                         "When a connected agent or app requests a payment, it appears here for you to review and sign.",
@@ -50,16 +59,18 @@ fun InboxScreen(vm: InboxViewModel, onOpen: (String) -> Unit) {
                         color = VelarumTheme.colors.textMuted,
                     )
                 }
-            } else {
-                ui.items.forEach { item -> InboxCard(item = item, onClick = { onOpen(item.id) }) }
+            }
+        } else {
+            items(ui.items) { item ->
+                InboxCard(item = item, onClick = { onOpen(item.id) }, modifier = Modifier.padding(horizontal = Spacing.s5))
             }
         }
     }
 }
 
 @Composable
-private fun InboxCard(item: InboxItem, onClick: () -> Unit) {
-    VpCard(modifier = Modifier.fillMaxWidth().clickable { onClick() }) {
+private fun InboxCard(item: InboxItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    VpCard(modifier = modifier.fillMaxWidth().clickable { onClick() }) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,

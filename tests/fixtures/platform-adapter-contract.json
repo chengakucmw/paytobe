@@ -1,0 +1,27 @@
+{
+  "version": "velarum.platform-adapter-contract.v1",
+  "scenarios": {
+    "health": {
+      "express_sqlite": {"status": 200, "ok": true, "error_code": null, "has_request_id": false},
+      "worker_d1": {"status": 200, "ok": true, "error_code": null, "has_request_id": false}
+    },
+    "error_envelope": {
+      "express_sqlite": {"status": 404, "ok": false, "error_code": "resource_not_found", "has_request_id": true},
+      "worker_d1": {"status": 404, "ok": false, "error_code": "not_found", "has_request_id": true}
+    },
+    "auth_context_missing": {
+      "express_sqlite": {"status": 401, "ok": false, "error_code": "unauthorized_connection", "has_request_id": true},
+      "worker_d1": {"status": 401, "ok": false, "error_code": "unauthorized_connection", "has_request_id": true}
+    },
+    "idempotency_conflict": {
+      "express_sqlite": {"first_status": 201, "second_status": 200, "second_error_code": null, "duplicate": true, "returned_original_request": true},
+      "worker_d1": {"first_status": 201, "second_status": 201, "second_error_code": null, "duplicate": false, "returned_original_request": true}
+    }
+  },
+  "difference_allowlist": [
+    {"id": "worker-legacy-not-found-code", "scenario": "error_envelope", "remove_by_task": "VP-TASK-048"},
+    {"id": "legacy-connection-auth-code", "scenario": "auth_context_missing", "remove_by_task": "VP-TASK-067"},
+    {"id": "idempotency-conflict-not-enforced", "scenario": "idempotency_conflict", "remove_by_task": "VP-TASK-070"},
+    {"id": "idempotent-duplicate-status-differs", "scenario": "idempotency_conflict", "remove_by_task": "VP-TASK-070"}
+  ]
+}

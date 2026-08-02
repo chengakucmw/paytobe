@@ -497,9 +497,8 @@ final class TruthPanel {
     }
 
     private static String shortAddress(String value) {
-        if (value == null) return "";
-        if (value.length() <= 18) return value;
-        return value.substring(0, 10) + "..." + value.substring(value.length() - 8);
+        // Delegates to the shared AddressFormat (D9/Q5) — unified 10…8 form.
+        return AddressFormat.medium(value);
     }
 
     static final class Section {

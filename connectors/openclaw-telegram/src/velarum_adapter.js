@@ -308,7 +308,12 @@ function assertPresent(value, field) {
 }
 
 function assertDecimalAmount(value) {
-  if (typeof value !== "string" || !/^(0|[1-9]\d*)(\.\d+)?$/.test(value) || Number(value) <= 0) {
+  // Positive decimal WITHOUT floating point. The regex proves a canonical
+  // non-negative amount; such a value is zero iff it has no 1-9 digit, so
+  // "/[1-9]/" === "> 0". The old Number(value) <= 0 round-tripped money through a
+  // double (F3). This skill is intentionally self-contained, so the pattern stays a
+  // local copy here (kept in sync with packages/protocol/src/decimal-format.js).
+  if (typeof value !== "string" || !/^(0|[1-9]\d*)(\.\d+)?$/.test(value) || !/[1-9]/.test(value)) {
     throw new Error("payment.amount must be a positive decimal string");
   }
 }

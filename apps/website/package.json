@@ -1,0 +1,13 @@
+{
+  "name": "@velarumpay/website",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node scripts/build-site.mjs",
+    "check": "node --check server.mjs && node --check public/site.js && node --check scripts/build-site.mjs && node --check cloud/worker-template.mjs",
+    "test": "npm run build && node --test test/site.test.mjs"
+  }
+}

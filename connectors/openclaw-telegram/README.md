@@ -1,5 +1,9 @@
 # OpenClaw Telegram Connector
 
+> **Last modified**
+> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-07-21 13:50:07 UTC
+
 Local OpenClaw-side bridge for Telegram payment commands.
 
 The connector now builds a standard `velarum.payment_request.v1` payload and keeps the legacy `agentwallet.payment_intent.v1` relay wrapper for migration. It never handles private keys, mnemonic phrases, wallet signing, or automatic payment approval.
@@ -28,7 +32,7 @@ The parser may still accept the migration alias `evm_erc20` for Base USDC input.
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/connectors/openclaw-telegram
+cd /Users/yang/code/VelarumPay/code/connectors/openclaw-telegram
 cp .env.example .env
 TELEGRAM_BOT_TOKEN=... \
 TELEGRAM_ALLOWED_CHAT_IDS=123456 \
@@ -210,7 +214,7 @@ The legacy wrapper keeps `payment.rail = "base_usdc"` for Base USDC and includes
 ## Checks
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/connectors/openclaw-telegram
+cd /Users/yang/code/VelarumPay/code/connectors/openclaw-telegram
 npm install
 npm run check
 ```

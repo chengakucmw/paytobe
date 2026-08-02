@@ -1,0 +1,13 @@
+{
+  "name": "velarumpay-agentfood-service",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "start:production": "AGENTFOOD_RUNTIME_ENV=production node src/server.mjs",
+    "check": "node --check ../../packages/protocol/src/stellar-address.js && node --check src/config.mjs && node --check src/money.mjs && node --check src/catalog.mjs && node --check src/store.mjs && node --check src/platform-client.mjs && node --check src/artifacts.mjs && node --check src/server.mjs",
+    "test": "node --test test/*.test.mjs"
+  }
+}

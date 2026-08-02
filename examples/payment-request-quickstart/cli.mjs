@@ -371,7 +371,7 @@ async function api(baseUrl, method, urlPath, body = null) {
     });
   } catch (error) {
     throw new CliError(`Could not reach Platform API at ${baseUrl}`, {
-      hint: "Start it with: cd /Users/yang/code/VelarumPayCode/services/platform-api && npm start",
+      hint: "Start it with: cd /Users/yang/code/VelarumPay/code/services/platform-api && npm start",
       cause: error
     });
   }
@@ -389,7 +389,7 @@ async function unwrap(promise) {
     result = await promise;
   } catch (error) {
     throw new CliError("Could not reach Platform API", {
-      hint: "Start it with: cd /Users/yang/code/VelarumPayCode/services/platform-api && npm start",
+      hint: "Start it with: cd /Users/yang/code/VelarumPay/code/services/platform-api && npm start",
       cause: error
     });
   }

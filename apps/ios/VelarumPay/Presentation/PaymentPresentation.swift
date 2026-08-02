@@ -671,3 +671,91 @@ func challengePositions(for wordCount: Int) -> [Int] {
     return Array(0..<min(3, wordCount))
 }
 
+// MARK: - Recovery-phrase verification (OKX-style "tap a few words in order")
+//
+// Pure logic, no SwiftUI/UIKit. Mirrored 1:1 by the Android `SeedVerification` object; both were
+// validated against a shared reference sweep (110k+ property assertions, 0 failures). This only
+// powers the backup self-check ("did you actually write the phrase down?") — it never touches
+// key material, derivation, or signing.
+
+/// One chip in the candidate pool. `id` is stable for the lifetime of a challenge.
+struct SeedOption: Identifiable, Equatable {
+    let id: Int
+    let word: String
+}
+
+/// A generated verification challenge: the (ascending, 0-based) blanks to fill + the shuffled pool.
+struct SeedChallenge: Equatable {
+    let positions: [Int]
+    let options: [SeedOption]
+}
+
+enum SeedVerification {
+    /// How many blanks the user must fill.
+    static let defaultBlanks = 4
+    /// Pool size (correct words + decoys).
+    static let defaultOptionCount = 10
+
+    /// Convenience using the system RNG.
+    static func make(words: [String], blanks: Int = defaultBlanks, optionCount: Int = defaultOptionCount) -> SeedChallenge {
+        var generator = SystemRandomNumberGenerator()
+        return make(words: words, blanks: blanks, optionCount: optionCount, using: &generator)
+    }
+
+    /// Deterministic given `generator` (so the logic is testable).
+    ///
+    /// Invariants (covered by the shared reference's property tests):
+    ///  1. `positions`: `blanks` distinct, ascending indices in `0..<words.count`.
+    ///  2. Every blank's correct word appears in `options` → a tap-only solution always exists.
+    ///  3. Duplicate words in the phrase get one guaranteed chip per blank (enough to fill).
+    ///  4. Decoys come from other positions, de-duplicated, never equal to a correct word.
+    static func make<G: RandomNumberGenerator>(
+        words: [String],
+        blanks: Int = defaultBlanks,
+        optionCount: Int = defaultOptionCount,
+        using generator: inout G
+    ) -> SeedChallenge {
+        let n = words.count
+        guard n > 0 else { return SeedChallenge(positions: [], options: []) }
+        let k = min(max(blanks, 1), n)
+
+        // 1. distinct positions, shown ascending ("in order")
+        let positions = Array(Array(0..<n).shuffled(using: &generator).prefix(k)).sorted()
+
+        // 2. one guaranteed correct chip per blank (handles duplicate words in the phrase)
+        let correct = positions.map { words[$0] }
+        let correctSet = Set(correct)
+
+        // 3. decoys: distinct words from the OTHER positions, never equal to a correct word
+        let used = Set(positions)
+        var seen = Set<String>()
+        var decoyPool: [String] = []
+        for i in 0..<n where !used.contains(i) {
+            let w = words[i]
+            if correctSet.contains(w) || seen.contains(w) { continue }
+            seen.insert(w)
+            decoyPool.append(w)
+        }
+        decoyPool.shuffle(using: &generator)
+        let decoyCount = min(max(optionCount - k, 0), decoyPool.count)
+        let decoys = Array(decoyPool.prefix(decoyCount))
+
+        // 4. correct + decoy chips, shuffled; id == display index
+        var pool = correct + decoys
+        pool.shuffle(using: &generator)
+        let options = pool.enumerated().map { SeedOption(id: $0.offset, word: $0.element) }
+        return SeedChallenge(positions: positions, options: options)
+    }
+
+    /// True iff `selectedWords` equals the phrase words at `positions`, in order.
+    static func isCorrect(words: [String], positions: [Int], selectedWords: [String]) -> Bool {
+        guard selectedWords.count == positions.count else { return false }
+        for i in positions.indices {
+            let p = positions[i]
+            guard p >= 0 && p < words.count else { return false }
+            if selectedWords[i] != words[p] { return false }
+        }
+        return true
+    }
+}
+

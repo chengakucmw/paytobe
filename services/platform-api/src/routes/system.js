@@ -4,7 +4,7 @@ import express from "express";
 import { runtimeHealth } from "../security.js";
 
 export function createSystemRouter(deps) {
-  const { store, observability, runtimeConfig, runtimeValidation, sendApiError, refreshRuntimeMetrics } = deps;
+  const { store, observability, runtimeConfig, runtimeValidation, sendApiError, refreshRuntimeMetrics, platformCore } = deps;
   const router = express.Router();
 
   router.get("/health", (_req, res) => {
@@ -12,7 +12,7 @@ export function createSystemRouter(deps) {
     res.json({
       ok: true,
       service: "agentwallet-relay",
-      time: new Date().toISOString(),
+      time: platformCore.clock.nowIso(),
       observability: {
         metrics: true,
         audit_events_buffered: observability.auditEventCount()

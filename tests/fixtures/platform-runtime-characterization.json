@@ -1,0 +1,181 @@
+{
+  "version": 1,
+  "generated_at": "deterministic",
+  "runtimes": {
+    "express_sqlite": {
+      "routes": [
+        "GET /health",
+        "GET /metrics",
+        "GET /v1/audit/events",
+        "POST /v1/devices/app",
+        "POST /v1/devices/app/:id/rotate-token",
+        "PUT /v1/devices/app/:id/push-token",
+        "DELETE /v1/devices/app/:id/push-token",
+        "POST /v1/transaction-contexts",
+        "GET /v1/transaction-contexts/:transaction_id",
+        "POST /v1/pairing/sessions",
+        "GET /v1/pairing/sessions/:id",
+        "POST /v1/pairing/sessions/:id/approve",
+        "POST /v1/pairing/sessions/:id/reject",
+        "POST /v1/connect-invitations",
+        "POST /v1/connect-invitations/claim",
+        "GET /v1/connect-invitations/:id",
+        "DELETE /v1/connect-invitations/:id",
+        "POST /v1/connect-invitations/:id/exchange",
+        "GET /v1/connections",
+        "PATCH /v1/connections/:id",
+        "DELETE /v1/connections/:id",
+        "POST /v1/connections/:id/rotate-token",
+        "POST /v1/payment-requests",
+        "GET /v1/payment-requests",
+        "GET /v1/payment-requests/events",
+        "GET /v1/payment-requests/:id",
+        "POST /v1/payment-requests/:id/status",
+        "POST /v1/payment-intents",
+        "GET /v1/payment-intents",
+        "GET /v1/payment-intents/:id",
+        "POST /v1/payment-intents/:id/status",
+        "GET /v1/openclaw/events"
+      ],
+      "authentication_inputs": [
+        "Authorization: Bearer <connection_token>",
+        "X-Connection-Token",
+        "X-App-Device-Id + X-App-Device-Token",
+        "query.device_id + query.token",
+        "body.device_id + body.token",
+        "X-Connect-Claim-Token"
+      ],
+      "tenant_fields": [
+        "connection.merchant_id (canonical binding)",
+        "connection.agent_identity.tenant_id (legacy compatibility only)"
+      ]
+    },
+    "worker_d1": {
+      "routes": [
+        "GET /",
+        "GET /health",
+        "POST /v1/integrations/agentfood/chat",
+        "POST /v1/integrations/agentfood/connect",
+        "POST /v1/admin/agent-clients",
+        "POST /v1/devices/app",
+        "PUT /v1/devices/app/:id/push-token",
+        "DELETE /v1/devices/app/:id/push-token",
+        "POST /v1/connect-invitations",
+        "POST /v1/connect-invitations/claim",
+        "GET /v1/connect-invitations/:id",
+        "DELETE /v1/connect-invitations/:id",
+        "POST /v1/connect-invitations/:id/exchange",
+        "GET /v1/pairing/sessions/:id",
+        "POST /v1/pairing/sessions/:id/approve",
+        "POST /v1/pairing/sessions/:id/reject",
+        "GET /v1/connections",
+        "PATCH /v1/connections/:id",
+        "DELETE /v1/connections/:id",
+        "POST /v1/transaction-contexts",
+        "POST /v1/payment-requests",
+        "GET /v1/payment-requests",
+        "GET /v1/payment-requests/events",
+        "GET /v1/payment-requests/:id",
+        "POST /v1/payment-requests/:id/status"
+      ],
+      "authentication_inputs": [
+        "Authorization: Bearer <agent_client_token>",
+        "X-Agent-Client-Token",
+        "Authorization: Bearer <connection_token>",
+        "body.connection_token",
+        "X-App-Device-Id + X-App-Device-Token",
+        "query.device_id + query.token",
+        "body.device_id + body.token",
+        "X-Connect-Claim-Token"
+      ],
+      "tenant_fields": [
+        "agent_client.tenant_id",
+        "connection.tenant_id",
+        "identity.tenant_id",
+        "admin request body tenant_id (bootstrap-only input)"
+      ]
+    }
+  },
+  "scenarios": {
+    "health": {
+      "express_sqlite": {
+        "status": 200,
+        "content_type": "application/json",
+        "ok": true,
+        "error_code": null
+      },
+      "worker_d1": {
+        "status": 200,
+        "content_type": "application/json",
+        "ok": true,
+        "error_code": null
+      }
+    },
+    "unknown_route": {
+      "express_sqlite": {
+        "status": 404,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "resource_not_found"
+      },
+      "worker_d1": {
+        "status": 404,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "not_found"
+      }
+    },
+    "payment_request_without_auth": {
+      "express_sqlite": {
+        "status": 401,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "unauthorized_connection"
+      },
+      "worker_d1": {
+        "status": 401,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "unauthorized_connection"
+      }
+    },
+    "self_declared_connect_claim": {
+      "express_sqlite": {
+        "status": 401,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "unauthenticated",
+        "identity_assurance": null
+      },
+      "worker_d1": {
+        "status": 401,
+        "content_type": "application/json",
+        "ok": false,
+        "error_code": "agent_client_auth_required",
+        "identity_assurance": null
+      }
+    }
+  },
+  "gaps": [
+    {
+      "id": "runtime-error-envelope-404",
+      "classification": "compatible_difference",
+      "summary": "Remediated by VP-TASK-047: both runtimes now return a structured unknown-route error envelope."
+    },
+    {
+      "id": "runtime-authenticated-agent-claim",
+      "classification": "compatible_difference",
+      "summary": "Remediated by VP-TASK-067: both runtimes reject anonymous self-declared Agent claims; their stable error codes remain runtime-specific."
+    },
+    {
+      "id": "runtime-health-payload",
+      "classification": "compatible_difference",
+      "summary": "Health payload fields and service labels differ while both runtimes return HTTP 200 JSON."
+    },
+    {
+      "id": "runtime-route-coverage",
+      "classification": "missing_capability",
+      "summary": "The two runtimes expose different public route sets."
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+module velarum_wallet_coreFFI {
+    header "velarum_wallet_coreFFI.h"
+    export *
+}

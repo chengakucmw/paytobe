@@ -48,21 +48,21 @@ test("a legacy v1 single-blob SQLite store migrates into the normalized tables o
   raw.prepare("INSERT INTO relay_state (id, state_json, updated_at) VALUES (1, ?, ?)").run(JSON.stringify(v1State), "t");
   raw.close();
 
-  // Opening it upgrades to v2 without losing data.
+  // Opening it upgrades through normalized v2 and tenant schema v3 without losing data.
   const store = new Store(file);
-  assert.equal(store.info().schema_version, 2, "store reports the normalized schema version");
+  assert.equal(store.info().schema_version, 3, "store reports the current tenant schema version");
   assert.ok(store.device("dev1"), "device survived the migration");
   assert.equal(store.state.eventSeq, 7, "persistent event counter survived");
   assert.equal(store.eventsSince(0).length, 1, "events survived");
   store.close();
 
-  // The data now lives in the normalized tables, and the schema is stamped v2.
+  // The data now lives in the normalized tables, and the schema is stamped v3.
   assert.equal(tableCount(file, "devices"), 1, "device row moved into the devices table");
   assert.equal(tableCount(file, "events"), 1, "event row moved into the events table");
   const db = new DatabaseSync(file);
   const version = db.prepare("SELECT MAX(version) AS v FROM schema_migrations").get().v;
   db.close();
-  assert.equal(version, 2, "schema stamped to v2 so the import never repeats");
+  assert.equal(version, 3, "schema stamped to v3 so neither import nor tenant migration repeats");
 });
 
 test("writes land in per-entity tables, never the legacy blob row", (t) => {
@@ -91,19 +91,19 @@ test("delta writes keep the tables exactly in sync, including deletes", (t) => {
 
   const store = new Store(file);
   store.createConnection("conn1", "tok1", { scopes: ["payment.requests.read"], approved_by_device_id: "d1" });
-  // Rotating the token deletes the old token-index row and inserts a new one;
-  // the delta writer must DELETE the stale row, not leave it orphaned.
+  // Rotation replaces the old hash index. Revocation then deletes every token
+  // index immediately so neither generation remains usable after restart.
   store.rotateConnectionToken("conn1", "tok2");
   store.updateConnectionStatus("conn1", "revoked");
   store.close();
 
   assert.equal(tableCount(file, "connections"), 1, "exactly one connection row");
-  assert.equal(tableCount(file, "connection_tokens"), 1, "old token index row was deleted, not orphaned");
+  assert.equal(tableCount(file, "connection_tokens"), 0, "revocation deleted every token index row");
 
   // The new token resolves; the old one does not.
   const reopened = new Store(file);
   t.after(() => reopened.close());
-  assert.ok(reopened.connectionByToken("tok2"), "rotated token resolves after reopen");
+  assert.equal(reopened.connectionByToken("tok2"), null, "revoked rotated token no longer resolves");
   assert.equal(reopened.connectionByToken("tok1"), null, "old token no longer resolves");
   assert.equal(reopened.connection("conn1").status, "revoked", "status update persisted");
 });

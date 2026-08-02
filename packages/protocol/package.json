@@ -13,16 +13,53 @@
     "./fixtures": {
       "types": "./src/index.d.ts",
       "import": "./src/fixtures.js"
+    },
+    "./schema/payment-request-v1": {
+      "default": "./schema/velarum.payment_request.v1.schema.json"
+    },
+    "./schema/transaction-context-v1": {
+      "default": "./schema/velarum.transaction_context.v1.schema.json"
+    },
+    "./schema/platform-api-error-v1": {
+      "default": "./schema/velarum.platform_api.error.v1.schema.json"
+    },
+    "./schema/auth-context-v1": {
+      "default": "./schema/velarum.auth_context.v1.schema.json"
+    },
+    "./schema/idempotency-scope-v1": {
+      "default": "./schema/velarum.idempotency_scope.v1.schema.json"
+    },
+    "./schema/merchant-v1": {
+      "default": "./schema/velarum.merchant.v1.schema.json"
+    },
+    "./schema/merchant-membership-v1": {
+      "default": "./schema/velarum.merchant_membership.v1.schema.json"
+    },
+    "./schema/merchant-domain-v1": {
+      "default": "./schema/velarum.merchant_domain.v1.schema.json"
+    },
+    "./schema/agent-v1": {
+      "default": "./schema/velarum.agent.v1.schema.json"
+    },
+    "./schema/agent-credential-v1": {
+      "default": "./schema/velarum.agent_credential.v1.schema.json"
+    },
+    "./schema/recipient-v1": {
+      "default": "./schema/velarum.recipient.v1.schema.json"
+    },
+    "./schema/webhook-endpoint-v1": {
+      "default": "./schema/velarum.webhook_endpoint.v1.schema.json"
     }
   },
   "files": [
     "src",
+    "schema",
     "README.md",
     "package.json"
   ],
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
-    "check": "node --check src/index.js && node --check src/constants.js && node --check src/fixtures.js && node --check src/transfer-assets.js && node --check src/validators.js && npm run pack:dry",
+    "check": "node --check src/index.js && node --check src/constants.js && node --check src/fixtures.js && node --check src/transfer-assets.js && node --check src/stellar-address.js && node --check src/platform-api.js && node --check src/control-plane.js && node --check src/validators.js && node -e \"for (const name of require('node:fs').readdirSync('schema').filter((value) => value.endsWith('.json'))) JSON.parse(require('node:fs').readFileSync('schema/' + name))\" && npm run pack:dry",
     "pack:dry": "npm pack --dry-run --json >/dev/null",
     "test": "node --test ../../tests/protocol/*.test.mjs"
   }

@@ -1,0 +1,935 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "VelarumPay Platform API",
+    "version": "0.1.0",
+    "description": "Canonical v0.1 API for pairing, Transaction Context, Payment Request, and status observation. The service never holds user private keys and never signs user transactions."
+  },
+  "x-velarumpay-control-plane-contract-version": "velarum.platform-api.v1",
+  "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
+  "servers": [
+    {
+      "url": "https://api-testnet.velarumpay.com",
+      "description": "Official VelarumPay testnet"
+    },
+    {
+      "url": "http://127.0.0.1:8787",
+      "description": "Local contract testing"
+    }
+  ],
+  "x-velarumpay-contract-version": "velarumpay.platform_api.v0.1",
+  "x-authoritative-documents": [
+    "00056-00001-00008",
+    "00056-00001-00005",
+    "00056-00001-00007",
+    "00056-00001-00015",
+    "00056-00003-00013",
+    "00056-00011-00012"
+  ],
+  "x-legacy-paths-not-public": [
+    "/v1/payment-intents",
+    "/v1/openclaw/events",
+    "/v1/ws/openclaw"
+  ],
+  "tags": [
+    {"name": "System"},
+    {"name": "Devices"},
+    {"name": "Pairing"},
+    {"name": "Connections"},
+    {"name": "Merchant Accounts"},
+    {"name": "Merchant Domains"},
+    {"name": "Agents"},
+    {"name": "Agent Auth"},
+    {"name": "Recipients"},
+    {"name": "Connect"},
+    {"name": "Webhooks"},
+    {"name": "Transaction Contexts"},
+    {"name": "Payment Requests"}
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Service health",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["ok"],
+                  "properties": {"ok": {"const": true}},
+                  "additionalProperties": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/merchant-accounts/registrations": {
+      "post": {
+        "tags": ["Merchant Accounts"],
+        "operationId": "registerMerchantAccount",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantAccountRegistration"}}}},
+        "responses": {
+          "202": {"description": "Enumeration-safe registration response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "429": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/merchant-accounts/email-verifications": {
+      "post": {
+        "tags": ["Merchant Accounts"],
+        "operationId": "verifyMerchantAccountEmail",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EmailVerification"}}}},
+        "responses": {
+          "200": {"description": "Email verified and one-time session grant returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/merchants": {
+      "post": {
+        "tags": ["Merchant Accounts"],
+        "operationId": "createMerchant",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantCreate"}}}},
+        "responses": {
+          "201": {"description": "Merchant organization created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/merchant-sessions": {
+      "post": {
+        "tags": ["Merchant Accounts"],
+        "operationId": "createMerchantSession",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantSessionCreate"}}}},
+        "responses": {
+          "201": {"description": "HttpOnly merchant session cookie and CSRF proof issued", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/merchant-domains": {
+      "post": {
+        "tags": ["Merchant Domains"], "operationId": "createMerchantDomain", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantDomainCreate"}}}},
+        "responses": {
+          "201": {"description": "Domain challenge created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/merchant-domains/{id}/verify": {
+      "post": {
+        "tags": ["Merchant Domains"], "operationId": "verifyMerchantDomain", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "responses": {
+          "200": {"description": "Domain verification result", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"},
+          "422": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/agents": {
+      "get": {
+        "tags": ["Agents"], "operationId": "listAgents", "security": [{"merchantSession": []}],
+        "responses": {"200": {"description": "Tenant-scoped Agent list", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}}
+      },
+      "post": {
+        "tags": ["Agents"], "operationId": "createAgent", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentCreate"}}}},
+        "responses": {"201": {"description": "Agent registered", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/agents/{id}": {
+      "get": {
+        "tags": ["Agents"], "operationId": "getAgent", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "responses": {"200": {"description": "Tenant-scoped Agent", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}}
+      },
+      "patch": {
+        "tags": ["Agents"], "operationId": "updateAgent", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentUpdate"}}}},
+        "responses": {"200": {"description": "Agent updated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/agents/{agentId}/credentials": {
+      "post": {
+        "tags": ["Agents"], "operationId": "registerAgentCredential", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/AgentId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentCredentialRegister"}}}},
+        "responses": {"201": {"description": "Public credential registered", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/agents/{agentId}/credentials/{credentialId}/activate": {
+      "post": {
+        "tags": ["Agents"], "operationId": "activateAgentCredential", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/AgentId"}, {"$ref": "#/components/parameters/CredentialId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentCredentialActivation"}}}},
+        "responses": {"200": {"description": "Credential activated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/agent-auth/token": {
+      "post": {
+        "tags": ["Agent Auth"], "operationId": "exchangeAgentAssertion",
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentTokenExchange"}}}},
+        "responses": {"200": {"description": "Short-lived Agent access token", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentTokenEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "429": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/recipients": {
+      "get": {
+        "tags": ["Recipients"], "operationId": "listRecipients", "security": [{"merchantSession": []}],
+        "responses": {"200": {"description": "Tenant-scoped Recipient list", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}}
+      },
+      "post": {
+        "tags": ["Recipients"], "operationId": "createRecipient", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecipientCreate"}}}},
+        "responses": {"201": {"description": "Recipient draft and first immutable version created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/recipients/{id}/verify": {
+      "post": {
+        "tags": ["Recipients"], "operationId": "verifyRecipient", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecipientVerify"}}}},
+        "responses": {"200": {"description": "Evidence accepted and cooling period started", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/recipients/{id}/versions/{versionId}/activate": {
+      "post": {
+        "tags": ["Recipients"], "operationId": "activateRecipientVersion", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/VersionId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecipientActivate"}}}},
+        "responses": {"200": {"description": "Verified version activated after cooling", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/connect-invitations/claim": {
+      "post": {
+        "tags": ["Connect"], "operationId": "claimConnectInvitation", "security": [{"agentBearer": []}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectClaim"}}}},
+        "responses": {"201": {"description": "Invitation claimed; wallet approval still required", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/connect-invitations/{id}": {
+      "get": {
+        "tags": ["Connect"], "operationId": "getConnectInvitationReview",
+        "security": [{"appDeviceId": [], "appDeviceToken": []}, {"connectClaimBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "responses": {"200": {"description": "Live server-derived Connect identity review", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectInvitationEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/connect-invitations/{id}/approve": {
+      "post": {
+        "tags": ["Connect"], "operationId": "approveConnectInvitation",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectWalletDecision"}}}},
+        "responses": {"201": {"description": "Live identity facts revalidated and invitation approved", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectInvitationEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "410": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/connect-invitations/{id}/reject": {
+      "post": {
+        "tags": ["Connect"], "operationId": "rejectConnectInvitation",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectWalletDecision"}}}},
+        "responses": {"200": {"description": "Invitation rejected by its target wallet", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ConnectInvitationEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "410": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/connect-invitations/{id}/exchange": {
+      "post": {
+        "tags": ["Connect"], "operationId": "exchangeConnectInvitation", "security": [{"connectClaimBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "responses": {"200": {"description": "Approved invitation exchanged for scoped connection", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "410": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/webhook-endpoints": {
+      "get": {
+        "tags": ["Webhooks"], "operationId": "listWebhookEndpoints", "security": [{"merchantSession": []}],
+        "responses": {"200": {"description": "Tenant-scoped Webhook endpoint list", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}}
+      },
+      "post": {
+        "tags": ["Webhooks"], "operationId": "createWebhookEndpoint", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/CsrfToken"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WebhookEndpointCreate"}}}},
+        "responses": {"201": {"description": "Endpoint created; generated secret returned once", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "503": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/webhook-endpoints/{id}/verify": {
+      "post": {
+        "tags": ["Webhooks"], "operationId": "verifyWebhookEndpoint", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "responses": {"200": {"description": "Endpoint verified", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "422": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/webhook-endpoints/{id}/rotate-secret": {
+      "post": {
+        "tags": ["Webhooks"], "operationId": "rotateWebhookSecret", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "responses": {"200": {"description": "New secret returned once with bounded overlap", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}, "503": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/webhook-deliveries": {
+      "get": {
+        "tags": ["Webhooks"], "operationId": "listWebhookDeliveries", "security": [{"merchantSession": []}],
+        "responses": {"200": {"description": "Sanitized tenant-scoped delivery attempts", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/webhook-deliveries/{id}/replay": {
+      "post": {
+        "tags": ["Webhooks"], "operationId": "replayWebhookDelivery", "security": [{"merchantSession": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
+        "responses": {"200": {"description": "Eligible delivery replay enqueued", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+      }
+    },
+    "/v1/devices/app": {
+      "post": {
+        "tags": ["Devices"],
+        "operationId": "registerAppDevice",
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AppDeviceRegistration"}}}
+        },
+        "responses": {
+          "200": {"description": "App device registered or idempotently confirmed", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/devices/app/{id}/push-token": {
+      "put": {
+        "tags": ["Devices"],
+        "operationId": "registerAppDevicePushToken",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PushTokenRegistration"}}}
+        },
+        "responses": {
+          "200": {"description": "FCM token encrypted and registered", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "503": {"$ref": "#/components/responses/ApiError"}
+        }
+      },
+      "delete": {
+        "tags": ["Devices"],
+        "operationId": "deleteAppDevicePushToken",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletAuthenticatedBody"}}}
+        },
+        "responses": {
+          "200": {"description": "FCM token invalidated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/pairing/sessions": {
+      "post": {
+        "tags": ["Pairing"],
+        "operationId": "createPairingSession",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {"$ref": "#/components/schemas/PairingSessionCreate"}
+            }
+          }
+        },
+        "responses": {
+          "201": {"description": "Pairing session created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "429": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/pairing/sessions/{id}": {
+      "get": {
+        "tags": ["Pairing"],
+        "operationId": "getPairingSession",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "responses": {
+          "200": {"description": "Pairing session", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/pairing/sessions/{id}/approve": {
+      "post": {
+        "tags": ["Pairing"],
+        "operationId": "approvePairingSession",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletAuthenticatedBody"}}}
+        },
+        "responses": {
+          "200": {"description": "Pairing approved; connection token is returned once", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/pairing/sessions/{id}/reject": {
+      "post": {
+        "tags": ["Pairing"],
+        "operationId": "rejectPairingSession",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletAuthenticatedBody"}}}},
+        "responses": {
+          "200": {"description": "Pairing rejected", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/connections": {
+      "get": {
+        "tags": ["Connections"],
+        "operationId": "listConnections",
+        "security": [{"connectionBearer": []}],
+        "responses": {
+          "200": {"description": "Connections visible to the caller", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/connections/{id}": {
+      "delete": {
+        "tags": ["Connections"],
+        "operationId": "revokeConnection",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletAuthenticatedBody"}}}},
+        "responses": {
+          "200": {"description": "Connection revoked", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/connections/{id}/rotate-token": {
+      "post": {
+        "tags": ["Connections"],
+        "operationId": "rotateConnectionToken",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/WalletAuthenticatedBody"}}}},
+        "responses": {
+          "200": {"description": "New token returned once; prior token invalidated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/transaction-contexts": {
+      "post": {
+        "tags": ["Transaction Contexts"],
+        "operationId": "putTransactionContext",
+        "security": [{"connectionBearer": []}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/TransactionContext"}}}
+        },
+        "responses": {
+          "201": {"description": "Context created or replaced", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/transaction-contexts/{transaction_id}": {
+      "get": {
+        "tags": ["Transaction Contexts"],
+        "operationId": "getTransactionContext",
+        "security": [{"connectionBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/TransactionId"}],
+        "responses": {
+          "200": {"description": "Transaction Context", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/payment-requests": {
+      "post": {
+        "tags": ["Payment Requests"],
+        "operationId": "createPaymentRequest",
+        "security": [{"connectionBearer": []}],
+        "parameters": [{"$ref": "#/components/parameters/IdempotencyKey"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestCreate"}}}
+        },
+        "responses": {
+          "201": {"description": "Payment Request created", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestEnvelope"}}}},
+          "200": {"description": "Idempotent duplicate; existing request returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"}
+        }
+      },
+      "get": {
+        "tags": ["Payment Requests"],
+        "operationId": "listPaymentRequests",
+        "security": [{"connectionBearer": []}, {"appDeviceId": [], "appDeviceToken": []}],
+        "responses": {
+          "200": {"description": "Payment Requests visible to the caller", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ListEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/payment-requests/events": {
+      "get": {
+        "tags": ["Payment Requests"],
+        "operationId": "listPaymentRequestEvents",
+        "security": [{"connectionBearer": []}, {"appDeviceId": [], "appDeviceToken": []}],
+        "parameters": [{"name": "since", "in": "query", "required": false, "schema": {"type": "integer", "minimum": 0}}],
+        "responses": {
+          "200": {"description": "Ordered status events plus cursor retention metadata; reset_required instructs the caller to perform a full authenticated sync", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestEventListEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/payment-requests/{id}": {
+      "get": {
+        "tags": ["Payment Requests"],
+        "operationId": "getPaymentRequest",
+        "security": [{"connectionBearer": []}, {"appDeviceId": [], "appDeviceToken": []}],
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "responses": {
+          "200": {"description": "Payment Request", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestEnvelope"}}}},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "403": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    },
+    "/v1/payment-requests/{id}/status": {
+      "post": {
+        "tags": ["Payment Requests"],
+        "operationId": "updatePaymentRequestStatus",
+        "parameters": [{"$ref": "#/components/parameters/ResourceId"}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestStatusUpdate"}}}
+        },
+        "responses": {
+          "200": {"description": "Status updated", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/PaymentRequestEnvelope"}}}},
+          "400": {"$ref": "#/components/responses/ApiError"},
+          "401": {"$ref": "#/components/responses/ApiError"},
+          "404": {"$ref": "#/components/responses/ApiError"},
+          "409": {"$ref": "#/components/responses/ApiError"}
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "connectionBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "VelarumPay connection token"
+      },
+      "appDeviceId": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-App-Device-Id"
+      },
+      "appDeviceToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-App-Device-Token"
+      },
+      "merchantSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "vp_merchant_session"
+      },
+      "agentBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "VelarumPay short-lived Agent access token"
+      },
+      "connectClaimBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "VelarumPay short-lived Connect claim token"
+      }
+    },
+    "parameters": {
+      "ResourceId": {"name": "id", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "AgentId": {"name": "agentId", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "CredentialId": {"name": "credentialId", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "VersionId": {"name": "versionId", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "TransactionId": {"name": "transaction_id", "in": "path", "required": true, "schema": {"type": "string", "minLength": 1}},
+      "IdempotencyKey": {"name": "x-idempotency-key", "in": "header", "required": false, "schema": {"type": "string", "maxLength": 256}},
+      "CsrfToken": {"name": "x-csrf-token", "in": "header", "required": true, "schema": {"type": "string", "minLength": 1}}
+    },
+    "responses": {
+      "ApiError": {
+        "description": "Structured API error",
+        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ErrorEnvelope"}}}
+      }
+    },
+    "schemas": {
+      "PaymentRequest": {"$ref": "../../../packages/protocol/schema/velarum.payment_request.v1.schema.json"},
+      "TransactionContext": {"$ref": "../../../packages/protocol/schema/velarum.transaction_context.v1.schema.json"},
+      "MerchantAccountRegistration": {
+        "type": "object", "required": ["email"],
+        "properties": {"email": {"type": "string", "format": "email", "maxLength": 320}},
+        "additionalProperties": false
+      },
+      "EmailVerification": {
+        "type": "object", "required": ["token"],
+        "properties": {"token": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "additionalProperties": false
+      },
+      "MerchantCreate": {
+        "type": "object", "required": ["display_name", "session_grant"],
+        "properties": {
+          "display_name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "legal_name": {"type": "string", "maxLength": 200},
+          "session_grant": {"type": "string", "minLength": 1, "writeOnly": true}
+        },
+        "additionalProperties": false
+      },
+      "MerchantSessionCreate": {
+        "type": "object", "required": ["merchant_id", "session_grant"],
+        "properties": {
+          "merchant_id": {"type": "string", "minLength": 1, "maxLength": 160},
+          "session_grant": {"type": "string", "minLength": 1, "writeOnly": true}
+        },
+        "additionalProperties": false
+      },
+      "MerchantDomainCreate": {
+        "type": "object", "required": ["domain"],
+        "properties": {
+          "domain": {"type": "string", "minLength": 3, "maxLength": 253},
+          "method": {"type": "string", "enum": ["dns_txt", "https_well_known"], "default": "dns_txt"}
+        },
+        "additionalProperties": false
+      },
+      "AgentCreate": {
+        "type": "object", "required": ["name", "runtime", "environment", "allowed_scopes"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "runtime": {"type": "string", "minLength": 1, "maxLength": 80},
+          "environment": {"type": "string", "enum": ["sandbox", "testnet", "production"]},
+          "allowed_scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/components/schemas/PairingScope"}}
+        },
+        "additionalProperties": false
+      },
+      "AgentCredentialRegister": {
+        "type": "object", "required": ["kid", "alg", "public_key", "not_before", "expires_at"],
+        "properties": {
+          "kid": {"type": "string", "minLength": 1, "maxLength": 80},
+          "alg": {"const": "Ed25519"},
+          "public_key": {"type": "string", "minLength": 1},
+          "not_before": {"type": "string", "format": "date-time"},
+          "expires_at": {"type": "string", "format": "date-time"}
+        },
+        "additionalProperties": false
+      },
+      "AgentUpdate": {
+        "type": "object", "required": ["version"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "runtime": {"type": "string", "minLength": 1, "maxLength": 80},
+          "environment": {"type": "string", "enum": ["sandbox", "testnet", "production"]},
+          "allowed_scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/components/schemas/PairingScope"}},
+          "status": {"type": "string", "enum": ["draft", "active", "suspended", "revoked"]},
+          "version": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      },
+      "AgentCredentialActivation": {
+        "type": "object", "required": ["challenge", "signature"],
+        "properties": {
+          "challenge": {"type": "string", "minLength": 1, "writeOnly": true},
+          "signature": {"type": "string", "minLength": 1, "writeOnly": true}
+        },
+        "additionalProperties": false
+      },
+      "AgentTokenExchange": {
+        "type": "object", "required": ["client_assertion"],
+        "properties": {"client_assertion": {"type": "string", "minLength": 1, "writeOnly": true}},
+        "additionalProperties": false
+      },
+      "AgentTokenEnvelope": {
+        "type": "object", "required": ["ok", "access_token", "token_type", "expires_in", "scope"],
+        "properties": {
+          "ok": {"const": true},
+          "access_token": {"type": "string", "writeOnly": true},
+          "token_type": {"const": "Bearer"},
+          "expires_in": {"type": "integer", "minimum": 1, "maximum": 300},
+          "scope": {"type": "array", "items": {"$ref": "#/components/schemas/PairingScope"}}
+        },
+        "additionalProperties": true
+      },
+      "RecipientCreate": {
+        "type": "object", "required": ["name", "network", "asset", "address"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 120},
+          "rail": {"type": "string"},
+          "network": {"type": "string"},
+          "asset": {"type": "string", "minLength": 1},
+          "address": {"type": "string", "minLength": 1},
+          "contract": {"type": "string"}, "issuer": {"type": "string"},
+          "memo": {"type": "string"}, "tag": {"type": "string"}
+        },
+        "additionalProperties": false
+      },
+      "RecipientVerify": {
+        "type": "object", "required": ["recipient_version_id", "type", "source_id", "version"],
+        "properties": {
+          "recipient_version_id": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "enum": ["domain_proof", "address_control", "reviewed_operational"]},
+          "source_id": {"type": "string", "minLength": 1},
+          "evidence_digest": {"type": "string"},
+          "version": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      },
+      "RecipientActivate": {
+        "type": "object", "required": ["evidence_id", "evidence_digest", "version"],
+        "properties": {
+          "evidence_id": {"type": "string", "minLength": 1},
+          "evidence_digest": {"type": "string", "minLength": 1},
+          "version": {"type": "integer", "minimum": 1}
+        },
+        "additionalProperties": false
+      },
+      "ConnectClaim": {
+        "type": "object", "required": ["connect_key", "requested_scopes"],
+        "properties": {
+          "connect_key": {"type": "string", "pattern": "^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$", "writeOnly": true},
+          "requested_scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/components/schemas/PairingScope"}}
+        },
+        "additionalProperties": false
+      },
+      "ConnectWalletDecision": {
+        "type": "object",
+        "required": ["device_id", "token"],
+        "properties": {
+          "device_id": {"type": "string", "minLength": 1},
+          "token": {"type": "string", "minLength": 1, "writeOnly": true}
+        },
+        "additionalProperties": false
+      },
+      "ConnectIdentityReview": {
+        "type": "object",
+        "required": ["state", "approval_allowed", "reason_code", "observed_at", "merchant", "agent", "credential"],
+        "properties": {
+          "state": {"type": "string", "enum": ["verified", "pending", "suspended", "unverifiable"]},
+          "approval_allowed": {"type": "boolean"},
+          "reason_code": {"type": "string", "minLength": 1},
+          "observed_at": {"type": "string", "format": "date-time"},
+          "merchant": {"type": ["object", "null"], "properties": {"merchant_id": {"type": "string"}, "display_name": {"type": "string"}, "status": {"type": "string"}, "verification_state": {"type": "string"}, "verified_domain": {"type": ["string", "null"]}}, "additionalProperties": false},
+          "agent": {"type": ["object", "null"], "properties": {"agent_id": {"type": "string"}, "name": {"type": "string"}, "runtime": {"type": "string"}, "status": {"type": "string"}}, "additionalProperties": false},
+          "credential": {"type": ["object", "null"], "properties": {"credential_id": {"type": "string"}, "status": {"type": "string"}, "not_before": {"type": "string", "format": "date-time"}, "expires_at": {"type": "string", "format": "date-time"}}, "additionalProperties": false}
+        },
+        "additionalProperties": false
+      },
+      "ConnectInvitation": {
+        "type": "object",
+        "required": ["connect_invitation_id", "status", "requested_scopes", "created_at", "updated_at", "expires_at", "identity_review"],
+        "properties": {
+          "connect_invitation_id": {"type": "string", "minLength": 1},
+          "status": {"type": "string", "enum": ["waiting", "claimed", "approved", "connected", "rejected", "cancelled", "expired"]},
+          "agent_identity": {"type": ["object", "null"], "additionalProperties": true},
+          "identity_assurance": {"type": ["string", "null"]},
+          "requested_scopes": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/components/schemas/PairingScope"}},
+          "pairing_session_id": {"type": ["string", "null"]},
+          "connection_id": {"type": ["string", "null"]},
+          "created_at": {"type": "string", "format": "date-time"},
+          "updated_at": {"type": "string", "format": "date-time"},
+          "claimed_at": {"type": ["string", "null"], "format": "date-time"},
+          "approved_at": {"type": ["string", "null"], "format": "date-time"},
+          "connected_at": {"type": ["string", "null"], "format": "date-time"},
+          "rejected_at": {"type": ["string", "null"], "format": "date-time"},
+          "cancelled_at": {"type": ["string", "null"], "format": "date-time"},
+          "expired_at": {"type": ["string", "null"], "format": "date-time"},
+          "expires_at": {"type": "string", "format": "date-time"},
+          "identity_review": {"$ref": "#/components/schemas/ConnectIdentityReview"}
+        },
+        "additionalProperties": false
+      },
+      "ConnectInvitationEnvelope": {
+        "type": "object",
+        "required": ["ok", "connect_invitation"],
+        "properties": {
+          "ok": {"const": true},
+          "connect_invitation": {"$ref": "#/components/schemas/ConnectInvitation"},
+          "connection": {"type": "object", "additionalProperties": true}
+        },
+        "additionalProperties": false
+      },
+      "PaymentRequestCreate": {
+        "type": "object", "required": ["recipient_id", "payment", "policy"],
+        "properties": {
+          "recipient_id": {"type": "string", "minLength": 1},
+          "recipient_version_id": {"type": "string", "minLength": 1},
+          "payment": {
+            "type": "object", "required": ["amount"],
+            "properties": {"amount": {"type": "string", "pattern": "^(?=.*[1-9])(0|[1-9][0-9]*)(\\.[0-9]+)?$"}},
+            "additionalProperties": false
+          },
+          "expires_at": {"type": "string", "format": "date-time"},
+          "transaction_context_ref": {"type": "object", "additionalProperties": true},
+          "display": {"type": "object", "additionalProperties": true},
+          "metadata": {"type": "object", "additionalProperties": true},
+          "policy": {
+            "type": "object", "required": ["requires_user_approval"],
+            "properties": {"requires_user_approval": {"const": true}},
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "WebhookEndpointCreate": {
+        "type": "object", "required": ["url", "event_types"],
+        "properties": {
+          "url": {"type": "string", "format": "uri", "pattern": "^https://"},
+          "event_types": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"}}
+        },
+        "additionalProperties": false
+      },
+      "VersionPrecondition": {
+        "type": "object", "required": ["version"],
+        "properties": {"version": {"type": "integer", "minimum": 1}},
+        "additionalProperties": false
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": ["pending", "signed", "broadcasted", "confirmed", "failed", "expired", "rejected"]
+      },
+      "PairingScope": {
+        "type": "string",
+        "enum": ["payment.requests.create", "payment.requests.read", "transaction_contexts.create", "transaction_contexts.read", "wallet.addresses.read"]
+      },
+      "PairingSessionCreate": {
+        "type": "object",
+        "required": ["agent", "requested_scopes"],
+        "properties": {
+          "agent": {"type": "object", "additionalProperties": true},
+          "requested_scopes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/components/schemas/PairingScope"}},
+          "expires_in_seconds": {"type": "integer", "minimum": 60, "maximum": 600}
+        },
+        "additionalProperties": true
+      },
+      "WalletAuthenticatedBody": {
+        "type": "object",
+        "required": ["device_id", "token"],
+        "properties": {
+          "device_id": {"type": "string", "minLength": 1},
+          "token": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": true
+      },
+      "AppDeviceRegistration": {
+        "type": "object",
+        "required": ["device_id", "token"],
+        "properties": {
+          "device_id": {"type": "string", "minLength": 1},
+          "token": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      },
+      "PushTokenRegistration": {
+        "allOf": [
+          {"$ref": "#/components/schemas/WalletAuthenticatedBody"},
+          {
+            "type": "object",
+            "required": ["provider", "push_token"],
+            "properties": {
+              "provider": {"const": "fcm"},
+              "push_token": {"type": "string", "minLength": 20, "maxLength": 4096}
+            }
+          }
+        ]
+      },
+      "PaymentRequestStatusUpdate": {
+        "allOf": [
+          {"$ref": "#/components/schemas/WalletAuthenticatedBody"},
+          {
+            "type": "object",
+            "required": ["status"],
+            "properties": {
+              "status": {"$ref": "#/components/schemas/PaymentStatus"},
+              "tx_hash": {"type": ["string", "null"]},
+              "error": {"type": ["string", "object", "null"]}
+            }
+          }
+        ]
+      },
+      "ValidationIssue": {
+        "type": "object",
+        "required": ["code", "message"],
+        "properties": {
+          "code": {"type": "string"},
+          "message": {"type": "string"},
+          "severity": {"type": "string", "enum": ["blocker", "warning", "review_required", "info"]},
+          "field": {"type": "string"},
+          "details": {"type": "object", "additionalProperties": true}
+        },
+        "additionalProperties": true
+      },
+      "ErrorEnvelope": {"$ref": "../../../packages/protocol/schema/velarum.platform_api.error.v1.schema.json"},
+      "AuthContext": {"$ref": "../../../packages/protocol/schema/velarum.auth_context.v1.schema.json"},
+      "IdempotencyScope": {"$ref": "../../../packages/protocol/schema/velarum.idempotency_scope.v1.schema.json"},
+      "SuccessEnvelope": {
+        "type": "object",
+        "required": ["ok"],
+        "properties": {"ok": {"const": true}},
+        "additionalProperties": true
+      },
+      "PaymentRequestEnvelope": {
+        "type": "object",
+        "required": ["ok", "payment_request"],
+        "properties": {
+          "ok": {"const": true},
+          "duplicate": {"type": "boolean"},
+          "payment_request": {"$ref": "#/components/schemas/PaymentRequest"},
+          "warnings": {"type": "array", "items": {"$ref": "#/components/schemas/ValidationIssue"}}
+        },
+        "additionalProperties": true
+      },
+      "ListEnvelope": {
+        "type": "object",
+        "required": ["ok", "items"],
+        "properties": {
+          "ok": {"const": true},
+          "items": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+        },
+        "additionalProperties": true
+      },
+      "PaymentRequestEventListEnvelope": {
+        "type": "object",
+        "required": ["ok", "items", "latest_seq", "oldest_retained_seq", "reset_required"],
+        "properties": {
+          "ok": {"const": true},
+          "items": {"type": "array", "items": {"type": "object", "additionalProperties": true}},
+          "latest_seq": {"type": "integer", "minimum": 0},
+          "oldest_retained_seq": {"type": "integer", "minimum": 0},
+          "reset_required": {"type": "boolean"}
+        },
+        "additionalProperties": true
+      }
+    }
+  }
+}

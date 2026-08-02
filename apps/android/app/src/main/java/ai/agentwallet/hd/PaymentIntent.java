@@ -34,6 +34,7 @@ final class PaymentIntent {
     final String amount;
     final String to;
     final String memo;
+    final String memoType;
     final String rpcUrl;
     final String horizonUrl;
     final boolean stellarTestnet;
@@ -53,22 +54,7 @@ final class PaymentIntent {
     final String merchantWebsite;
     final String merchantCategory;
     final String recipientName;
-    final String orderId;
-    final String orderType;
-    final String orderUrl;
-    final String shoppingSiteUrl;
-    final String restaurantName;
-    final String restaurantCuisine;
-    final String restaurantImageUrl;
-    final String restaurantUrl;
-    final String itemSummary;
-    final String orderSubtotalUsd;
-    final String orderDeliveryFeeUsd;
-    final String orderTotalUsd;
-    final String orderEtaMinutes;
-    final String agentPrompt;
-    final String agentNote;
-    final List<OrderItem> orderItems;
+    final DemoOrderMetadata demo;
     final List<String> warnings;
     final JSONObject raw;
 
@@ -86,24 +72,10 @@ final class PaymentIntent {
         if (risk == null) risk = new JSONObject();
         JSONObject display = raw.optJSONObject("display");
         if (display == null) display = new JSONObject();
-        JSONObject metadata = raw.optJSONObject("metadata");
-        if (metadata == null) metadata = new JSONObject();
-        JSONObject order = firstObject(
-                raw.optJSONObject("order"),
-                velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("order"),
-                metadata.optJSONObject("food_order")
-        );
-        if (order == null) order = new JSONObject();
-        JSONObject restaurant = order.optJSONObject("restaurant");
-        if (restaurant == null) restaurant = new JSONObject();
-        JSONObject pricing = order.optJSONObject("pricing");
-        if (pricing == null) pricing = new JSONObject();
         JSONObject merchant = firstObject(raw.optJSONObject("merchant"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("merchant"));
         if (merchant == null) merchant = new JSONObject();
         JSONObject recipient = firstObject(raw.optJSONObject("recipient"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("recipient"));
         if (recipient == null) recipient = new JSONObject();
-        JSONObject agentContext = order.optJSONObject("agent_context");
-        if (agentContext == null) agentContext = new JSONObject();
 
         id = request.id;
         status = request.status;
@@ -124,6 +96,7 @@ final class PaymentIntent {
         amount = request.amount;
         to = request.recipient;
         memo = request.memo;
+        memoType = request.memoType;
         rpcUrl = request.rpcUrl;
         stellarTestnet = request.stellarTestnet;
         horizonUrl = request.horizonUrl;
@@ -156,22 +129,10 @@ final class PaymentIntent {
         merchantWebsite = normalizePublicUrl(firstNonEmpty(merchant.optString("website", ""), request.payeeDomain));
         merchantCategory = merchant.optString("category", "");
         recipientName = firstNonEmpty(recipient.optString("name", ""), request.payeeName);
-        orderId = order.optString("id", order.optString("order_id", ""));
-        orderType = order.optString("type", "");
-        orderUrl = normalizePublicUrl(order.optString("url", ""));
-        shoppingSiteUrl = normalizePublicUrl(firstNonEmpty(order.optString("shopping_site_url", ""), order.optString("website_url", ""), orderUrl, merchantWebsite));
-        restaurantName = restaurant.optString("name", "");
-        restaurantCuisine = restaurant.optString("cuisine", "");
-        restaurantImageUrl = firstNonEmpty(restaurant.optString("image_url", ""), restaurant.optString("hero_image_url", ""));
-        restaurantUrl = normalizePublicUrl(restaurant.optString("url", ""));
-        itemSummary = order.optString("item_summary", "");
-        orderSubtotalUsd = pricing.optString("subtotal_usd", "");
-        orderDeliveryFeeUsd = pricing.optString("delivery_fee_usd", "");
-        orderTotalUsd = pricing.optString("total_usd", "");
-        orderEtaMinutes = String.valueOf(restaurant.opt("eta_minutes") == null ? "" : restaurant.opt("eta_minutes"));
-        agentPrompt = agentContext.optString("user_prompt", "");
-        agentNote = agentContext.optString("note", "");
-        orderItems = readOrderItems(order.optJSONArray("items"));
+        // L3: demo-only food_order / restaurant fields are parsed by a dedicated
+        // adapter so this core protocol model stays free of demo coupling
+        // (see DemoOrderMetadata; AGENTS.md item 9). Mirrors iOS.
+        demo = DemoOrderMetadata.parse(this.raw);
         warnings = request.warnings;
     }
 
@@ -249,7 +210,7 @@ final class PaymentIntent {
 
     String summary() {
         if (displaySummary.length() > 0) return displaySummary;
-        if (itemSummary.length() > 0) return itemSummary;
+        if (demo.itemSummary.length() > 0) return demo.itemSummary;
         if (request.summary().length() > 0) return request.summary();
         return sourceLabel();
     }
@@ -257,17 +218,6 @@ final class PaymentIntent {
     String payButtonLabel() {
         if (displayButton.length() > 0) return displayButton;
         return request.payButtonLabel();
-    }
-
-    boolean hasOrderDetails() {
-        return orderId.length() > 0 || restaurantName.length() > 0 || itemSummary.length() > 0 || !orderItems.isEmpty();
-    }
-
-    String primaryImageUrl() {
-        for (OrderItem item : orderItems) {
-            if (item.imageUrl.length() > 0) return item.imageUrl;
-        }
-        return restaurantImageUrl;
     }
 
     String sourceLabel() {
@@ -298,25 +248,6 @@ final class PaymentIntent {
         return "hex";
     }
 
-    private static List<OrderItem> readOrderItems(JSONArray array) {
-        List<OrderItem> out = new ArrayList<>();
-        if (array == null) return out;
-        for (int i = 0; i < array.length(); i++) {
-            JSONObject item = array.optJSONObject(i);
-            if (item == null) continue;
-            out.add(new OrderItem(
-                    item.optString("name", item.optString("item_id", "Item")),
-                    item.optInt("quantity", 1),
-                    item.optString("line_total_usd", ""),
-                    item.optString("description", ""),
-                    item.optString("image_url", ""),
-                    normalizePublicUrl(item.optString("url", "")),
-                    item.optString("note", "")
-            ));
-        }
-        return out;
-    }
-
     private static List<String> readWarnings(JSONArray array) {
         List<String> out = new ArrayList<>();
         if (array == null) return out;
@@ -336,6 +267,7 @@ final class PaymentIntent {
         try {
             return java.time.Instant.parse(value).toEpochMilli();
         } catch (Exception ignored) {
+            VpLog.d("PaymentIntent", "parse time failed; using fallback: " + ignored);
             return fallback;
         }
     }
@@ -354,25 +286,5 @@ final class PaymentIntent {
         String trimmed = value == null ? "" : value.trim();
         if (trimmed.length() > 0) return trimmed;
         return testnet ? "https://horizon-testnet.stellar.org" : "https://horizon.stellar.org";
-    }
-
-    static final class OrderItem {
-        final String name;
-        final int quantity;
-        final String lineTotalUsd;
-        final String description;
-        final String imageUrl;
-        final String url;
-        final String note;
-
-        OrderItem(String name, int quantity, String lineTotalUsd, String description, String imageUrl, String url, String note) {
-            this.name = name;
-            this.quantity = quantity;
-            this.lineTotalUsd = lineTotalUsd;
-            this.description = description;
-            this.imageUrl = imageUrl;
-            this.url = url;
-            this.note = note;
-        }
     }
 }

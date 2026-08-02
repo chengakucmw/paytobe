@@ -1,25 +1,29 @@
 # VelarumPay Platform API
 
+> **Last modified / 最后修改时间**
+> - **Taipei Time / 台北时间:** 2026-07-24 15:40:49 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-07-24 07:40:49 UTC
+
 Local development API for VelarumPay payment requests, Transaction Context Lite, and legacy AgentWallet relay compatibility.
 
 ## Features
 
 - App device registration.
-- OpenClaw-signed payment intent creation.
-- WebSocket delivery to AgentWallet App.
-- REST inbox sync.
-- Status callback: `pending`, `signed`, `broadcasted`, `confirmed`, `failed`, `expired`, `rejected`.
+- Canonical connection-authenticated Payment Request creation; OpenClaw payment intent is legacy migration compatibility.
+- Minimal-data FCM wake-up delivery plus authenticated REST compensation sync.
+- WebSocket delivery as a foreground/legacy secondary channel.
+- Wallet status update and agent observation: `pending`, `signed`, `broadcasted`, `confirmed`, `failed`, `expired`, `rejected`.
 - Velarum Payment Request v1 normalization.
 - Transaction Context v1 validation and latest-context store.
 - Agent pairing sessions with QR URI and short code.
 - Connection-scoped tokens for standard Payment Request create/read.
-- Risk policy: chain/token allowlist, Base USDC contract allowlist, optional address whitelist, daily USDC/XLM limits, idempotency.
+- Risk policy: chain/token allowlist, Base USDC contract allowlist, daily USDC/XLM limits, idempotency, and a fail-closed Stellar public-network gate with a fixed Horizon endpoint, single-payment cap, and mandatory recipient allowlist.
 - Structured audit events and Prometheus metrics for pairing, connection, Payment Request, HTTP, and API error paths.
 
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/services/platform-api
+cd /Users/yang/code/VelarumPay/code/services/platform-api
 cp .env.example .env
 npm install
 npm start
@@ -63,11 +67,16 @@ RUNTIME_ENV=production \
 RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite \
 CORS_ALLOWED_ORIGINS=https://wallet.example.com \
 OPENCLAW_DEVICE_SECRET=replace-with-random-secret \
+METRICS_TOKEN=replace-with-random-metrics-token \
+FCM_ENABLED=true \
+FCM_PROJECT_ID=velarumpay-production \
+FCM_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json \
+FCM_TOKEN_ENCRYPTION_KEY=replace-with-base64-32-byte-key \
 npm run check:runtime-config
 ```
 
 Production rejects weak OpenClaw secrets, unsigned legacy OpenClaw mode, wildcard
-or missing CORS allowlists, and relative store paths. Local development may use
+or missing CORS allowlists, incomplete FCM configuration, public metrics, and relative store paths. Local development may use
 `ALLOW_UNSIGNED_OPENCLAW=true`, but unsigned legacy OpenClaw requests are still
 accepted only from localhost unless `ALLOW_UNSIGNED_OPENCLAW_LOCAL_ONLY=false`.
 
@@ -86,12 +95,25 @@ OPENCLAW_WS_TOKEN=legacy-websocket-token
 Connection and app-device tokens are stored as hashes at rest. New plaintext
 tokens are returned only when created or rotated.
 
+FCM registration tokens are encrypted with AES-256-GCM at rest and bound to the wallet device identifier. Push payloads contain no amount, address, memo, payment status, or business context. The device receives only a sync signal, opaque request id, and event cursor, then retrieves authoritative data over authenticated REST. Production requires FCM so delivery cannot be silently omitted, while REST remains the source of truth.
+
+Stellar public-network payments are disabled by default. To enable a controlled small-mainnet deployment, configure all of the following:
+
+```bash
+STELLAR_PUBLIC_ENABLED=true
+STELLAR_PUBLIC_SINGLE_PAYMENT_MAX_XLM=1
+STELLAR_PUBLIC_HORIZON_URL=https://horizon.stellar.org
+ADDRESS_WHITELIST_STELLAR=G...verified-recipient
+```
+
+Every `stellar_public` Payment Request is blocked unless the feature is enabled, the amount is positive and no greater than the single-payment cap, the Horizon endpoint matches the configured HTTPS endpoint, and the recipient is allowlisted. This check runs independently of the Android build gate and independently of the daily XLM limit.
+
 ## Deployment
 
 Docker Compose, systemd, health checks, preflight, and rollback notes live in:
 
 ```text
-/Users/yang/code/VelarumPayCode/services/platform-api/deploy
+/Users/yang/code/VelarumPay/code/services/platform-api/deploy
 ```
 
 ## Observability and Audit Logs
@@ -136,9 +158,23 @@ http://10.0.2.2:8787
 
 ## API
 
+The machine-readable public contract is `openapi/velarumpay-platform-api-v0.1.openapi.json`. It references:
+
+- `packages/protocol/schema/velarum.payment_request.v1.schema.json` for `velarum.payment_request.v1`.
+- `packages/protocol/schema/velarum.transaction_context.v1.schema.json` for `velarum.transaction_context.v1`.
+
+Legacy PaymentIntent and OpenClaw-specific routes are implemented for migration but are not part of the canonical public OpenAPI surface.
+
 ```http
 POST /v1/devices/app
 POST /v1/devices/app/{device_id}/rotate-token
+PUT  /v1/devices/app/{device_id}/push-token
+DELETE /v1/devices/app/{device_id}/push-token
+POST /v1/connect-invitations
+POST /v1/connect-invitations/claim
+GET  /v1/connect-invitations/{connect_invitation_id}
+DELETE /v1/connect-invitations/{connect_invitation_id}
+POST /v1/connect-invitations/{connect_invitation_id}/exchange
 POST /v1/pairing/sessions
 GET  /v1/pairing/sessions/{pairing_session_id_or_code}?code=...
 POST /v1/pairing/sessions/{pairing_session_id_or_code}/approve
@@ -246,7 +282,7 @@ Connection auth errors return `unauthorized_connection`. Missing scope or cross-
 
 `POST /v1/transaction-contexts` accepts `velarum.transaction_context.v1`, validates it, and stores the latest object by `transaction_id`. Standard callers should use a connection token with `transaction_contexts.create` or `transaction_contexts.read`; the legacy OpenClaw path remains available for migration and local quickstarts.
 
-Payment Request creation can carry `transaction_context_snapshot` as a compatibility shortcut, while `transaction_id` remains the standard reference for opening the full dossier or audit trail.
+`transaction_id` is the standard reference for opening the full dossier or audit trail. The Platform API builds any immutable `transaction_context_snapshot` from the stored context owned by the same connection; caller-supplied snapshots are never trusted or used as a safe-looking fallback.
 
 Payment Request creation reads `x-idempotency-key` or body `idempotency_key`. Standard requests scope idempotency by `connection_id`; legacy requests without a connection keep the migration-compatible key behavior. A duplicate returns `duplicate: true` and the existing `payment_request` projection.
 
@@ -318,7 +354,7 @@ Status update responses return the standard `payment_request` projection and app
 Copyable Payment Request and Transaction Context examples live under:
 
 ```text
-/Users/yang/code/VelarumPayCode/examples/payment-request-quickstart
+/Users/yang/code/VelarumPay/code/examples/payment-request-quickstart
 ```
 
 Run the local smoke check from the repository root:
@@ -327,4 +363,4 @@ Run the local smoke check from the repository root:
 node examples/payment-request-quickstart/smoke-check.mjs
 ```
 
-Formal specs live in `/Users/yang/code/VelarumPay`; this README only documents nearby code.
+Formal specs live in `/Users/yang/code/VelarumPay/docs`; this README only documents nearby code.

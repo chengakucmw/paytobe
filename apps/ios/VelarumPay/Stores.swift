@@ -268,4 +268,60 @@ final class LocalStore {
         }
         saveUserNetworks(items)
     }
+
+    // MARK: - Client-side risk backstop persistence
+    //
+    // Mirrors Android RiskPolicy's SharedPreferences spend ledger + recipient whitelist, so
+    // the iOS client can enforce the daily spend cap and the unverified-recipient cap locally
+    // (defense in depth) instead of trusting the relay-supplied verdict alone. Amounts are
+    // stored as exact decimal strings, never Double.
+    private var riskSpendKey: String { "VelarumPay.ios.risk-spend" }
+    private var riskWhitelistStellarKey: String { "VelarumPay.ios.risk-whitelist-stellar" }
+
+    // "yyyy-MM-dd:ASSET" in the device-local date, matching Android's LocalDate.now() key, so
+    // the daily window resets at local midnight.
+    private static func spendLedgerKey(asset: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return "\(formatter.string(from: Date())):\(asset.uppercased())"
+    }
+
+    /// Exact amount of `asset` already broadcast today, from the local ledger.
+    func spentToday(asset: String) -> Decimal {
+        let map = defaults.dictionary(forKey: riskSpendKey) as? [String: String] ?? [:]
+        return LocalRiskPolicy.parseAmount(map[LocalStore.spendLedgerKey(asset: asset)] ?? "0") ?? 0
+    }
+
+    /// Add a successfully-broadcast amount to today's ledger (exact decimal). Mirrors Android
+    /// RiskPolicy.recordSuccessfulPayment.
+    func recordSpend(asset: String, amount: String) {
+        guard let add = LocalRiskPolicy.parseAmount(amount), add > 0 else { return }
+        var map = defaults.dictionary(forKey: riskSpendKey) as? [String: String] ?? [:]
+        let key = LocalStore.spendLedgerKey(asset: asset)
+        let before = LocalRiskPolicy.parseAmount(map[key] ?? "0") ?? 0
+        map[key] = LocalRiskPolicy.plainString(before + add)
+        defaults.set(map, forKey: riskSpendKey)
+    }
+
+    /// Whether `address` is on the local Stellar recipient whitelist (case-insensitive).
+    func isRecipientWhitelisted(_ address: String) -> Bool {
+        let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        let list = defaults.stringArray(forKey: riskWhitelistStellarKey) ?? []
+        return list.contains { $0.caseInsensitiveCompare(trimmed) == .orderedSame }
+    }
+
+    /// The local Stellar recipient whitelist. Empty by default (fail closed above the
+    /// unverified cap), populated by a future trusted-recipients setting.
+    func stellarWhitelist() -> [String] {
+        defaults.stringArray(forKey: riskWhitelistStellarKey) ?? []
+    }
+
+    func setStellarWhitelist(_ addresses: [String]) {
+        let cleaned = addresses
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        defaults.set(cleaned, forKey: riskWhitelistStellarKey)
+    }
 }

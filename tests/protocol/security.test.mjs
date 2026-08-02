@@ -3,9 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { hmacHex } from "../../services/platform-api/src/crypto.js";
+import { hmacHex, openClawCanonicalPayload } from "../../services/platform-api/src/crypto.js";
 import {
   MemoryRateLimiter,
+  ReplayGuard,
   isOriginAllowed,
   legacyUnsignedDecision,
   loadRuntimeConfig,
@@ -57,19 +58,81 @@ test("OpenClaw HMAC verification accepts active and previous secrets", () => {
     OPENCLAW_DEVICE_SECRET_PREVIOUS: "previous-secret"
   });
   const rawBody = JSON.stringify({ intent_id: "pi_rotation" });
+  const now = 1_700_000_000_000;
+  const sign = (secret, nonce) => {
+    const timestamp = String(now);
+    return {
+      "x-timestamp": timestamp,
+      "x-nonce": nonce,
+      "x-signature": `sha256=${hmacHex(secret, openClawCanonicalPayload(timestamp, nonce, rawBody))}`
+    };
+  };
 
   assert.equal(verifyOpenClawRequest(mockReq({
     rawBody,
+    headers: sign("active-secret", "nonce-active")
+  }), config, { now, replayGuard: new ReplayGuard() }).ok, true);
+  assert.equal(verifyOpenClawRequest(mockReq({
+    rawBody,
+    headers: sign("previous-secret", "nonce-previous")
+  }), config, { now, replayGuard: new ReplayGuard() }).ok, true);
+  assert.equal(verifyOpenClawRequest(mockReq({
+    rawBody,
+    headers: sign("wrong-secret", "nonce-wrong")
+  }), config, { now, replayGuard: new ReplayGuard() }).status, 401);
+});
+
+test("OpenClaw signed requests must carry a timestamp and nonce", () => {
+  const config = loadRuntimeConfig({ OPENCLAW_DEVICE_SECRET: "active-secret" });
+  const rawBody = JSON.stringify({ intent_id: "pi_incomplete" });
+  // Old-style signature over the body only, with no freshness headers.
+  const result = verifyOpenClawRequest(mockReq({
+    rawBody,
     headers: { "x-signature": `sha256=${hmacHex("active-secret", rawBody)}` }
-  }), config).ok, true);
-  assert.equal(verifyOpenClawRequest(mockReq({
-    rawBody,
-    headers: { "x-signature": `sha256=${hmacHex("previous-secret", rawBody)}` }
-  }), config).ok, true);
-  assert.equal(verifyOpenClawRequest(mockReq({
-    rawBody,
-    headers: { "x-signature": `sha256=${hmacHex("wrong-secret", rawBody)}` }
-  }), config).status, 401);
+  }), config, { replayGuard: new ReplayGuard() });
+  assert.equal(result.ok, false);
+  assert.equal(result.status, 401);
+  assert.equal(result.code, "openclaw_signature_incomplete");
+});
+
+test("OpenClaw signatures outside the freshness window are rejected", () => {
+  const config = loadRuntimeConfig({ OPENCLAW_DEVICE_SECRET: "active-secret" });
+  const rawBody = JSON.stringify({ intent_id: "pi_stale" });
+  const signedAt = 1_700_000_000_000;
+  const timestamp = String(signedAt);
+  const nonce = "nonce-stale";
+  const headers = {
+    "x-timestamp": timestamp,
+    "x-nonce": nonce,
+    "x-signature": `sha256=${hmacHex("active-secret", openClawCanonicalPayload(timestamp, nonce, rawBody))}`
+  };
+  const result = verifyOpenClawRequest(mockReq({ rawBody, headers }), config, {
+    now: signedAt + 10 * 60_000, // default freshness window is 5 minutes
+    replayGuard: new ReplayGuard()
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "openclaw_signature_expired");
+});
+
+test("OpenClaw nonce cannot be replayed within the window", () => {
+  const config = loadRuntimeConfig({ OPENCLAW_DEVICE_SECRET: "active-secret" });
+  const rawBody = JSON.stringify({ intent_id: "pi_replay" });
+  const now = 1_700_000_000_000;
+  const timestamp = String(now);
+  const nonce = "nonce-replay";
+  const headers = {
+    "x-timestamp": timestamp,
+    "x-nonce": nonce,
+    "x-signature": `sha256=${hmacHex("active-secret", openClawCanonicalPayload(timestamp, nonce, rawBody))}`
+  };
+  const guard = new ReplayGuard();
+
+  const first = verifyOpenClawRequest(mockReq({ rawBody, headers }), config, { now, replayGuard: guard });
+  assert.equal(first.ok, true);
+
+  const replay = verifyOpenClawRequest(mockReq({ rawBody, headers }), config, { now, replayGuard: guard });
+  assert.equal(replay.ok, false);
+  assert.equal(replay.code, "openclaw_replay_detected");
 });
 
 test("MemoryRateLimiter blocks requests over the configured window", () => {

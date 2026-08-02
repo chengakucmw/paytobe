@@ -1,0 +1,54 @@
+# ============================================================================
+# VelarumPay — Baseline Profile（提速地图 · 起步版 / 手写）
+# ----------------------------------------------------------------------------
+# 作用：告诉系统「这些类/方法是启动和滚动时的高频路径」，让它在【安装时】就提前
+#       编译成机器码（AOT），于是头几次打开 App、第一次滑动列表就直接顺滑，
+#       而不是「边用边变快」。配合 release + androidx.profileinstaller 生效。
+#
+# 规则语法（profgen 人类可读格式）：
+#   行首 H/S/P 标记方法是 Hot/Startup/Post-startup；`L包/类;` 表示包含整个类；
+#   `**` 为通配。无法匹配的行会被忽略，不会导致构建失败。
+#
+# ⚠️ 这是「手写起步版」，覆盖面广但不如真机实测精准。要拿到最佳效果，请按性能文档
+#    用 Baseline Profile Generator 在真机/模拟器跑一遍关键流程，生成正式版覆盖本文件。
+# ============================================================================
+
+# --- 应用自身：原生 UI、ViewModel、钱包桥（启动 + 各屏滚动的核心热点）-------------
+HSPLai/agentwallet/hd/**->**(**)**
+Lai/agentwallet/hd/**
+
+# --- Stable C ABI wallet bridge (wallet creation, derivation, and signing) ---
+HSPLai/agentwallet/hd/WalletCoreBridge;->**(**)**
+Lai/agentwallet/hd/WalletCoreBridge;
+
+# --- Jetpack Compose 运行时（重组引擎，几乎每帧都跑）-------------------------------
+HSPLandroidx/compose/runtime/**->**(**)**
+Landroidx/compose/runtime/**
+
+# --- Compose UI 核心（测量/布局/绘制/输入）----------------------------------------
+HSPLandroidx/compose/ui/**->**(**)**
+Landroidx/compose/ui/**
+
+# --- Compose foundation（LazyColumn、滚动、手势——列表滑动顺滑度的关键）-----------
+HSPLandroidx/compose/foundation/**->**(**)**
+Landroidx/compose/foundation/**
+
+# --- Material3 组件（卡片、文本、按钮、Scaffold 等）--------------------------------
+HSPLandroidx/compose/material3/**->**(**)**
+Landroidx/compose/material3/**
+
+# --- Compose 动画（转场/涟漪等）---------------------------------------------------
+HSPLandroidx/compose/animation/**->**(**)**
+Landroidx/compose/animation/**
+
+# --- Navigation-Compose（切屏路由）------------------------------------------------
+HSPLandroidx/navigation/**->**(**)**
+Landroidx/navigation/**
+
+# --- Lifecycle / ViewModel（collectAsStateWithLifecycle、VM 注入）-----------------
+HSPLandroidx/lifecycle/**->**(**)**
+Landroidx/lifecycle/**
+
+# --- Activity-Compose（setContent、宿主 Activity 启动路径）------------------------
+HSPLandroidx/activity/**->**(**)**
+Landroidx/activity/**

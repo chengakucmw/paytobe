@@ -1,13 +1,45 @@
 {
-  "description": "Authoritative HD key-derivation golden vectors. SINGLE SOURCE OF TRUTH that BOTH wallets must match: Android (ai.agentwallet.hd.HDWallet) and iOS (StellarService). The Stellar address is SLIP-10 ed25519 at m/44'/148'/0' derived from the BIP39 seed with an EMPTY passphrase. Values were computed independently with the SEP-0005 reference library 'stellar-hd-wallet' (not from either app), so a mismatch on either platform is a real bug. Drift here means the two apps would compute DIFFERENT wallet addresses from the same secret phrase = funds sent to the wrong/uncontrolled address. Enforced by tests/protocol/hd-derivation-contract.test.mjs (pins both platform tests to these values), apps/ios/VelarumPayTests/HDDerivationGoldenTests.swift, and apps/android/.../HDDerivationGoldenTest.java.",
-  "spec": "SEP-0005",
+  "description": "Authoritative HD key-derivation golden vectors. SINGLE SOURCE OF TRUTH that BOTH wallets must match: Android (ai.agentwallet.hd.HDWallet) and iOS (StellarService / Models). For each recovery phrase the three chain addresses are derived as: Stellar = SLIP-10 ed25519 at m/44'/148'/0' from the BIP39 seed with an EMPTY passphrase (SEP-0005); EVM = BIP-44 secp256k1 at m/44'/60'/0'/0/0 (EIP-55 checksummed); Solana = SLIP-10 ed25519 at m/44'/501'/0'/0' (base58). Every value was computed INDEPENDENTLY with the third-party bip_utils library (not from either app, not from the Rust core), so a mismatch on any platform is a real bug. Drift here means the two apps would compute DIFFERENT wallet addresses from the same secret phrase = funds sent to the wrong/uncontrolled address. Enforced by tests/protocol/hd-derivation-contract.test.mjs (pins both platform tests to these values), apps/ios/VelarumPayTests/HDDerivationGoldenTests.swift, apps/android/.../HDDerivationGoldenTest.java, and crates/velarum-wallet-core/tests/golden_vectors.rs.",
+  "spec": "SEP-0005 (Stellar), BIP-44 (EVM), SLIP-0010 (Solana)",
+  "stellar_derivation_path": "m/44'/148'/0'",
+  "evm_derivation_path": "m/44'/60'/0'/0/0",
+  "solana_derivation_path": "m/44'/501'/0'/0'",
   "vectors": [
     {
       "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
       "word_count": 12,
       "bip39_passphrase": "",
       "derivation_path": "m/44'/148'/0'",
-      "stellar_address": "GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX"
+      "stellar_address": "GB3JDWCQJCWMJ3IILWIGDTQJJC5567PGVEVXSCVPEQOTDN64VJBDQBYX",
+      "evm_address": "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+      "solana_address": "HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk"
+    },
+    {
+      "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank yellow",
+      "word_count": 12,
+      "bip39_passphrase": "",
+      "derivation_path": "m/44'/148'/0'",
+      "stellar_address": "GAFOIIMIXWLSN66RYL32JHCI7AMKWZ3TYYSZTOXSTLPHJWPMZDERMXUO",
+      "evm_address": "0x58A57ed9d8d624cBD12e2C467D34787555bB1b25",
+      "solana_address": "BLeUXTx9thHGT7VJUtF9vHEmfMDgW1nnKZ9UVer2CoLX"
+    },
+    {
+      "mnemonic": "letter advice cage absurd amount doctor acoustic avoid letter advice cage above",
+      "word_count": 12,
+      "bip39_passphrase": "",
+      "derivation_path": "m/44'/148'/0'",
+      "stellar_address": "GBBWHEZC4L5ATI7RHDC7QEY5MMY7Z7BJUNA5VEI67GLGZQLBR3HJPKQI",
+      "evm_address": "0x3061750d3dF69ef7B8d4407CB7f3F879Fd9d2398",
+      "solana_address": "DeFBNaVhnpKkv1mG6vhCwQe3QzrGwMe1V5ust48PMQ9i"
+    },
+    {
+      "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "word_count": 24,
+      "bip39_passphrase": "",
+      "derivation_path": "m/44'/148'/0'",
+      "stellar_address": "GB3TCCIC6KLYKM72PX7KA6RNYC2BHC7DQYDMEAAN7PDMUZQD7UKJGSSY",
+      "evm_address": "0xF278cF59F82eDcf871d630F28EcC8056f25C1cdb",
+      "solana_address": "3Cy3YNTFywCmxoxt8n7UH6hg6dLo5uACowX3CFceaSnx"
     }
   ]
 }

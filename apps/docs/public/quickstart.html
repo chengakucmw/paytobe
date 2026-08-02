@@ -3,87 +3,140 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Quickstart · VelarumPay Docs</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <title>Merchant Quickstart · VelarumPay Docs</title>
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="inner">
-      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
-      <nav class="nav">
-        <a href="/">Overview</a>
-        <a href="/quickstart.html">Quickstart</a>
-        <a href="/api.html">REST API</a>
-        <a href="/protocol.html">Protocol</a>
-        <a href="/mcp.html">MCP for agents</a>
-      </nav>
-    </div>
-  </header>
+  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumpay.com/preview">View program boundaries</a></div>
+  <header class="topbar"><div class="inner">
+    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <nav class="nav">
+      <a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a>
+      <a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a><a href="/protocol.html">Protocol</a>
+    </nav>
+  </div></header>
 
   <main>
-    <span class="pill">Quickstart</span>
-    <h1>Connect an agent in 5 steps</h1>
-    <p class="lead">This walks through the JavaScript SDK. The same flow works over the <a href="/api.html">REST API</a> or the <a href="/mcp.html">MCP server</a>.</p>
+    <span class="pill">Merchant Quickstart · Testnet</span>
+    <h1>From merchant registration to a user-approved test request</h1>
+    <p class="lead">This is the canonical onboarding order for the official testnet origin <code>https://api-testnet.velarumpay.com</code>. A local offline mock exercises the same order without network access or credentials.</p>
+    <div class="note">This flow never asks for a wallet private key and never grants payment-signing authority to an Agent. Recipient facts come from an active verified Recipient version; the wallet still reviews and approves every payment.</div>
 
-    <div class="note">You need: the Platform API running (locally <code>http://127.0.0.1:8787</code>, or your deployed URL), and the VelarumPay wallet app to approve pairing.</div>
+    <h2>0. Run the offline contract first</h2>
+    <pre><code>node examples/generic-payment-request/merchant-quickstart.mjs</code></pre>
+    <p>The zero-dependency mock completes registration, domain verification, Recipient and Agent setup, Agent token exchange, Connect, and a pending Payment Request. It uses reserved <code>.invalid</code> domains and labeled test values.</p>
 
-    <h2>1. Install the SDK</h2>
-    <pre><code>npm install @velarumpay/sdk-js</code></pre>
+    <h2>1. Register and verify the merchant account</h2>
+    <p>Submit the operator email to <code>POST /v1/merchant-accounts/registrations</code>, then follow the email link through <code>POST /v1/merchant-accounts/email-verifications</code>. Registration returns a generic response to prevent account enumeration. Verification returns a one-time session grant.</p>
 
-    <h2>2. Create a client and start pairing</h2>
-    <p>Your agent introduces itself and asks for scopes. The response includes a short code and a pairing URI you can render as a QR for the user to scan.</p>
-    <pre><code>import { createVelarumPayClient, validatePaymentRequest } from "@velarumpay/sdk-js";
+    <h2>2. Create the organization and verify its domain</h2>
+    <p>Create the organization with <code>POST /v1/merchants</code> using the one-time grant, then exchange the returned next grant at <code>POST /v1/merchant-sessions</code>. The browser receives an HttpOnly session cookie and an in-memory CSRF proof. Register an exact domain using <code>POST /v1/merchant-domains</code>, publish only the returned DNS or HTTPS challenge, then call <code>POST /v1/merchant-domains/{id}/verify</code>. Do not fetch or probe a user-entered domain from browser code.</p>
+    <div class="note">Domain proof is a gate, not a client-side activation command. Stop here until the Platform API reports the merchant as <code>active</code>; do not use an operator credential or an undocumented route to bypass verification.</div>
 
-const client = createVelarumPayClient({
-  baseUrl: "http://127.0.0.1:8787"   // or your deployed API URL
+    <h2>3. Register, verify, and activate a Recipient</h2>
+    <pre><code>const recipient = await merchant.createRecipient({
+  name: "Test Recipient",
+  network: "stellar_testnet",
+  asset: "XLM",
+  address: recipientTestnetAddress
 });
 
-const pairing = await client.createPairingSession({
-  agent: {
-    agent_id: "agt_local_123",
-    agent_name: "Hermes on Alice MacBook",
-    runtime: "hermes",
-    device_label: "Alice MacBook"
-  },
-  requested_scopes: [
-    "payment.requests.create",
-    "payment.requests.read",
-    "transaction_contexts.create",
-    "transaction_contexts.read"
-  ],
-  expires_in_seconds: 300
+const verification = await merchant.verifyRecipient(recipient.recipient.recipient_id, {
+  recipient_version_id: recipient.recipient_version.recipient_version_id,
+  type: "domain_proof",
+  source_id: verifiedEvidenceSourceId,
+  version: recipient.recipient.version
 });
 
-// Show pairing.pairing_session.pairing_uri as a QR, or the short code to type.</code></pre>
+// Activate only after evidence succeeds and the cooling period completes.
+await merchant.activateRecipientVersion(
+  recipient.recipient.recipient_id,
+  recipient.recipient_version.recipient_version_id,
+  {
+    evidence_id: verification.evidence.evidence_id,
+    evidence_digest: verification.evidence.evidence_digest,
+    version: nextRecipientVersion
+  }
+);</code></pre>
+    <p>Never put an address, memo, contract, issuer, or recipient override in <code>display</code> or <code>metadata</code>. Payment creation supplies <code>recipient_id</code> and amount; the Platform API pins the active Recipient version and derives the immutable payment facts.</p>
 
-    <h2>3. The user approves in their wallet</h2>
-    <p>The person scans the code in the VelarumPay app and approves the scopes. The wallet returns a <strong>connection token</strong> to your agent. Inject it into the client:</p>
-    <pre><code>client.setConnectionToken("conn_tok_...");</code></pre>
-    <div class="note">The connection token is the only credential your agent needs after pairing. Store it securely; treat it like a password scoped to this one user and these scopes.</div>
+    <h2>4. Create an Agent and register its public credential</h2>
+    <pre><code>const agent = await merchant.createAgent({
+  name: "Checkout Agent",
+  runtime: "node",
+  environment: "testnet",
+  allowed_scopes: ["payment.requests.create", "payment.requests.read"]
+});
 
-    <h2>4. Create a transaction context, then a payment request</h2>
-    <p>The transaction context is the human-readable explanation the user sees before signing. The payment request carries the exact on-chain facts.</p>
-    <pre><code>await client.createTransactionContext(transactionContextPayload);
+const credential = await merchant.registerAgentCredential(agent.agent.agent_id, {
+  kid: credentialId,
+  alg: "Ed25519",
+  public_key: exportedPublicKey,
+  not_before: credentialNotBefore,
+  expires_at: credentialExpiresAt
+});
 
-const validation = validatePaymentRequest(paymentRequestPayload);
-if (!validation.ok) console.error(validation.error);
+await merchant.activateAgentCredential(
+  agent.agent.agent_id,
+  credential.credential.credential_id,
+  { challenge: credential.proof_challenge, signature: localProofSignature }
+);
+await merchant.updateAgent(agent.agent.agent_id, { status: "active", version: 1 });</code></pre>
+    <p>The registration response contains a five-minute proof challenge. Sign that challenge locally before activation. Generate and retain signing material in your secure local signer; upload only the public key and proof of possession. See <a href="/agent-auth.html">Agent Auth</a> for the exact assertion fields.</p>
 
-const created = await client.createPaymentRequest(paymentRequestPayload, {
-  idempotencyKey: paymentRequestPayload.idempotency_key
-});</code></pre>
+    <h2>5. Exchange a local Agent Assertion for a short token</h2>
+    <pre><code>import { createVelarumPayClient } from "@velarumpay/sdk-js";
 
-    <h2>5. Read status / poll events</h2>
-    <pre><code>const detail = await client.getPaymentRequest(created.payment_request.request_id);
-const events = await client.pollEvents({ since: 0 });</code></pre>
-    <p>Status moves through <code>pending → signed → broadcasted → confirmed</code> (or <code>failed</code>, <code>expired</code>, <code>rejected</code>). Your agent never signs — it only proposes and reads.</p>
+const agentClient = createVelarumPayClient({
+  baseUrl: "https://api-testnet.velarumpay.com",
+  agentAuth: {
+    agentId,
+    clientId,
+    kid: credentialId,
+    scopes: ["payment.requests.create", "payment.requests.read"],
+    keyHandle: secureKeyHandle,
+    signer: ({ data, keyHandle }) =&gt; secureSigner.sign(data, keyHandle)
+  }
+});
 
-    <h2>Amounts: a rule that prevents bugs</h2>
-    <div class="note">Always send amounts as <strong>exact decimal strings</strong> (for example <code>"42.00"</code>), never as floating-point numbers. This avoids rounding errors in money math. See the <a href="/protocol.html">Protocol</a> page for the full field rules.</div>
+await agentClient.exchangeAgentToken();</code></pre>
+    <p>The SDK holds the short token in memory and coordinates refresh. It retries one Agent-authenticated request after a <code>401</code>; it does not loop on <code>403</code>, revocation, clock skew, or duplicate JTI.</p>
 
-    <h2>Next steps</h2>
-    <p>See the full field-by-field <a href="/protocol.html">Protocol reference</a>, the <a href="/api.html">REST endpoints</a>, or wire it into an AI agent with the <a href="/mcp.html">MCP server</a>.</p>
+    <h2>6. Claim the user's one-time Connect Key</h2>
+    <pre><code>const claim = await agentClient.claimConnectInvitation(connectKey, [
+  "payment.requests.create",
+  "payment.requests.read"
+]);
+
+// The user reviews verified merchant + Agent identity and scopes in VelarumPay.
+const connection = await agentClient.exchangeConnectInvitation(
+  claim.connect_invitation.connect_invitation_id,
+  claim.claim_token
+);</code></pre>
+    <p>A Connect Key and claim token are one-time coordination credentials, not approval or signing authority. The exchange succeeds only after wallet approval and returns a scoped connection token.</p>
+
+    <h2>7. Create a test Payment Request</h2>
+    <pre><code>const created = await agentClient.createPaymentRequest({
+  recipient_id: recipientId,
+  recipient_version_id: activeRecipientVersionId,
+  payment: { amount: "1.00" },
+  expires_at: expiresAt,
+  policy: { requires_user_approval: true }
+}, {
+  idempotencyKey: "test-payment-1",
+  requestId: requestId
+});
+
+const detail = await agentClient.getPaymentRequest(created.payment_request.request_id);
+const events = await agentClient.pollEvents({ since: 0 });</code></pre>
+    <div class="note">A successful create means “pending wallet review,” not “paid.” Use exact decimal strings, a stable idempotency key, and the returned request ID. Never auto-sign, auto-approve, or treat a Webhook as the source of truth.</div>
+
+    <h2>8. Add a signed Webhook</h2>
+    <p>Create and verify the endpoint in Merchant Portal, display the generated endpoint secret once, and store it only in your server-side secret manager. Verify the exact raw body before parsing JSON; see the <a href="/webhooks.html">Webhook verification guide and fixed vector</a>.</p>
+
+    <h2>Contracts and errors</h2>
+    <p>Download the <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1 contract</a> and protocol schemas. Errors are stable envelopes with <code>error.code</code>, <code>error.message</code>, and <code>error.request_id</code>. Cross-tenant lookups use a non-enumerating <code>resource_not_found</code> response.</p>
   </main>
-
   <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

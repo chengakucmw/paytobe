@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VelarumPay security — User approval and local signing</title>
+  <meta name="description" content="Understand VelarumPay's non-custodial boundary, transaction truth model, scoped connections, expiry, and Preview security limits." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="VelarumPay security" />
+  <meta property="og:description" content="Keys stay on the device. Requests are scoped. Transaction facts outrank display copy." />
+  <meta property="og:image" content="__SITE_ORIGIN__/og.png" />
+  <meta property="og:url" content="__SITE_ORIGIN__/security" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#2727E6" />
+  <link rel="canonical" href="https://velarumpay.com/security" />
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802" />
+  <script src="/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="preview-bar">Developer Preview · Security claims are limited to the stated product boundary · <a href="/preview">See current availability</a></div>
+  <header class="site-header"><div class="header-inner">
+    <a class="brand" href="/" aria-label="VelarumPay home"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a>
+    <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-navigation" data-menu-button></button>
+    <nav class="site-nav" id="site-navigation" aria-label="Primary navigation" data-site-nav><a href="/personal">Personal</a><a href="/business">Business</a><a href="/security" aria-current="page">Security</a><a href="/support">Support</a><a href="https://docs.velarumpay.com">Developers</a><a class="button compact" href="/business#pilot">Request a pilot</a></nav>
+  </div></header>
+
+  <main id="main">
+    <section class="shell page-hero">
+      <span class="eyebrow">Security and trust</span>
+      <h1>Signing authority stays with the person holding the wallet.</h1>
+      <p class="lead">VelarumPay routes and validates requests, but it does not move private keys to a server or grant merchants and agents the ability to sign user transactions.</p>
+    </section>
+
+    <section class="section surface-band">
+      <div class="shell">
+        <div class="section-header"><div><span class="eyebrow">Core boundaries</span><h2>Designed to reduce authority, not hide it.</h2></div><p>Security starts by defining what each participant can and cannot do.</p></div>
+        <div class="grid-3">
+          <article class="card dark"><h3>User wallet</h3><p>Stores local signing material, presents transaction facts, applies local risk checks, and signs only after user approval.</p></article>
+          <article class="card dark"><h3>Platform API</h3><p>Authenticates, validates, routes, stores request state, applies policy, and synchronizes status. It does not sign for users.</p></article>
+          <article class="card dark"><h3>Merchant or agent</h3><p>Creates requests and reads permitted status within scoped access. It cannot export keys, approve, or sign.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="section-header"><div><span class="eyebrow">Controls</span><h2>Layered around the request lifecycle.</h2></div><p>No single label makes a payment safe. The product combines local key custody, deterministic validation, limited connections, and explicit user review.</p></div>
+      <div class="grid-3">
+        <article class="card"><h3>Local key custody</h3><p>Seed phrases, private keys, and derived signing material remain on the user's device.</p></article>
+        <article class="card"><h3>Approval by default</h3><p>Real payments require the wallet user to review and approve before local signing.</p></article>
+        <article class="card"><h3>Scoped connections</h3><p>Connections receive limited, explicit capabilities and can be revoked.</p></article>
+        <article class="card"><h3>Expiry</h3><p>Requests and invitations have time boundaries and cannot remain silently actionable forever.</p></article>
+        <article class="card"><h3>Idempotency</h3><p>Creation retries are designed not to produce duplicate payment requests.</p></article>
+        <article class="card"><h3>Status history</h3><p>Request state and events support diagnosis without giving observers signing power.</p></article>
+      </div>
+    </section>
+
+    <section class="section surface-band">
+      <div class="shell trust-panel">
+        <div><span class="eyebrow">Truth before presentation</span><h2>Chain facts cannot be overridden by marketing copy.</h2><p class="lead">A transaction context can explain a purchase. It cannot change the network, asset, amount, recipient, contract or issuer, memo, or fee being reviewed.</p></div>
+        <div class="truth-stack">
+          <div class="truth-row"><span>01</span><div><strong>Immutable payment facts</strong><small>Network, asset, amount, recipient, contract or issuer, memo, and fee</small></div></div>
+          <div class="truth-row"><span>02</span><div><strong>Separate transaction context</strong><small>Reason, evidence, order details, and agent activity</small></div></div>
+          <div class="truth-row"><span>03</span><div><strong>Visible mismatch risk</strong><small>Conflicting claims are a reason to stop, not a reason to reinterpret facts</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="section-header"><div><span class="eyebrow">Preview limits</span><h2>Security architecture is not a release certificate.</h2></div><p>The Preview remains subject to device testing, deployment exercises, license review, legal review, and release evidence.</p></div>
+      <div class="notice"><strong>Use test and explicitly enabled paths only</strong>Do not infer production safety, regulatory availability, network support, asset support, or audit completion from this website or a protocol example.</div>
+      <div class="grid-2 spaced-grid">
+        <article class="card"><h3>For wallet users</h3><ul class="feature-list"><li>Never share a recovery phrase or private key.</li><li>Verify the exact recipient and network.</li><li>Reject unexpected or urgent requests.</li><li>Use only capabilities shown as supported in your build.</li></ul></article>
+        <article class="card"><h3>For integrators</h3><ul class="feature-list"><li>Keep tokens out of client logs and source code.</li><li>Request the minimum scopes needed.</li><li>Use exact amount strings and idempotency.</li><li>Do not place private or signing material in metadata.</li></ul></article>
+      </div>
+    </section>
+
+    <section class="shell section compact"><div class="cta-band"><div><h2>Found a security concern?</h2><p>Do not include secrets or sensitive user data in the first message. The coordinated disclosure process remains part of Preview readiness.</p></div><div class="actions"><a class="button" href="mailto:security@velarumpay.com?subject=VelarumPay%20security%20report">Contact security</a><a class="button secondary" href="/support">Support guidance</a></div></div></section>
+  </main>
+
+  <footer class="site-footer"><div class="footer-inner">
+    <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a><p>Non-custodial payment requests for people, trusted applications, merchants, and local AI agents.</p></div>
+    <div class="footer-column"><strong>Use VelarumPay</strong><a href="/personal">Personal</a><a href="/preview">Preview</a><a href="/support">Support</a></div>
+    <div class="footer-column"><strong>Build</strong><a href="/business">Business</a><a href="https://docs.velarumpay.com">Developer docs</a><a href="/business#pilot">Request a pilot</a></div>
+    <div class="footer-column"><strong>Trust</strong><a href="/security">Security</a><a href="/support#availability">Availability</a><a href="/support#legal">Legal status</a></div>
+    <div class="footer-bottom"><span>© 2026 VelarumPay. Brand identifiers are separately protected.</span><span>Developer Preview · Test and pilot use only</span></div>
+  </div></footer>
+</body>
+</html>

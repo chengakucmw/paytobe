@@ -1,5 +1,7 @@
 package ai.agentwallet.hd.ui.wallet
 
+import ai.agentwallet.hd.AddressFormat
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -8,6 +10,7 @@ import ai.agentwallet.hd.SettingsRepository
 import ai.agentwallet.hd.WalletRepository
 import ai.agentwallet.hd.WalletState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +23,8 @@ import java.util.Locale
 data class WalletUiState(
     val loading: Boolean = true,
     val refreshing: Boolean = false,
+    val refreshError: String? = null,
+    val completedRefreshCount: Long = 0,
     val wallet: WalletState = EMPTY_WALLET,
     val displayedKeys: List<String> = listOf("xlm", "sol", "eth", "base_usdc"),
 ) {
@@ -46,28 +51,61 @@ class WalletViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _ui = MutableStateFlow(WalletUiState())
     val ui: StateFlow<WalletUiState> = _ui.asStateFlow()
+    private var refreshJob: Job? = null
+    private var refreshAgain = false
 
     init {
-        reloadCached()
-        refresh()
+        startRefresh(loadCachedFirst = true)
     }
 
-    private fun reloadCached() {
-        viewModelScope.launch {
-            val state = withContext(Dispatchers.IO) { WalletRepository.loadWalletState(getApplication()) }
-            val keys = withContext(Dispatchers.IO) { SettingsRepository.displayedKeys(getApplication()) }
-            _ui.update { it.copy(loading = false, wallet = state, displayedKeys = keys) }
+    private fun startRefresh(loadCachedFirst: Boolean) {
+        if (refreshJob?.isActive == true) {
+            // A lifecycle/route/manual refresh that arrives during an in-flight request must
+            // not be dropped. Run one more pass after the current request completes.
+            if (!loadCachedFirst) refreshAgain = true
+            return
+        }
+        refreshJob = viewModelScope.launch {
+            if (loadCachedFirst) {
+                publishSnapshot(refreshing = false, topLevelFailure = null, completedRefresh = false)
+            }
+            do {
+                refreshAgain = false
+                _ui.update { it.copy(refreshing = true, refreshError = null) }
+                val failure = withContext(Dispatchers.IO) {
+                    runCatching { WalletRepository.refreshBalances(getApplication()) }.exceptionOrNull()
+                }
+                publishSnapshot(refreshing = false, topLevelFailure = failure, completedRefresh = true)
+            } while (refreshAgain)
         }
     }
 
     fun refresh() {
-        if (_ui.value.refreshing) return
-        _ui.update { it.copy(refreshing = true) }
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { runCatching { WalletRepository.refreshBalances(getApplication()) } }
-            val state = withContext(Dispatchers.IO) { WalletRepository.loadWalletState(getApplication()) }
-            val keys = withContext(Dispatchers.IO) { SettingsRepository.displayedKeys(getApplication()) }
-            _ui.update { it.copy(refreshing = false, loading = false, wallet = state, displayedKeys = keys) }
+        startRefresh(loadCachedFirst = false)
+    }
+
+    private suspend fun publishSnapshot(
+        refreshing: Boolean,
+        topLevelFailure: Throwable?,
+        completedRefresh: Boolean,
+    ) {
+        val state = withContext(Dispatchers.IO) { WalletRepository.loadWalletState(getApplication()) }
+        val keys = withContext(Dispatchers.IO) { SettingsRepository.displayedKeys(getApplication()) }
+        val hasAssetFailure = state.balances.values.any { it.status == "error" }
+        val error = if (topLevelFailure != null || hasAssetFailure) {
+            "Balance refresh failed. Check your connection and try again."
+        } else {
+            null
+        }
+        _ui.update {
+            it.copy(
+                refreshing = refreshing,
+                loading = false,
+                refreshError = error,
+                completedRefreshCount = if (completedRefresh) it.completedRefreshCount + 1 else it.completedRefreshCount,
+                wallet = state,
+                displayedKeys = keys,
+            )
         }
     }
 }
@@ -85,12 +123,31 @@ data class DisplayAsset(
     val markColor: Long,
 )
 
-val HOME_ASSETS: List<DisplayAsset> = listOf(
-    DisplayAsset("XLM", "Stellar", "xlm", AddressKind.STELLAR, 0xFF3E78A6),
-    DisplayAsset("SOL", "Solana", "sol", AddressKind.SOLANA, 0xFF7E5BD0),
-    DisplayAsset("ETH", "Ethereum", "eth", AddressKind.EVM, 0xFF5C6359),
-    DisplayAsset("USDC", "Base", "base_usdc", AddressKind.EVM, 0xFF2E7D43),
+/** Home 资产的 UI 装饰（余额键 / 地址族 / 品牌色），按 rail 关联到注册表正本。 */
+private data class HomeAssetSpec(
+    val rail: String,
+    val balanceKey: String,
+    val addressKind: AddressKind,
+    val markColor: Long,
 )
+
+private val HOME_ASSET_SPECS: List<HomeAssetSpec> = listOf(
+    HomeAssetSpec("stellar_xlm", "xlm", AddressKind.STELLAR, 0xFF3E78A6),
+    HomeAssetSpec("solana_sol", "sol", AddressKind.SOLANA, 0xFF7E5BD0),
+    HomeAssetSpec("ethereum_eth", "eth", AddressKind.EVM, 0xFF5C6359),
+    HomeAssetSpec("base_usdc", "base_usdc", AddressKind.EVM, 0xFF2E7D43),
+)
+
+// 单一事实来源：symbol / chain 一律取自 WalletRepository.transferAssets()（= 包内 TransferAssetRegistry 正本），
+// 首页不再硬编码资产名 / 链名，从根上杜绝与注册表漂移。UI 字段（余额键 / 地址族 / 色）仍按 rail 装饰。
+val HOME_ASSETS: List<DisplayAsset> = run {
+    val catalog = WalletRepository.transferAssets().associateBy { it.rail }
+    HOME_ASSET_SPECS.mapNotNull { spec ->
+        catalog[spec.rail]?.let { opt ->
+            DisplayAsset(opt.symbol, opt.chain, spec.balanceKey, spec.addressKind, spec.markColor)
+        }
+    }
+}
 
 fun assetByKey(key: String): DisplayAsset? = HOME_ASSETS.firstOrNull { it.balanceKey == key }
 
@@ -107,17 +164,41 @@ fun addressFor(kind: AddressKind, wallet: WalletState): String? = when (kind) {
     AddressKind.STELLAR -> wallet.stellarAddress
 }
 
-/** error / inactive / 空 一律按 0 显示（对照 app-bridge 的归一化）。 */
-fun displayBalance(bal: AssetBalance?): String {
-    if (bal == null) return "0"
-    if (bal.status == "error" || bal.status == "inactive") return "0"
-    val b = bal.balance
-    return if (b.isBlank() || b == "--") "0" else b
+enum class BalanceCondition { AVAILABLE, ZERO, INACTIVE, ERROR, UNKNOWN }
+
+fun balanceCondition(bal: AssetBalance?): BalanceCondition = when {
+    bal == null -> BalanceCondition.UNKNOWN
+    bal.status == "error" -> BalanceCondition.ERROR
+    bal.status == "inactive" -> BalanceCondition.INACTIVE
+    bal.status != "ok" -> BalanceCondition.UNKNOWN
+    bal.balance.toBigDecimalOrNull()?.signum() == 0 -> BalanceCondition.ZERO
+    bal.balance.toBigDecimalOrNull()?.signum() == 1 -> BalanceCondition.AVAILABLE
+    else -> BalanceCondition.UNKNOWN
 }
 
-fun totalUsd(wallet: WalletState): Double = HOME_ASSETS.sumOf { asset ->
-    val amount = displayBalance(wallet.balances[asset.balanceKey]).toDoubleOrNull() ?: 0.0
-    amount * (UNIT_USD[asset.symbol] ?: 0.0)
+/** Never present an unfunded account or a failed request as a confirmed zero balance. */
+fun displayBalance(bal: AssetBalance?): String {
+    if (balanceCondition(bal) !in setOf(BalanceCondition.AVAILABLE, BalanceCondition.ZERO)) return "—"
+    val b = bal?.balance.orEmpty()
+    return if (b.isBlank() || b == "--") "—" else b
+}
+
+fun balanceStatusLabel(bal: AssetBalance?): String = when (balanceCondition(bal)) {
+    BalanceCondition.AVAILABLE -> "In wallet"
+    BalanceCondition.ZERO -> "Zero balance"
+    BalanceCondition.INACTIVE -> "Account not activated"
+    BalanceCondition.ERROR -> "Refresh failed"
+    BalanceCondition.UNKNOWN -> "Not refreshed"
+}
+
+fun totalUsd(wallet: WalletState): Double? {
+    if (HOME_ASSETS.any { balanceCondition(wallet.balances[it.balanceKey]) in setOf(BalanceCondition.ERROR, BalanceCondition.UNKNOWN) }) {
+        return null
+    }
+    return HOME_ASSETS.sumOf { asset ->
+        val amount = displayBalance(wallet.balances[asset.balanceKey]).toDoubleOrNull() ?: 0.0
+        amount * (UNIT_USD[asset.symbol] ?: 0.0)
+    }
 }
 
 fun formatUsd(value: Double): String = String.format(Locale.US, "%,.2f", if (value.isFinite()) value else 0.0)
@@ -128,8 +209,5 @@ fun fiatUsd(symbol: String, amount: String): Double {
     return value * (UNIT_USD[symbol] ?: 0.0)
 }
 
-fun shortAddress(addr: String?): String {
-    if (addr.isNullOrBlank()) return "—"
-    if (addr.length <= 12) return addr
-    return addr.substring(0, 6) + "…" + addr.substring(addr.length - 4)
-}
+// Delegates to the shared AddressFormat (D9/Q5) — single home for address shortening.
+fun shortAddress(addr: String?): String = AddressFormat.shortAddress(addr)

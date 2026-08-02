@@ -6,8 +6,13 @@
 // verifyAppQuery(req), verifyAppBody(req), verifyOpenClaw(req), etc.
 
 import { shouldAttemptLegacyOpenClaw, verifyOpenClawRequest } from "../security.js";
+import {
+  CONNECTION_TOKEN_AUDIENCE,
+  rejoinConnectionState,
+  validateConnectionBinding
+} from "../application/connections/binding.js";
 
-export function createAuth({ store, runtimeConfig, observability }) {
+export function createAuth({ store, runtimeConfig, observability, replayGuard, merchantSessionService, agentAuthService }) {
   function auditActorFromAuth(auth) {
     if (auth?.connection) {
       return {
@@ -24,10 +29,13 @@ export function createAuth({ store, runtimeConfig, observability }) {
     const authorization = req.get("authorization") || "";
     const match = authorization.match(/^Bearer\s+(.+)$/i);
     if (match) return match[1].trim();
-    return String(req.get("x-connection-token") || req.query.connection_token || req.body?.connection_token || "").trim();
+    return String(req.get("x-connection-token") || "").trim();
   }
 
   function authorizeConnection(req, scope, options = {}) {
+    if (req.query?.connection_token || req.body?.connection_token) {
+      return { ok: false, status: 400, code: "token_transport_forbidden", message: "Connection tokens are accepted only in authorization headers" };
+    }
     const token = connectionTokenFromRequest(req);
     if (!token) {
       if (options.allowLegacyOpenClaw && shouldAttemptLegacyOpenClaw(req, runtimeConfig)) {
@@ -59,6 +67,22 @@ export function createAuth({ store, runtimeConfig, observability }) {
       return { ok: false, status: 401, code: "unauthorized_connection", message: "Connection token expired" };
     }
 
+    const supplied = {
+      merchant_id: req.body?.merchant_id || req.query?.merchant_id,
+      agent_id: req.body?.agent_id || req.query?.agent_id,
+      client_id: req.body?.client_id || req.query?.client_id,
+      credential_id: req.body?.credential_id || req.query?.credential_id,
+      approved_by_device_id: req.body?.target_app_device_id || req.body?.device_id || req.query?.device_id,
+      connection_id: req.body?.connection_id || req.query?.connection_id
+    };
+    const binding = validateConnectionBinding(connection, {
+      audience: options.audience || CONNECTION_TOKEN_AUDIENCE,
+      supplied
+    });
+    if (!binding.ok) return binding;
+    const current = rejoinConnectionState(store, connection);
+    if (!current.ok) return current;
+
     const requestedConnectionId = req.body?.connection_id || req.query?.connection_id;
     if (requestedConnectionId && requestedConnectionId !== connection.connection_id) {
       return { ok: false, status: 401, code: "unauthorized_connection", message: "Connection token does not match connection_id" };
@@ -71,7 +95,7 @@ export function createAuth({ store, runtimeConfig, observability }) {
   }
 
   function verifyOpenClaw(req) {
-    const result = verifyOpenClawRequest(req, runtimeConfig);
+    const result = verifyOpenClawRequest(req, runtimeConfig, { replayGuard });
     if (!result.ok) {
       observability.recordAuditEvent("legacy_openclaw.auth_failed", "failure", {
         actor: { type: "legacy_openclaw" },
@@ -83,10 +107,10 @@ export function createAuth({ store, runtimeConfig, observability }) {
   }
 
   function verifyAppQuery(req) {
-    const deviceId = req.query.device_id;
-    const token = req.query.token;
+    const deviceId = req.get?.("x-app-device-id") || req.query.device_id;
+    const token = req.get?.("x-app-device-token") || req.query.token;
     if (!store.verifyDeviceToken(deviceId, token)) return { ok: false, status: 401, error: "Invalid app device token" };
-    return { ok: true };
+    return { ok: true, device_id: deviceId };
   }
 
   function verifyAppBody(req) {
@@ -96,12 +120,50 @@ export function createAuth({ store, runtimeConfig, observability }) {
     return { ok: true };
   }
 
+  function verifyMerchantSession(req, options = {}) {
+    if (!merchantSessionService) return { ok: false, status: 503, code: "merchant_session_unavailable", message: "Merchant sessions are unavailable" };
+    return merchantSessionService.authenticate({
+      session_token: cookie(req, "vp_merchant_session"),
+      csrf_token: String(req.get?.("x-csrf-token") || ""),
+      origin: String(req.get?.("origin") || ""),
+      require_csrf: Boolean(options.csrf)
+    });
+  }
+
+  function requireMerchantStepUp(req, operation) {
+    const auth = verifyMerchantSession(req, { csrf: true });
+    if (!auth.ok) return auth;
+    if (!merchantSessionService.isStepUpFresh(auth.session)) {
+      return { ok: false, status: 403, code: "step_up_required", message: `Recent step-up authentication is required for ${operation}` };
+    }
+    return auth;
+  }
+
+  function verifyAgentAccessToken(req, requiredScopes = []) {
+    if (!agentAuthService) return { ok: false, status: 503, code: "unauthenticated", message: "Agent authentication is unavailable" };
+    const authorization = String(req.get?.("authorization") || "");
+    const match = authorization.match(/^Bearer\s+(.+)$/i);
+    return agentAuthService.authenticate(match?.[1] || "", String(req.request_id || req.id || "unknown"), requiredScopes);
+  }
+
   return {
     auditActorFromAuth,
     connectionTokenFromRequest,
     authorizeConnection,
     verifyOpenClaw,
     verifyAppQuery,
-    verifyAppBody
+    verifyAppBody,
+    verifyMerchantSession,
+    requireMerchantStepUp,
+    verifyAgentAccessToken
   };
+}
+
+function cookie(req, name) {
+  const header = String(req.get?.("cookie") || "");
+  for (const part of header.split(";")) {
+    const [key, ...value] = part.trim().split("=");
+    if (key === name) return decodeURIComponent(value.join("="));
+  }
+  return "";
 }

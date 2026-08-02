@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.velarumpay.com/velarum.merchant_domain.v1.schema.json",
+  "title": "VelarumPay Merchant Domain v1",
+  "type": "object",
+  "required": ["domain_id", "merchant_id", "domain", "method", "status", "version", "created_at", "updated_at"],
+  "properties": {
+    "domain_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "merchant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "domain": {"type": "string", "minLength": 1, "maxLength": 253},
+    "method": {"type": "string", "enum": ["dns_txt", "https_well_known"]},
+    "evidence_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"type": "string", "enum": ["pending", "verified", "reverification_required", "failed", "revoked"]},
+    "verified_at": {"type": "string", "format": "date-time"},
+    "version": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false,
+  "x-velarumpay-contract-version": "velarum.control-plane.v1"
+}

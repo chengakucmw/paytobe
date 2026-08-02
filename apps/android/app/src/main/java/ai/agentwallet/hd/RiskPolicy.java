@@ -15,6 +15,11 @@ final class RiskPolicy {
     private static final String PREFS = "agentwallet_risk_policy";
     private static final String KEY_EVM_WHITELIST = "evm_whitelist";
     private static final String KEY_STELLAR_WHITELIST = "stellar_whitelist";
+    // Canonical caps live in packages/protocol/src/constants.js RISK_LIMITS
+    // (daily_limit_default = "1000", unverified_recipient_cap = "100"). The Android
+    // wallet keeps its own BigDecimal copies because it cannot import the JS protocol
+    // package at runtime; tests/protocol/risk-limits-contract.test.mjs pins these
+    // literals to the canonical values so the two cannot silently drift apart.
     private static final BigDecimal DAILY_USDC_LIMIT = new BigDecimal("1000");
     private static final BigDecimal DAILY_XLM_LIMIT = new BigDecimal("1000");
     // B7: SOL has its own daily cap. Exact BigDecimal, never floating point. The SOL
@@ -35,6 +40,7 @@ final class RiskPolicy {
         Result result = new Result();
         if (intent.isExpired()) result.errors.add("Payment request is expired");
         if (!intent.status.equals(PaymentIntent.STATUS_PENDING)) result.errors.add("Payment request is not pending");
+        result.errors.addAll(BuildNetworkPolicy.violations(intent));
         String unsupported = TransferAssetRegistry.unsupportedReason(intent.rail, intent.network, intent.asset, intent.to);
 
         if (unsupported.length() > 0) {
@@ -51,6 +57,12 @@ final class RiskPolicy {
         } else if (intent.isStellarXlm()) {
             if (!intent.to.startsWith("G")) result.errors.add("Stellar recipient must be a G... public key");
             if (intent.horizonUrl.length() == 0) result.errors.add("Stellar Horizon URL is required");
+            result.errors.addAll(StellarMainnetPolicy.violations(
+                    intent.stellarTestnet,
+                    intent.horizonUrl,
+                    intent.to,
+                    intent.amount
+            ));
             checkWhitelist(context, KEY_STELLAR_WHITELIST, intent.to, "recipient Stellar address", intent.amount, UNVERIFIED_XLM_CAP, result);
             checkDailyLimit(context, "XLM", intent.amount, DAILY_XLM_LIMIT, result);
         } else if (intent.isStellarAsset()) {

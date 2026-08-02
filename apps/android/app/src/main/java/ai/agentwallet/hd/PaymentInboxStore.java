@@ -16,6 +16,8 @@ final class PaymentInboxStore {
     private static final String KEY_DEVICE_ID = "device_id";
     private static final String KEY_RELAY_URL = "relay_url";
     private static final String KEY_DEVICE_TOKEN = "device_token";
+    private static final String KEY_EVENT_CURSOR = "payment_request_event_cursor";
+    private static final String KEY_EVENT_CURSOR_RELAY = "payment_request_event_cursor_relay";
 
     private PaymentInboxStore() {}
 
@@ -30,7 +32,7 @@ final class PaymentInboxStore {
         for (int i = 0; i < array.length(); i++) {
             JSONObject item = array.getJSONObject(i);
             if (matchesRequest(item, request)) {
-                next.put(request.toJson());
+                next.put(reconcile(item, request));
                 written = true;
             } else {
                 next.put(item);
@@ -38,6 +40,33 @@ final class PaymentInboxStore {
         }
         if (!written) next.put(request.toJson());
         prefs(context).edit().putString(KEY_INTENTS, next.toString()).apply();
+    }
+
+    /**
+     * H12 parity with iOS LocalStore.upsertIntent: never let a stale or out-of-order relay
+     * snapshot downgrade a locally-advanced status or perform an illegal lifecycle jump
+     * (e.g. broadcasted -> pending, or pending -> confirmed skipping the signature step),
+     * which could make a paid request look actionable again and risk a duplicate payment, or
+     * drop a known tx hash. The richer fields from the incoming snapshot are still taken; only
+     * the protected status / tx_hash are preserved when the incoming status is not a legal
+     * advance. The allowed transitions live in {@link PaymentRequest#canApplyStatusUpdate}.
+     */
+    static JSONObject reconcile(JSONObject existingItem, PaymentRequest incoming) throws Exception {
+        JSONObject existingPayload = itemPayload(existingItem);
+        String existingStatus = existingPayload.optString("status", "");
+        if (PaymentRequest.canApplyStatusUpdate(existingStatus, incoming.status)) {
+            return incoming.toJson();
+        }
+        // Rejected status change: keep the fresh incoming snapshot but restore the protected
+        // status and a known tx hash from local state. Deep-copy so the request's own raw
+        // JSON is not mutated.
+        JSONObject merged = new JSONObject(incoming.toJson().toString());
+        merged.put("status", PaymentRequest.normalizeLifecycleStatus(existingStatus));
+        String existingTxHash = existingPayload.optString("tx_hash", "");
+        if (existingTxHash.length() > 0 && merged.optString("tx_hash", "").length() == 0) {
+            merged.put("tx_hash", existingTxHash);
+        }
+        return merged;
     }
 
     static synchronized void updateStatus(Context context, String intentId, String status, String txHash, String error) throws Exception {
@@ -122,11 +151,19 @@ final class PaymentInboxStore {
     }
 
     static String relayUrl(Context context) {
-        return prefs(context).getString(KEY_RELAY_URL, "");
+        return PlatformServiceConfig.baseUrl(prefs(context).getString(KEY_RELAY_URL, ""));
     }
 
     static void setRelayUrl(Context context, String value) {
-        prefs(context).edit().putString(KEY_RELAY_URL, value.replaceAll("/+$", "")).apply();
+        if (PlatformServiceConfig.isManaged()) return;
+        String normalized = value.replaceAll("/+$", "");
+        SharedPreferences preferences = prefs(context);
+        String previous = preferences.getString(KEY_RELAY_URL, "");
+        SharedPreferences.Editor edit = preferences.edit().putString(KEY_RELAY_URL, normalized);
+        if (!normalized.equals(previous)) {
+            edit.remove(KEY_EVENT_CURSOR).remove(KEY_EVENT_CURSOR_RELAY);
+        }
+        edit.apply();
     }
 
     static String deviceToken(Context context) {
@@ -136,6 +173,20 @@ final class PaymentInboxStore {
         String generated = "awt_" + java.util.UUID.randomUUID().toString().replace("-", "");
         p.edit().putString(KEY_DEVICE_TOKEN, generated).apply();
         return generated;
+    }
+
+    static long eventCursor(Context context) {
+        SharedPreferences preferences = prefs(context);
+        String relay = relayUrl(context);
+        if (!relay.equals(preferences.getString(KEY_EVENT_CURSOR_RELAY, ""))) return 0L;
+        return Math.max(0L, preferences.getLong(KEY_EVENT_CURSOR, 0L));
+    }
+
+    static void setEventCursor(Context context, long cursor) {
+        prefs(context).edit()
+                .putLong(KEY_EVENT_CURSOR, Math.max(0L, cursor))
+                .putString(KEY_EVENT_CURSOR_RELAY, relayUrl(context))
+                .apply();
     }
 
     private static JSONArray readArray(Context context) throws Exception {

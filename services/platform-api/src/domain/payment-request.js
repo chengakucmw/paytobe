@@ -96,7 +96,7 @@ export function paymentRequestProjection(request) {
   };
 }
 
-export function paymentRequestEventProjection(event) {
+export function paymentRequestEventProjection(event, request = null) {
   const data = event.data || {};
   return {
     seq: event.seq,
@@ -107,6 +107,10 @@ export function paymentRequestEventProjection(event) {
     status: data.status || null,
     tx_hash: data.tx_hash || null,
     error: data.error || null,
+    recipient_id: data.recipient_id || request?.recipient_id || null,
+    recipient_version_id: data.recipient_version_id || request?.recipient_version_id || null,
+    recipient_facts_hash: data.recipient_facts_hash || request?.recipient_facts_hash || null,
+    recipient_snapshot: data.recipient_snapshot || request?.recipient_snapshot || null,
     at: event.at,
     data
   };

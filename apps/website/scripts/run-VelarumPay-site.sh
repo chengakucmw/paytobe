@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-APP_DIR="/Users/yang/code/VelarumPayCode/apps/website"
+APP_DIR="/Users/yang/code/VelarumPay/code/apps/website"
 ENV_FILE="$APP_DIR/.env"
 
 if [ -f "$ENV_FILE" ]; then

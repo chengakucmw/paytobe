@@ -118,20 +118,65 @@ final class EvmTransfer {
         BigInteger gasPrice = gasResp.getGasPrice();
         BigInteger gasLimit = estimateErc20Gas(web3j, from, contract, data);
 
-        RawTransaction tx = RawTransaction.createTransaction(
-                nonce,
-                gasPrice,
-                gasLimit,
-                contract,
-                BigInteger.ZERO,
-                data
-        );
-        byte[] signed = TransactionEncoder.signMessage(tx, chainId, credentials);
-        String raw = Numeric.toHexString(signed);
+        String raw;
+        if (USE_SHARED_CORE_SIGNING) {
+            // ERC-20 is a legacy EVM transaction whose value is 0 and whose `data`
+            // carries the transfer() call; the shared core signs the identical
+            // EIP-155 RLP (byte-checked vs web3j in VelarumWalletCoreConformanceTest).
+            raw = WalletCoreBridge.signEvm(privateKey, chainId, nonce.longValueExact(),
+                    gasPrice.toString(), gasLimit.longValueExact(), contract, "0", data).rawTxHex;
+        } else {
+            RawTransaction tx = RawTransaction.createTransaction(
+                    nonce,
+                    gasPrice,
+                    gasLimit,
+                    contract,
+                    BigInteger.ZERO,
+                    data
+            );
+            byte[] signed = TransactionEncoder.signMessage(tx, chainId, credentials);
+            raw = Numeric.toHexString(signed);
+        }
         if (progress != null) progress.onGenerated("Signed ERC-20 transaction");
         EthSendTransaction sent = web3j.ethSendRawTransaction(raw).send();
         if (sent.hasError()) throw new IllegalStateException(sent.getError().getMessage());
         return sent.getTransactionHash();
+    }
+
+    /**
+     * Read-only live fee estimate (no signing, no broadcast): {@code gasPrice × gasLimit} in wei.
+     * Native transfers use the fixed 21000 gas; ERC-20 transfers estimate gas via the node
+     * (same path the send uses). Returns null on any RPC error so the caller can fall back.
+     */
+    static BigInteger estimateFeeWei(
+            String rpcUrl,
+            String fromAddress,
+            String tokenContract,
+            String toAddress,
+            String amount,
+            int decimals,
+            boolean erc20
+    ) {
+        try {
+            Web3j web3j = Web3j.build(new HttpService(rpcUrl, HTTP));
+            EthGasPrice gasResp = web3j.ethGasPrice().send();
+            if (gasResp.hasError()) return null;
+            BigInteger gasPrice = gasResp.getGasPrice();
+            BigInteger gasLimit;
+            if (erc20) {
+                String from = normalizeAddress(fromAddress, "sender");
+                String contract = normalizeAddress(tokenContract, "token contract");
+                String to = normalizeAddress(toAddress, "recipient");
+                String data = erc20TransferData(to, tokenUnits(amount, decimals));
+                gasLimit = estimateErc20Gas(web3j, from, contract, data);
+            } else {
+                gasLimit = BigInteger.valueOf(21_000);
+            }
+            return gasPrice.multiply(gasLimit);
+        } catch (Exception ignored) {
+            VpLog.w("EvmTransfer", "fee estimate failed", ignored);
+            return null;
+        }
     }
 
     private static BigInteger estimateErc20Gas(Web3j web3j, String from, String contract, String data) {
@@ -150,6 +195,7 @@ final class EvmTransfer {
                 return estimate.getAmountUsed().multiply(BigInteger.valueOf(120)).divide(BigInteger.valueOf(100));
             }
         } catch (Exception ignored) {
+            VpLog.w("EvmTransfer", "ERC-20 gas estimate failed; using fallback gas", ignored);
             return ERC20_FALLBACK_GAS;
         }
         return ERC20_FALLBACK_GAS;
@@ -164,11 +210,8 @@ final class EvmTransfer {
     }
 
     private static BigInteger tokenUnits(String amount, int decimals) {
-        if (decimals < 0 || decimals > 255) throw new IllegalArgumentException("Token decimals must be between 0 and 255");
-        BigDecimal value = new BigDecimal(amount.trim()).movePointRight(decimals);
-        BigInteger units = value.toBigIntegerExact();
-        if (units.signum() <= 0) throw new IllegalArgumentException("Token amount must be greater than zero");
-        return units;
+        // Delegates to the shared AmountUnits (D9/Q4). Behaviour is unchanged.
+        return AmountUnits.tokenUnits(amount, decimals);
     }
 
     private static String normalizeAddress(String address, String label) {

@@ -37,7 +37,15 @@ class InboxViewModel(app: Application) : AndroidViewModel(app) {
     fun reload() {
         _ui.update { it.copy(loading = true) }
         viewModelScope.launch {
-            val items = withContext(Dispatchers.IO) { InboxRepository.load(getApplication(), _ui.value.filter) }
+            val items = withContext(Dispatchers.IO) {
+                // Pull from the relay first so opening/refreshing the inbox surfaces
+                // newly-arrived agent payment requests. Without this the list only
+                // ever reads the local store and stays empty until a (currently
+                // unstarted) push service delivers something. Failure is silent
+                // (offline / relay not configured) and falls back to local data.
+                InboxRepository.syncFromRelay(getApplication())
+                InboxRepository.load(getApplication(), _ui.value.filter)
+            }
             _ui.update { it.copy(loading = false, items = items) }
         }
     }
@@ -100,9 +108,14 @@ class DetailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reject() {
         if (_ui.value.submitting) return
+        // Set submitting=true so reject and pay are mutually exclusive (DetailScreen
+        // disables both buttons on submitting) and a double-tap can't fire twice.
+        // Previously reject() checked submitting but never set it, leaving a
+        // reject/pay race and a double-submit window on the same intent.
+        _ui.update { it.copy(submitting = true, error = null) }
         viewModelScope.launch {
             withContext(Dispatchers.IO) { runCatching { WalletRepository.rejectInbox(getApplication(), intentId) } }
-            _ui.update { it.copy(rejected = true) }
+            _ui.update { it.copy(submitting = false, rejected = true) }
         }
     }
 }

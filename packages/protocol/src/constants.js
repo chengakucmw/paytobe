@@ -66,6 +66,25 @@ export const RISK_SEVERITIES = Object.freeze([
   "info"
 ]);
 
+// Canonical risk caps shared by the backend risk policy and the wallet clients.
+// THIS is the single source of truth for the default daily spend cap and the
+// unverified-recipient cap. The runtime consumers MUST match these values:
+//   - services/platform-api/src/risk/limits.js  (dailyLimitFor fallback)
+//   - apps/android/app/src/main/java/ai/agentwallet/hd/RiskPolicy.java
+//       (DAILY_*_LIMIT and UNVERIFIED_*_CAP literals)
+//   - apps/ios/VelarumPay/RiskPolicy.swift
+//       (LocalRiskPolicy.dailyXLMLimit and .unverifiedXLMCap literals)
+// Amounts are exact decimal STRINGS (never float), consistent with decimal.js
+// and Android's BigDecimal. Consistency is enforced by
+// tests/protocol/risk-limits-contract.test.mjs.
+export const RISK_LIMITS = Object.freeze({
+  // Default per-asset daily spend cap when no DAILY_LIMIT_<ASSET> env override is set.
+  daily_limit_default: "1000",
+  // With no recipient whitelist configured, a payment above this cap to an
+  // unverified recipient is blocked (fail closed) rather than merely warned.
+  unverified_recipient_cap: "100"
+});
+
 // Canonical pairing scopes, dot-namespaced. THIS is the single source of truth for
 // the pairing/authorization vocabulary. The runtime consumers MUST match this list:
 //   - services/platform-api/src/domain/scopes.js  (ALLOWED_PAIRING_SCOPES)

@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import ai.agentwallet.hd.BuildConfig
 import ai.agentwallet.hd.SettingsRepository
 import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpFactRow
@@ -50,10 +51,12 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             VpMenuRow("Security", "Seed phrase, backup, import", onSecurity, badgeText = if (backup) "Verified" else "Review", badgeTone = if (backup) VpTone.SAFE else VpTone.CAUTION)
-            VpMenuRow("Networks", "Chains and RPC endpoints", onNetworks)
+            VpMenuRow("Networks", "Networks and RPC endpoints", onNetworks)
             VpMenuRow("Notifications", "Payment requests and confirmations", onNotifications)
             VpMenuRow("Display & language", "Language and text size", onDisplayLanguage)
-            VpMenuRow("Developer", "Device, relay, and agent pairing", onDeveloper)
+            if (!BuildConfig.MANAGED_PLATFORM_SERVICE) {
+                VpMenuRow("Developer", "Device, Platform API, and local pairing", onDeveloper)
+            }
             VpMenuRow("Activity", "Transfer history", onActivity)
         }
     }

@@ -25,35 +25,88 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     @Published var selectedIntent: PaymentIntent?
     @Published var pairingInput = ""
     @Published var pairingSession: PairingSession?
+    @Published var connectInvitation: ConnectInvitation?
+    @Published var showingConnectInvitation = false
+    @Published var isCreatingConnectKey = false
     @Published var showingPairingScanner = false
     @Published var connections: [AgentConnection] = []
     @Published var selectedConnection: AgentConnection?
     @Published var networks: [WalletNetworkConfig] = []
+    /// Per-asset balances keyed by WalletAsset.id (rail), filled by refreshBalances(). Display-only.
+    @Published var assetBalances: [String: String] = [:]
     @Published var progress: PaymentProgress?
     @Published var errorMessage: String?
     @Published var selectedTab: AppTab = .home
+    // Guards the money-moving actions (pay / reject) against double-submit. Set
+    // synchronously on the main actor before the first await — the detail sheet
+    // can't dismiss within the same runloop tick, so without this a rapid second
+    // tap on Pay/Reject enqueues a second sign+broadcast (tx_bad_seq, or a payment
+    // that broadcast yet shows as failed). Bound to .disabled on both buttons too.
+    @Published var isProcessingIntent = false
+    // True until the off-main launch hydrate() finishes loading the wallet + local
+    // stores. The root view shows a lightweight splash while this is true, so an
+    // existing user never sees the empty / "no wallet" state flash at cold launch.
+    @Published var isHydrating = true
 
     private let walletStore = WalletStore()
     private let localStore = LocalStore()
     private let relay = RelayClient()
     private let stellar = StellarService()
+    private let evmService = EvmService()
+    private let solanaService = SolanaService()
 
     override init() {
-        relayURL = localStore.relayURL
-        deviceId = localStore.deviceId
-        deviceToken = localStore.deviceToken
-        inbox = localStore.loadInbox()
-        history = localStore.loadHistory()
-        connections = localStore.loadConnections()
-        networks = localStore.loadAllNetworks()
-        let loadedWallet = try? walletStore.load()
-        wallet = loadedWallet
-        if let loadedWallet {
-            statusText = loadedWallet.isBackupVerified ? "Ready" : "Backup required"
-        }
+        // Initialize stored properties with cheap defaults only — NO Keychain reads or
+        // JSON decoding on the main thread at launch. The real wallet + local stores are
+        // loaded off the main thread in hydrate() and published after the first frame.
+        relayURL = ""
+        deviceId = ""
+        deviceToken = ""
         super.init()
         UNUserNotificationCenter.current().delegate = self
         Task { await requestNotificationPermission() }
+        hydrate()
+    }
+
+    /// Loads the wallet (Keychain) and every local store (UserDefaults + JSON decode,
+    /// some Keychain-backed) OFF the main thread, then publishes them on the main actor.
+    /// Cold launch therefore never hitches on a synchronous Keychain hit + decoding.
+    /// The initial relay connect/sync is kicked from here too, because it needs the
+    /// device id/token that are now loaded off-main (handleScenePhase skips while
+    /// `isHydrating`). A splash covers the brief window (see isHydrating).
+    private func hydrate() {
+        let walletStore = self.walletStore
+        let localStore = self.localStore
+        DispatchQueue.global(qos: .userInitiated).async {
+            let relayURL = localStore.relayURL
+            let deviceId = localStore.deviceId
+            let deviceToken = localStore.deviceToken
+            let inbox = localStore.loadInbox()
+            let history = localStore.loadHistory()
+            let connections = localStore.loadConnections()
+            let networks = localStore.loadAllNetworks()
+            let wallet = try? walletStore.load()
+            Task { @MainActor in
+                self.relayURL = relayURL
+                self.deviceId = deviceId
+                self.deviceToken = deviceToken
+                self.inbox = inbox
+                self.history = history
+                self.connections = connections
+                self.networks = networks
+                self.wallet = wallet
+                if let wallet {
+                    self.statusText = wallet.isBackupVerified ? "Ready" : "Backup required"
+                }
+                self.isHydrating = false
+                // device id/token/relayURL are loaded now: run the initial relay connect +
+                // one-shot inbox sync that handleScenePhase deferred during hydration.
+                if !self.relayURL.isEmpty {
+                    self.connectRelay()
+                    self.syncInbox(silent: true)
+                }
+            }
+        }
     }
 
     var relayConfig: RelayClient.Config {
@@ -172,7 +225,9 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     func handleScenePhase(_ phase: ScenePhase) {
         switch phase {
         case .active:
-            guard !relayURL.isEmpty else { return }
+            // Skip while hydrating: the initial connect/sync is kicked from hydrate()
+            // once the device id/token are loaded off the main thread.
+            guard !isHydrating, !relayURL.isEmpty else { return }
             connectRelay()
             syncInbox(silent: true)
         case .background:
@@ -181,6 +236,44 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
             break
         @unknown default:
             break
+        }
+    }
+
+    /// Fetches each home asset's on-chain balance (XLM / ETH / USDC / SOL) concurrently and
+    /// fail-safe — any failure leaves that asset at "0". Read-only: never touches signing/sending.
+    func refreshBalances() {
+        guard let wallet else { return }
+        let stellarAddr = wallet.address
+        let evmAddr = wallet.evmAddress ?? ""
+        let solAddr = wallet.solanaAddress ?? ""
+        let ethRpc: String
+        if let network = networks.first(where: {
+            $0.family == WalletNetworkConfig.familyEVM && $0.chainId == 1
+        }) {
+            ethRpc = network.defaultRPCURL
+        } else {
+            ethRpc = ""
+        }
+        let baseRpc: String
+        if let network = networks.first(where: {
+            $0.family == WalletNetworkConfig.familyEVM && $0.chainId == 8453
+        }) {
+            baseRpc = network.defaultRPCURL
+        } else {
+            baseRpc = "https://mainnet.base.org"
+        }
+        Task {
+            async let xlm = stellar.xlmBalance(horizonURL: "https://horizon.stellar.org", accountId: stellarAddr)
+            async let eth = evmService.nativeBalance(rpcURL: ethRpc, address: evmAddr, decimals: 18)
+            async let usdc = evmService.tokenBalance(rpcURL: baseRpc, contract: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", address: evmAddr, decimals: 6)
+            async let sol = solanaService.solBalance(rpcURL: SolanaService.mainnetRPC, address: solAddr)
+            let (x, e, u, s) = await (xlm, eth, usdc, sol)
+            self.assetBalances = [
+                "stellar_xlm": x,
+                "ethereum_eth": e,
+                "base_usdc": u,
+                "solana_sol": s,
+            ]
         }
     }
 
@@ -212,6 +305,58 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
             } catch {
                 showError(error)
             }
+        }
+    }
+
+    func createConnectInvitation() {
+        guard !isCreatingConnectKey else { return }
+        isCreatingConnectKey = true
+        Task {
+            defer { isCreatingConnectKey = false }
+            do {
+                statusText = "Creating Connect Key"
+                let invitation = try await relay.createConnectInvitation(config: relayConfig)
+                connectInvitation = invitation
+                showingConnectInvitation = true
+                statusText = "Connect Key ready"
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    func refreshConnectInvitation() {
+        guard let invitation = connectInvitation, !invitation.isTerminal else { return }
+        Task {
+            do {
+                let refreshed = try await relay.fetchConnectInvitation(config: relayConfig, invitation: invitation)
+                connectInvitation = refreshed
+                statusText = refreshed.hasClaimedAgent ? "Review Agent request" : "Waiting for Agent"
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    func cancelConnectInvitation() {
+        guard let invitation = connectInvitation, !invitation.isTerminal else { return }
+        Task {
+            do {
+                connectInvitation = try await relay.cancelConnectInvitation(config: relayConfig, invitation: invitation)
+                statusText = "Connect Key cancelled"
+            } catch {
+                showError(error)
+            }
+        }
+    }
+
+    func reviewConnectInvitationAgent() {
+        guard let invitation = connectInvitation, !invitation.pairingSessionId.isEmpty else { return }
+        pairingInput = invitation.pairingSessionId
+        showingConnectInvitation = false
+        Task {
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            reviewPairing()
         }
     }
 
@@ -297,7 +442,10 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     }
 
     func pay(_ intent: PaymentIntent) {
+        guard !isProcessingIntent else { return }
+        isProcessingIntent = true
         Task {
+            defer { isProcessingIntent = false }
             do {
                 guard let wallet else { throw AppError.missingWallet }
                 guard intent.isPending else {
@@ -326,6 +474,21 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                         )
                     }
                     throw AppError.unsupportedPayment("iOS v1 supports Stellar XLM payment requests. \(intent.asset) / \(intent.network) is review-only for now.")
+                }
+
+                // Client-side risk backstop (defense in depth). The relay's verdict was
+                // already honored above via isPaymentDetailSignable; this independently
+                // recomputes the daily spend cap and the unverified-recipient cap in exact
+                // Decimal and fails closed, so a stale, buggy, or tampered payload that omits
+                // the server block can never reach the signer. Mirrors Android RiskPolicy.java.
+                // Only XLM is signable on iOS v1, so only the XLM caps apply here.
+                let backstop = LocalRiskPolicy.evaluateXLM(
+                    amount: intent.amount,
+                    spentTodayXLM: localStore.spentToday(asset: "XLM"),
+                    recipientWhitelisted: localStore.isRecipientWhitelisted(intent.to)
+                )
+                guard backstop.allowed else {
+                    throw AppError.invalidResponse(backstop.errors.joined(separator: " "))
                 }
 
                 // M14 fix: honor the protocol's policy.requires_user_approval flag.
@@ -412,6 +575,10 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
                 )
                 localStore.recordHistory(entry)
                 history = localStore.loadHistory()
+                // Record the successful spend in the local daily ledger so the client-side
+                // daily cap (LocalRiskPolicy) reflects it on the next payment, mirroring
+                // Android's RiskPolicy.recordSuccessfulPayment after a successful broadcast.
+                localStore.recordSpend(asset: "XLM", amount: intent.amount)
                 progress = PaymentProgress(
                     title: "Payment broadcasted",
                     message: "The transaction was submitted to the Stellar network.",
@@ -430,7 +597,10 @@ final class AppState: NSObject, ObservableObject, UNUserNotificationCenterDelega
     }
 
     func reject(_ intent: PaymentIntent) {
+        guard !isProcessingIntent else { return }
+        isProcessingIntent = true
         Task {
+            defer { isProcessingIntent = false }
             do {
                 guard intent.isPending else {
                     throw AppError.invalidResponse("Cannot reject: payment request is already \(intent.status).")

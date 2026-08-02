@@ -1,5 +1,9 @@
 # VelarumPay MCP Server
 
+> **Last modified**
+> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-07-21 13:50:07 UTC
+
 Local MCP stdio server for VelarumPay Payment Request v1. It exposes tools for
 pairing, Transaction Context creation, Payment Request creation, and status
 reads. It does not hold wallet private keys, sign transactions, approve
@@ -32,7 +36,7 @@ connection token and scope checks for every create/read call.
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPayCode/connectors/mcp-server
+cd /Users/yang/code/VelarumPay/code/connectors/mcp-server
 npm run start
 ```
 
@@ -171,7 +175,7 @@ Minimal tool input examples live in `fixtures/`. Full quickstart Payment Request
 fixtures remain in:
 
 ```text
-/Users/yang/code/VelarumPayCode/examples/payment-request-quickstart/fixtures
+/Users/yang/code/VelarumPay/code/examples/payment-request-quickstart/fixtures
 ```
 
 ## Check

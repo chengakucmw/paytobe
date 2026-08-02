@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VelarumPay for business — Request user-controlled payments</title>
+  <meta name="description" content="Evaluate VelarumPay payment requests through the Platform API, JavaScript SDK, MCP, and selected merchant pilots." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="VelarumPay for business" />
+  <meta property="og:description" content="Request payment without taking control of your customer's wallet." />
+  <meta property="og:image" content="__SITE_ORIGIN__/og.png" />
+  <meta property="og:url" content="__SITE_ORIGIN__/business" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#2727E6" />
+  <link rel="canonical" href="https://velarumpay.com/business" />
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802" />
+  <script src="/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="preview-bar">Developer Preview · Selected business pilots · <a href="/preview">See current availability</a></div>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="/" aria-label="VelarumPay home"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a>
+      <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-navigation" data-menu-button></button>
+      <nav class="site-nav" id="site-navigation" aria-label="Primary navigation" data-site-nav>
+        <a href="/personal">Personal</a><a href="/business" aria-current="page">Business</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://docs.velarumpay.com">Developers</a><a class="button compact" href="#pilot">Request a pilot</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="shell page-hero">
+      <span class="eyebrow">For businesses and builders</span>
+      <h1>Request payment without taking control of the wallet.</h1>
+      <p class="lead">Create a standard Payment Request, attach business context, let the customer review and sign locally, then follow the result through a consistent status model.</p>
+      <div class="actions"><a class="button" href="#pilot">Request a Preview pilot</a><a class="button secondary" href="https://docs.velarumpay.com/quickstart.html">Read the Quickstart</a></div>
+      <p class="microcopy">Preview pilots begin with sandbox and test flows. Live merchant onboarding, pricing, settlement claims, and regional availability are not yet open.</p>
+    </section>
+
+    <section class="section surface-band">
+      <div class="shell">
+        <div class="section-header"><div><span class="eyebrow">A clearer boundary</span><h2>Your system requests. The customer's wallet decides.</h2></div><p>VelarumPay keeps merchant systems, agent systems, and wallet signing responsibilities distinct.</p></div>
+        <div class="grid-4">
+          <article class="card dark"><span class="card-number">01</span><h3>Create context</h3><p>Describe the order, session, evidence, or agent task separately from payment facts.</p></article>
+          <article class="card dark"><span class="card-number">02</span><h3>Request payment</h3><p>Send an exact amount, asset, network, recipient, expiry, and idempotency key.</p></article>
+          <article class="card dark"><span class="card-number">03</span><h3>User approves</h3><p>The customer reviews risk and transaction facts before signing on their device.</p></article>
+          <article class="card dark"><span class="card-number">04</span><h3>Observe status</h3><p>Your integration reads deterministic status and events without gaining signing authority.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="shell section">
+      <div class="section-header"><div><span class="eyebrow">Integration paths</span><h2>One protocol, several ways to connect.</h2></div><p>Choose the surface that fits your application. Every supported path converges on <span class="mono">velarum.payment_request.v1</span>.</p></div>
+      <div data-tabs>
+        <div class="tab-list" role="tablist" aria-label="Integration methods">
+          <button class="tab-button" type="button" role="tab" id="tab-rest" aria-controls="panel-rest" aria-selected="true">REST API</button>
+          <button class="tab-button" type="button" role="tab" id="tab-sdk" aria-controls="panel-sdk" aria-selected="false" tabindex="-1">JavaScript SDK</button>
+          <button class="tab-button" type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false" tabindex="-1">MCP and connectors</button>
+        </div>
+        <section class="integration-panel tab-panel" id="panel-rest" role="tabpanel" aria-labelledby="tab-rest">
+          <span class="pill">Contract first</span><h3>Integrate directly with the Platform API.</h3><p>Use the published OpenAPI contract for pairing, connections, transaction contexts, Payment Requests, status, and events. Server-side services validate scopes, expiry, exact amounts, and idempotency.</p><p><a href="https://docs.velarumpay.com/api.html">Open the REST API reference →</a></p>
+        </section>
+        <section class="integration-panel tab-panel" id="panel-sdk" role="tabpanel" aria-labelledby="tab-sdk" hidden>
+          <span class="pill">JavaScript</span><h3>Use typed helpers around the same contracts.</h3><p>The JavaScript SDK packages pairing, validation, context creation, Payment Request creation, and status polling into a smaller client surface. The API and JSON Schema remain the source of truth.</p><p><a href="https://docs.velarumpay.com/quickstart.html">Follow the JavaScript Quickstart →</a></p>
+        </section>
+        <section class="integration-panel tab-panel" id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp" hidden>
+          <span class="pill">Agent ready</span><h3>Give agents request tools, never wallet keys.</h3><p>The MCP server and connectors expose a deliberately small tool set for pairing, creating context, requesting payment, and reading status. They cannot approve, sign, export keys, or bypass wallet review.</p><p><a href="https://docs.velarumpay.com/mcp.html">Review the MCP tools →</a></p>
+        </section>
+      </div>
+    </section>
+
+    <section class="shell section compact">
+      <div class="section-header"><div><span class="eyebrow">Pilot fit</span><h2>Start where the control model matters.</h2></div><p>Early pilots should have a clear user, requester, payment reason, and testable approval flow.</p></div>
+      <div class="grid-3">
+        <article class="card"><h3>Merchant checkout</h3><p>Evaluate wallet pairing and payment requests from an order flow without asking the merchant to handle user keys.</p></article>
+        <article class="card"><h3>Trusted applications</h3><p>Connect software that needs user-approved payments and auditable status without custodial authority.</p></article>
+        <article class="card"><h3>AI agent workflows</h3><p>Let a local or hosted agent propose a purchase while preserving deterministic validation and human approval.</p></article>
+      </div>
+    </section>
+
+    <section class="section surface-band">
+      <div class="shell trust-panel">
+        <div><span class="eyebrow">What your integration must preserve</span><h2>Clear facts, limited scopes, and observable state.</h2><p class="lead">A good integration makes it easy for the wallet user to verify the request and easy for your team to diagnose the outcome.</p></div>
+        <ul class="check-list">
+          <li>Exact decimal amount strings and explicit asset identity</li>
+          <li>Network, recipient, fee, expiry, and idempotency controls</li>
+          <li>Transaction context separated from immutable payment facts</li>
+          <li>Scopes limited to the capabilities your application actually needs</li>
+          <li>Safe handling of connection tokens and deterministic error states</li>
+          <li>No private keys, seed phrases, or signing material in your service</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="shell section" id="pilot">
+      <div class="pilot-layout">
+        <div>
+          <span class="eyebrow">Selected Preview pilots</span>
+          <h2>Tell us what you want to evaluate.</h2>
+          <p class="lead">The first conversation should establish your use case, integration surface, intended user approval flow, and test environment. A pilot request does not approve production access.</p>
+          <div class="notice"><strong>No sensitive data</strong>Do not include API keys, wallet addresses, seed phrases, private keys, production customer data, or signing material.</div>
+        </div>
+        <form class="pilot-form" data-pilot-form>
+          <div class="field-grid">
+            <div class="field"><label for="organization">Organization</label><input id="organization" name="organization" autocomplete="organization" required /></div>
+            <div class="field"><label for="email">Work email</label><input id="email" name="email" type="email" autocomplete="email" required /></div>
+          </div>
+          <div class="field"><label for="use-case">Use case</label><select id="use-case" name="use_case" required><option value="">Select one</option><option>Merchant checkout</option><option>Trusted application</option><option>AI agent workflow</option><option>Protocol or connector evaluation</option><option>Other</option></select></div>
+          <div class="field"><label for="integration">Preferred integration</label><select id="integration" name="integration" required><option value="">Select one</option><option>REST API</option><option>JavaScript SDK</option><option>MCP server</option><option>Connector</option><option>Not sure yet</option></select></div>
+          <div class="field"><label for="notes">What do you want to test?</label><textarea id="notes" name="notes" maxlength="1500" placeholder="Describe the user, request flow, test environment, and success criteria."></textarea></div>
+          <button class="button" type="submit">Prepare pilot request</button>
+          <p class="form-note">Submitting opens a prefilled email to <a href="mailto:pilot@velarumpay.com">pilot@velarumpay.com</a>. This website does not transmit or store the form.</p>
+          <p class="form-status" role="status" aria-live="polite" data-form-status></p>
+        </form>
+      </div>
+    </section>
+
+    <section class="shell section compact"><div class="cta-band"><div><h2>Prefer to inspect the contracts first?</h2><p>The developer subdomain contains the Quickstart, REST surface, protocol schemas, and MCP guide.</p></div><div class="actions"><a class="button" href="https://docs.velarumpay.com">Open developer docs</a><a class="button secondary" href="/security">Review security</a></div></div></section>
+  </main>
+
+  <footer class="site-footer"><div class="footer-inner">
+    <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a><p>Non-custodial payment requests for people, trusted applications, merchants, and local AI agents.</p></div>
+    <div class="footer-column"><strong>Use VelarumPay</strong><a href="/personal">Personal</a><a href="/preview">Preview</a><a href="/support">Support</a></div>
+    <div class="footer-column"><strong>Build</strong><a href="/business">Business</a><a href="https://docs.velarumpay.com">Developer docs</a><a href="#pilot">Request a pilot</a></div>
+    <div class="footer-column"><strong>Trust</strong><a href="/security">Security</a><a href="/support#availability">Availability</a><a href="/support#legal">Legal status</a></div>
+    <div class="footer-bottom"><span>© 2026 VelarumPay. Brand identifiers are separately protected.</span><span>Developer Preview · Test and pilot use only</span></div>
+  </div></footer>
+</body>
+</html>

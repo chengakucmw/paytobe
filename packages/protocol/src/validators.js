@@ -21,10 +21,18 @@ import {
   transferAssetAdapterWarning,
   validateTransferAddress
 } from "./transfer-assets.js";
+import { DECIMAL_STRING } from "./decimal-format.js";
+import { normalizeRecipientVersionV1 } from "./recipient-validation.js";
 
 const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const STELLAR_PUBLIC_KEY = /^G[A-Z2-7]{55}$/;
-const DECIMAL_STRING = /^(0|[1-9]\d*)(\.\d+)?$/;
+// Strict ISO 8601 / RFC 3339 instant: full date + time + an explicit timezone
+// (Z or ±HH:MM). The old check accepted anything Date.parse() tolerated, which
+// includes ambiguous, locale-dependent forms like "2026/06/20" or a bare
+// "2026-06-20T12:00:00" with no zone. A money request must carry one unambiguous
+// instant, so the shape is pinned here; Date.parse() then only confirms it names
+// a real moment.
+const ISO_8601_INSTANT = /^\d{4}-\d{2}-\d{2}[Tt]\d{2}:\d{2}:\d{2}(\.\d{1,9})?([Zz]|[+-]\d{2}:\d{2})$/;
 
 export function protocolError(code, message, details = {}) {
   return { code, message, details };
@@ -67,7 +75,21 @@ export function normalizePaymentRequestV1(payload, options = {}) {
 
   if (errors.length) return failed(errors[0], errors);
 
+  const createdAtMs = Date.parse(payload.created_at);
   const expiresAtMs = Date.parse(payload.expires_at);
+  // Structural sanity: an inverted or zero-length window (expires_at at or before
+  // created_at) is malformed, not merely expired. Flagging it as its own error
+  // stops a forged created_at/expires_at pair from sliding through as a normal
+  // request. A maximum validity window is intentionally NOT enforced: the protocol
+  // uses a far-future expiry (e.g. 2027-12-31) as a deliberate "effectively never
+  // expires" sentinel, and capping it would break that idiom.
+  if (expiresAtMs <= createdAtMs) {
+    return failed(protocolError("invalid_validity_window", "expires_at must be after created_at", {
+      field: "expires_at",
+      created_at: payload.created_at,
+      expires_at: payload.expires_at
+    }));
+  }
   if (expiresAtMs <= nowMs || status === "expired") {
     return failed(protocolError("expired_request", "Payment Request is expired", {
       field: "expires_at",
@@ -310,11 +332,44 @@ function normalizePayment(payment, options = {}) {
       received_type: typeof payment.amount
     }));
   }
-  if (Number(payment.amount) <= 0) {
+  // Amount > 0 without floating point. DECIMAL_STRING already proved the value is
+  // a non-negative base-10 string (no sign, no leading zeros), so it equals zero
+  // iff it contains no non-zero digit — a pure string test that honors the
+  // never-float64 money rule. (The old Number(amount) <= 0 round-tripped money
+  // through a double, which the rest of the stack is careful never to do.)
+  if (!/[1-9]/.test(payment.amount)) {
     return failed(protocolError("invalid_decimal_string", "payment.amount must be greater than zero", {
       field: "payment.amount"
     }));
   }
+
+  const recipient = normalizeRecipientVersionV1({
+    rail: payment.rail,
+    network: payment.network,
+    asset: payment.asset,
+    address: payment.to,
+    contract: payment.token_contract ?? payment.contract,
+    issuer: payment.issuer,
+    memo: payment.memo ?? payment.tag,
+    metadata: payment.metadata,
+    display: payment.display,
+    chain_id: payment.chain_id
+  }, { requireExplicitBindings: true });
+  if (!recipient.ok) {
+    return failed(protocolError(recipient.error.code, recipient.error.message, {
+      ...recipient.error.details,
+      field: `payment.${recipient.error.field}`
+    }));
+  }
+  payment = {
+    ...payment,
+    network: recipient.value.network,
+    asset: recipient.value.asset,
+    to: recipient.value.address,
+    memo: recipient.value.memo,
+    ...(recipient.value.contract ? { token_contract: recipient.value.contract } : {}),
+    ...(recipient.value.issuer ? { issuer: recipient.value.issuer } : {})
+  };
 
   if (rail === "stellar_xlm") return normalizeStellarXlm(payment);
   if (rail === "base_usdc" || rail === "evm_erc20") return normalizeBaseUsdc(payment, rail, options, warnings);
@@ -530,8 +585,8 @@ function requireString(value, field, errors, code = "invalid_payment_request") {
 }
 
 function requireIsoTimestamp(value, field, errors) {
-  if (!nonEmptyString(value) || Number.isNaN(Date.parse(value))) {
-    errors.push(protocolError("invalid_timestamp", `${field} must be a valid ISO timestamp`, { field, value }));
+  if (!nonEmptyString(value) || !ISO_8601_INSTANT.test(value.trim()) || Number.isNaN(Date.parse(value))) {
+    errors.push(protocolError("invalid_timestamp", `${field} must be an ISO 8601 timestamp with a timezone, e.g. 2026-06-20T12:34:56Z`, { field, value }));
   }
 }
 

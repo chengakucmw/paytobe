@@ -14,6 +14,94 @@ import AppKit
 import AVFoundation
 #endif
 
+struct ConnectInvitationView: View {
+    @EnvironmentObject private var app: AppState
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    InfoCard(
+                        title: "Public identifier, not signing authority",
+                        bodyText: "Share this one-time key with an Agent. It can request a connection, but it cannot access wallet keys, approve payments, or sign transactions."
+                    )
+                    if let invitation = app.connectInvitation {
+                        HStack {
+                            Text("Connect Key").font(.headline)
+                            Spacer()
+                            StatusPill(text: invitation.status)
+                        }
+                        Text(invitation.connectKey)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                            .privacySensitive()
+                        Button {
+                            app.copy(invitation.connectKey)
+                        } label: {
+                            Label("Copy Connect Key", systemImage: "doc.on.doc")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(VPButtonStyle(kind: .primary))
+                        FieldRow(title: "Expires", value: dateText(invitation.expiresAtMs))
+
+                        if invitation.hasClaimedAgent {
+                            Divider()
+                            Text("Agent requests access").font(.headline)
+                            FieldRow(title: "Agent", value: invitation.agentName)
+                            FieldRow(title: "Runtime", value: invitation.runtime)
+                            if !invitation.source.isEmpty {
+                                FieldRow(title: "Source", value: invitation.source)
+                            }
+                            FieldRow(title: "Identity", value: invitation.identityAssurance.isEmpty ? "unverified" : invitation.identityAssurance)
+                            Text("Requested scopes").font(.headline)
+                            ForEach(invitation.requestedScopes, id: \.self) { scope in
+                                Text("· \(scope)").font(.caption.monospaced())
+                            }
+                            Button {
+                                app.reviewConnectInvitationAgent()
+                            } label: {
+                                Text("Review Agent permissions").frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(VPButtonStyle(kind: .primary))
+                        } else if !invitation.isTerminal {
+                            ProgressView("Waiting for an Agent to claim this key…")
+                        }
+
+                        if !invitation.isTerminal {
+                            Button("Cancel Connect Key", role: .destructive) {
+                                app.cancelConnectInvitation()
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                    } else {
+                        ProgressView("Creating Connect Key…")
+                    }
+                }
+                .padding()
+            }
+            .navigationTitle("Connect Key")
+            .appInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Close") {
+                        app.showingConnectInvitation = false
+                        dismiss()
+                    }
+                }
+            }
+            .task(id: app.connectInvitation?.connectInvitationId) {
+                while !Task.isCancelled {
+                    guard let invitation = app.connectInvitation, !invitation.isTerminal else { return }
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    if Task.isCancelled { return }
+                    app.refreshConnectInvitation()
+                }
+            }
+        }
+    }
+}
+
 struct PairingScannerSheet: View {
     @Environment(\.dismiss) private var dismiss
     let onCode: (String) -> Void
@@ -239,4 +327,3 @@ struct PairingReviewView: View {
         }
     }
 }
-

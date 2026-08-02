@@ -21,7 +21,7 @@
     "README.md",
     "package.json"
   ],
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "scripts": {
     "start": "node src/index.js",
     "check": "node --check src/index.js && node --check src/mcp.js && node --check src/tools.js && node --test test/*.test.mjs && npm run pack:dry",

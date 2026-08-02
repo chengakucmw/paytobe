@@ -9,7 +9,7 @@
          <ExecutionAction
             ActionType = "Xcode.IDEStandardExecutionActionsCore.ExecutionActionType.ShellScriptAction">
             <ActionContent
-               title = "Build wallet-core (Rust/UniFFI)"
+               title = "Build wallet-core (stable C ABI)"
                scriptText = "test -d &quot;$SRCROOT/Generated/VelarumWalletCore.xcframework&quot; || PATH=&quot;$HOME/.cargo/bin:$PATH&quot; &quot;$SRCROOT/../../crates/velarum-wallet-core/scripts/build-apple.sh&quot;&#10;">
                <EnvironmentBuildable>
                   <BuildableReference

@@ -1,0 +1,37 @@
+[
+  {
+    "name": "stellar-testnet-xlm",
+    "input": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "xlm",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      "memo": "testnet-order-42"
+    },
+    "expected": {
+      "rail": "stellar_xlm",
+      "network": "stellar_testnet",
+      "asset": "XLM",
+      "address": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      "memo": "testnet-order-42"
+    }
+  },
+  {
+    "name": "base-usdc",
+    "input": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "usdc",
+      "address": "0x1111111111111111111111111111111111111111",
+      "contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    },
+    "expected": {
+      "rail": "base_usdc",
+      "network": "base_mainnet",
+      "asset": "USDC",
+      "address": "0x1111111111111111111111111111111111111111",
+      "memo": null,
+      "contract": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+  }
+]

@@ -16,6 +16,7 @@ final class BalanceStore {
             String raw = prefs(context).getString(KEY_BALANCES, "{}");
             return new JSONObject(raw == null ? "{}" : raw);
         } catch (Exception ignored) {
+            VpLog.w("BalanceStore", "cached balances read failed; returning empty", ignored);
             return new JSONObject();
         }
     }

@@ -232,6 +232,53 @@ test("Payment Request negative fixtures return structured errors", () => {
   assert.equal(unsupported.error.code, "unsupported_rail");
 });
 
+test("Payment Request rejects non-ISO-8601 timestamps", () => {
+  // Date-only string: parseable by Date.parse() but ambiguous and zone-less.
+  const dateOnly = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    expires_at: "2026-12-31"
+  }, { now: protocolFixtureClock.now });
+  assert.equal(dateOnly.ok, false);
+  assert.equal(dateOnly.error.code, "invalid_timestamp");
+  assert.equal(dateOnly.error.details.field, "expires_at");
+
+  // Local time with no timezone designator is no longer accepted.
+  const noZone = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    created_at: "2026-06-17T10:00:00"
+  }, { now: protocolFixtureClock.now });
+  assert.equal(noZone.ok, false);
+  assert.equal(noZone.error.code, "invalid_timestamp");
+  assert.equal(noZone.error.details.field, "created_at");
+
+  // A proper UTC instant still passes (regression guard).
+  const ok = normalizePaymentRequestV1(paymentRequestFixtures.valid_base_usdc, { now: protocolFixtureClock.now });
+  assert.equal(ok.ok, true);
+});
+
+test("Payment Request rejects an inverted validity window", () => {
+  const inverted = normalizePaymentRequestV1({
+    ...paymentRequestFixtures.valid_base_usdc,
+    created_at: "2026-12-31T10:10:00.000Z",
+    expires_at: "2026-12-31T10:05:00.000Z"
+  }, { now: protocolFixtureClock.now });
+  assert.equal(inverted.ok, false);
+  assert.equal(inverted.error.code, "invalid_validity_window");
+  assert.equal(inverted.error.details.field, "expires_at");
+});
+
+test("Payment Request rejects a zero amount without floating point", () => {
+  for (const amount of ["0", "0.00"]) {
+    const zero = normalizePaymentRequestV1({
+      ...paymentRequestFixtures.valid_base_usdc,
+      payment: { ...paymentRequestFixtures.valid_base_usdc.payment, amount }
+    }, { now: protocolFixtureClock.now });
+    assert.equal(zero.ok, false, `amount ${amount} must be rejected`);
+    assert.equal(zero.error.code, "invalid_decimal_string");
+    assert.equal(zero.error.details.field, "payment.amount");
+  }
+});
+
 test("prototype-aligned Payment Request fixtures preserve hard fields", () => {
   for (const name of ["missing_context", "mismatch", "ai_only"]) {
     const result = normalizePaymentRequestV1(paymentRequestFixtures[name], { now: protocolFixtureClock.now });

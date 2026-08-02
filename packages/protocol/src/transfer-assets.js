@@ -32,13 +32,27 @@ export const UNSUPPORTED_TRANSFER_NETWORKS = Object.freeze([
 ]);
 
 export const SUPPORTED_TRANSFER_ASSETS = deepFreeze([
-  asset("xlm-stellar", "stellar_xlm", "XLM", "Stellar", "stellar_public", "stellar", { decimals: 7, memo_label: "Memo", key_curve: "ed25519", coin_type: 148 }),
+  asset("xlm-stellar", "stellar_xlm", "XLM", "Stellar", "stellar_public", "stellar", {
+    decimals: 7,
+    memo_label: "Memo",
+    memo_policy: { mode: "optional", max_bytes: 28, charset: "printable_ascii" },
+    network_aliases: ["stellar_testnet"],
+    key_curve: "ed25519",
+    coin_type: 148
+  }),
   asset("sol-solana", "solana_sol", "SOL", "Solana", "solana_mainnet", "solana", { decimals: 9, key_curve: "ed25519", coin_type: 501 }),
   asset("eth-ethereum", "ethereum_eth", "ETH", "Ethereum", "ethereum_mainnet", "evm", { decimals: 18, chain_id: 1, key_curve: "secp256k1", coin_type: 60 }),
   asset("usdc-base", "base_usdc", "USDC", "Base", "base_mainnet", "evm", { decimals: 6, chain_id: 8453, token_contract: BASE_USDC_CONTRACT, key_curve: "secp256k1", coin_type: 60 }),
   asset("btc-bitcoin", "bitcoin_btc", "BTC", "Bitcoin", "bitcoin_mainnet", "bitcoin", { decimals: 8, execution_mode: "prepared_payload", key_curve: "secp256k1", coin_type: 0 }),
   asset("bnb-bnb-smart-chain", "bsc_bnb", "BNB", "BNB Smart Chain", "bsc_mainnet", "evm", { decimals: 18, chain_id: 56, key_curve: "secp256k1", coin_type: 60 }),
-  asset("xrp-xrp-ledger", "xrpl_xrp", "XRP", "XRP Ledger", "xrpl_mainnet", "xrp", { decimals: 6, memo_label: "Destination tag", execution_mode: "prepared_payload", key_curve: "secp256k1", coin_type: 144 }),
+  asset("xrp-xrp-ledger", "xrpl_xrp", "XRP", "XRP Ledger", "xrpl_mainnet", "xrp", {
+    decimals: 6,
+    memo_label: "Destination tag",
+    memo_policy: { mode: "optional", max_bytes: 10, charset: "digits", max_value: "4294967295" },
+    execution_mode: "prepared_payload",
+    key_curve: "secp256k1",
+    coin_type: 144
+  }),
   asset("eth-arbitrum-one", "arbitrum_eth", "ETH", "Arbitrum One", "arbitrum_one", "evm", { decimals: 18, chain_id: 42161, key_curve: "secp256k1", coin_type: 60 }),
   asset("pol-polygon-pos", "polygon_pol", "POL", "Polygon PoS", "polygon_pos", "evm", { decimals: 18, chain_id: 137, key_curve: "secp256k1", coin_type: 60 }),
   asset("avax-avalanche-c-chain", "avalanche_avax", "AVAX", "Avalanche C-Chain", "avalanche_c_chain", "evm", { decimals: 18, chain_id: 43114, key_curve: "secp256k1", coin_type: 60 }),
@@ -49,7 +63,14 @@ export const SUPPORTED_TRANSFER_ASSETS = deepFreeze([
   asset("ada-cardano", "cardano_ada", "ADA", "Cardano", "cardano_mainnet", "cardano", { decimals: 6, execution_mode: "prepared_payload", key_curve: "ed25519", coin_type: 1815 }),
   asset("atom-cosmos-hub", "cosmos_atom", "ATOM", "Cosmos Hub", "cosmos_hub", "cosmos", { decimals: 6, execution_mode: "prepared_payload", key_curve: "secp256k1", coin_type: 118 }),
   asset("dot-polkadot", "polkadot_dot", "DOT", "Polkadot", "polkadot_mainnet", "substrate", { decimals: 10, execution_mode: "prepared_payload", key_curve: "ed25519", coin_type: 354 }),
-  asset("hbar-hedera", "hedera_hbar", "HBAR", "Hedera", "hedera_mainnet", "hedera", { decimals: 8, memo_label: "Memo", execution_mode: "prepared_payload", key_curve: "ed25519", coin_type: 3030 }),
+  asset("hbar-hedera", "hedera_hbar", "HBAR", "Hedera", "hedera_mainnet", "hedera", {
+    decimals: 8,
+    memo_label: "Memo",
+    memo_policy: { mode: "optional", max_bytes: 100, charset: "printable_ascii" },
+    execution_mode: "prepared_payload",
+    key_curve: "ed25519",
+    coin_type: 3030
+  }),
   asset("cro-cronos", "cronos_cro", "CRO", "Cronos", "cronos_mainnet", "evm", { decimals: 18, chain_id: 25, key_curve: "secp256k1", coin_type: 60 }),
   asset("mnt-mantle", "mantle_mnt", "MNT", "Mantle", "mantle_mainnet", "evm", { decimals: 18, chain_id: 5000, key_curve: "secp256k1", coin_type: 60 }),
   asset("strk-starknet", "starknet_strk", "STRK", "Starknet", "starknet_mainnet", "starknet", { decimals: 18, execution_mode: "prepared_payload", key_curve: "stark", coin_type: 9004 }),
@@ -144,6 +165,7 @@ function asset(id, rail, symbol, chain, network, family, options = {}) {
     token_contract: options.token_contract,
     fee_asset: options.fee_asset || nativeFeeAsset(symbol, family),
     memo_label: options.memo_label || "",
+    memo_policy: options.memo_policy || { mode: "forbidden", max_bytes: 0, charset: "none" },
     signer_status: options.signer_status || "implemented",
     execution_mode: options.execution_mode || "direct_broadcast",
     key_curve: options.key_curve || "",

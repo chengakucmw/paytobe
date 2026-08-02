@@ -11,20 +11,22 @@ object AgentsRepository {
     fun list(context: Context): List<AgentUi> = try {
         AgentConnectionStore.list(context).map { it.toUi() }
     } catch (e: Exception) {
+        VpLog.w("AgentsRepository", "list agents failed", e)
         emptyList()
     }
 
     fun detail(context: Context, connectionId: String): AgentUi? = try {
         AgentConnectionStore.find(context, connectionId)?.toUi()
     } catch (e: Exception) {
+        VpLog.w("AgentsRepository", "agent detail lookup failed", e)
         null
     }
 
     /** 撤销连接：尽力同步 relay，并把本地状态置 revoked。 */
     fun revoke(context: Context, connectionId: String) {
-        val connection = try { AgentConnectionStore.find(context, connectionId) } catch (e: Exception) { null } ?: return
-        try { RelayClient.revokeConnection(context, connection) } catch (e: Exception) {}
-        try { AgentConnectionStore.updateStatus(context, connectionId, "revoked") } catch (e: Exception) {}
+        val connection = try { AgentConnectionStore.find(context, connectionId) } catch (e: Exception) { VpLog.w("AgentsRepository", "revoke: connection lookup failed", e); null } ?: return
+        try { RelayClient.revokeConnection(context, connection) } catch (e: Exception) { VpLog.w("AgentsRepository", "revoke: relay sync failed", e) }
+        try { AgentConnectionStore.updateStatus(context, connectionId, "revoked") } catch (e: Exception) { VpLog.w("AgentsRepository", "revoke: local status write failed", e) }
     }
 
     private fun AgentConnection.toUi() = AgentUi(
@@ -68,6 +70,32 @@ object PairingRepository {
     }
 }
 
+object ConnectInvitationRepository {
+    fun create(context: Context): ConnectInvitationUi = RelayClient.createConnectInvitation(context).toUi()
+
+    fun refresh(context: Context, invitationId: String, connectKey: String): ConnectInvitationUi =
+        RelayClient.fetchConnectInvitation(context, invitationId, connectKey).toUi()
+
+    fun cancel(context: Context, invitationId: String, connectKey: String): ConnectInvitationUi =
+        RelayClient.cancelConnectInvitation(context, invitationId, connectKey).toUi()
+
+    private fun ConnectInvitation.toUi() = ConnectInvitationUi(
+        id = connectInvitationId,
+        connectKey = connectKey,
+        status = status,
+        pairingSessionId = pairingSessionId,
+        connectionId = connectionId,
+        agentName = agentName,
+        runtime = runtime,
+        source = source,
+        identityAssurance = identityAssurance,
+        requestedScopes = requestedScopes,
+        expiresAt = expiresAt,
+        terminal = isTerminal(),
+        claimed = hasClaimedAgent(),
+    )
+}
+
 data class AgentUi(
     val id: String,
     val name: String,
@@ -85,4 +113,20 @@ data class PairingUi(
     val requestedScopes: List<String>,
     val pending: Boolean,
     val code: String,
+)
+
+data class ConnectInvitationUi(
+    val id: String,
+    val connectKey: String,
+    val status: String,
+    val pairingSessionId: String,
+    val connectionId: String,
+    val agentName: String,
+    val runtime: String,
+    val source: String,
+    val identityAssurance: String,
+    val requestedScopes: List<String>,
+    val expiresAt: String,
+    val terminal: Boolean,
+    val claimed: Boolean,
 )

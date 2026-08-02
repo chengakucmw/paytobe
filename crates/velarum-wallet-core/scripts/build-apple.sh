@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Builds the VelarumPay wallet-core for Apple platforms and assembles an
-# XCFramework + the Swift bindings the iOS app consumes.
+# Builds the VelarumPay wallet-core for Apple platforms and assembles the
+# stable C ABI XCFramework consumed by the checked-in Swift adapter.
 #
 # Output (git-ignored build artifacts) goes to apps/ios/Generated/:
 #   - VelarumWalletCore.xcframework   (device + simulator static libs)
-#   - velarum_wallet_core.swift       (UniFFI-generated Swift API)
+#   - velarum_wallet_core.swift       (checked-in compatibility adapter)
 #
 # Re-run after changing the Rust core. Requires: rustup, Xcode.
 set -euo pipefail
@@ -30,17 +30,11 @@ lipo -create \
   "target/x86_64-apple-ios/release/lib${LIB}.a" \
   -output "$SIMLIB"
 
-echo "==> generate Swift bindings"
-cargo build --release
-cargo run --quiet --features cli --bin uniffi-bindgen -- \
-  generate --library "target/release/lib${LIB}.dylib" --language swift \
-  --out-dir target/bindings/swift
-
-echo "==> assemble headers (module.modulemap is what Xcode auto-discovers)"
+echo "==> assemble stable C ABI headers"
 HDR="$CRATE_DIR/target/apple-headers"
 rm -rf "$HDR"; mkdir -p "$HDR"
-cp "target/bindings/swift/${LIB}FFI.h" "$HDR/"
-cp "target/bindings/swift/${LIB}FFI.modulemap" "$HDR/module.modulemap"
+cp "include/${LIB}FFI.h" "$HDR/"
+cp "include/module.modulemap" "$HDR/module.modulemap"
 
 echo "==> create XCFramework"
 mkdir -p "$OUT"
@@ -50,6 +44,5 @@ xcodebuild -create-xcframework \
   -library "$SIMLIB" -headers "$HDR" \
   -output "$OUT/VelarumWalletCore.xcframework" >/dev/null
 
-cp "target/bindings/swift/${LIB}.swift" "$OUT/velarum_wallet_core.swift"
 echo "==> done: $OUT"
 ls -la "$OUT"

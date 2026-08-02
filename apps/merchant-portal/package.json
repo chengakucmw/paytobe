@@ -1,0 +1,13 @@
+{
+  "name": "@velarumpay/merchant-portal",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node scripts/build.mjs",
+    "check": "node --check server.mjs && node --check public/app.js && node --check public/modules/api-client.js && node --check public/modules/auth-state.js && node --check public/modules/view.js && node --check src/pages/organization/index.js && node --check src/components/members/view.js && node --check src/pages/domains/index.js && node --check src/components/domains/view.js && node --check src/pages/agents/index.js && node --check src/components/agents/view.js && node --check src/pages/recipients/index.js && node --check src/components/recipients/view.js && node --check src/pages/webhooks/index.js && node --check src/pages/audit/index.js && node --check src/components/webhooks/view.js && node --check scripts/build.mjs && node --check scripts/test.mjs && node scripts/check.mjs",
+    "test": "npm run build && node scripts/test.mjs"
+  }
+}

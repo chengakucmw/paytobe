@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VelarumPay Developer Docs</title>
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
+  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumpay.com/preview">View program boundaries</a></div>
   <header class="topbar">
     <div class="inner">
       <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
@@ -14,8 +15,11 @@
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
         <a href="/api.html">REST API</a>
+        <a href="/agent-auth.html">Agent Auth</a>
+        <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
+        <a href="https://velarumpay.com/business">Business</a>
       </nav>
     </div>
   </header>
@@ -26,6 +30,7 @@
     <p class="lead">VelarumPay is a non-custodial wallet and payment-request platform. Your agent asks for a payment; the person reviews and signs it in their own wallet. The server never holds private keys.</p>
 
     <div class="note">New here? The fastest path is the <a href="/quickstart.html">Quickstart</a>: pair once, then create payment requests with a connection token.</div>
+    <div class="note">Machine-readable contracts: <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1</a>, <a href="/contracts/velarum.payment_request.v1.schema.json">Payment Request JSON Schema</a>, and <a href="/contracts/velarum.transaction_context.v1.schema.json">Transaction Context JSON Schema</a>.</div>
 
     <h2>How it works in one picture</h2>
     <div class="card">
@@ -72,6 +77,7 @@
       <tr><td>Scoped &amp; revocable</td><td>Connection tokens carry only the scopes the user approved, and can be revoked anytime.</td></tr>
       <tr><td>Open protocol</td><td>Payment facts are carried in a documented, validated format — no hidden fields.</td></tr>
     </table>
+    <p class="note">Asset registration and schema validation do not prove wallet signing or broadcast support. Use only the network and asset paths explicitly listed as supported for your wallet build; the v0.1 quickstart uses labeled test data.</p>
   </main>
 
   <footer class="footer">

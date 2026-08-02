@@ -20,10 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
+import ai.agentwallet.hd.ui.navigation.screen
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import ai.agentwallet.hd.AppEntry
@@ -38,12 +42,18 @@ import ai.agentwallet.hd.ui.components.VpBottomNav
 import ai.agentwallet.hd.ui.components.VpModalHost
 import ai.agentwallet.hd.ui.components.VpToastHost
 import ai.agentwallet.hd.ui.navigation.Routes
+import ai.agentwallet.hd.ui.navigation.appEnter
+import ai.agentwallet.hd.ui.navigation.appExit
+import ai.agentwallet.hd.ui.navigation.appPopEnter
+import ai.agentwallet.hd.ui.navigation.appPopExit
 import ai.agentwallet.hd.ui.wallet.ActivityScreen
 import ai.agentwallet.hd.ui.wallet.ActivityViewModel
 import ai.agentwallet.hd.ui.wallet.AgentDetailScreen
 import ai.agentwallet.hd.ui.wallet.AgentDetailViewModel
 import ai.agentwallet.hd.ui.wallet.AgentsScreen
 import ai.agentwallet.hd.ui.wallet.AgentsViewModel
+import ai.agentwallet.hd.ui.wallet.ConnectKeyScreen
+import ai.agentwallet.hd.ui.wallet.ConnectKeyViewModel
 import ai.agentwallet.hd.ui.wallet.AssetCustomizeScreen
 import ai.agentwallet.hd.ui.wallet.AssetDetailScreen
 import ai.agentwallet.hd.ui.wallet.AssetHistoryScreen
@@ -87,6 +97,7 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
     val agentsVm: AgentsViewModel = viewModel()
     val agentDetailVm: AgentDetailViewModel = viewModel()
     val pairingVm: PairingViewModel = viewModel()
+    val connectKeyVm: ConnectKeyViewModel = viewModel()
     val identityVm: IdentityViewModel = viewModel()
     val networksVm: NetworksViewModel = viewModel()
     val activityVm: ActivityViewModel = viewModel()
@@ -110,6 +121,28 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Refresh immediately whenever a balance-bearing screen becomes visible, again whenever
+    // the app returns to the foreground, and periodically while that screen stays resumed.
+    // This closes the stale-zero path where the first lookup happened before an account was
+    // funded and the old inactive result then survived indefinitely.
+    LaunchedEffect(lifecycleOwner, currentRoute) {
+        val showsBalances = currentRoute == Routes.HOME ||
+            currentRoute == Routes.RECEIVE ||
+            currentRoute.startsWith(Routes.ASSET_DETAIL)
+        if (!showsBalances) return@LaunchedEffect
+        lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                // The ViewModel already performs the cold-start request. Avoid immediately
+                // queueing a duplicate while that request is still loading or refreshing.
+                if (!walletVm.ui.value.loading && !walletVm.ui.value.refreshing) {
+                    walletVm.refresh()
+                }
+                delay(60_000L)
+            }
+        }
+    }
 
     // 通知/深链入口路由（退役 MainActivity 后由原生接住）。
     LaunchedEffect(entry) {
@@ -156,8 +189,15 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
             },
         ) { innerPadding ->
             Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                NavHost(navController = navController, startDestination = Routes.HOME) {
-                    composable(Routes.HOME) {
+                NavHost(
+                    navController = navController,
+                    startDestination = Routes.HOME,
+                    enterTransition = { appEnter() },
+                    exitTransition = { appExit() },
+                    popEnterTransition = { appPopEnter() },
+                    popExitTransition = { appPopExit() },
+                ) {
+                    screen(Routes.HOME) {
                         HomeScreen(
                             vm = walletVm,
                             onSend = { sendVm.reset(); navController.navigate(Routes.SEND) },
@@ -168,10 +208,10 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onAssetClick = { key -> navController.navigate("${Routes.ASSET_DETAIL}/$key") },
                         )
                     }
-                    composable(Routes.RECEIVE) {
+                    screen(Routes.RECEIVE) {
                         ReceiveScreen(vm = walletVm, onBack = { navController.popBackStack() })
                     }
-                    composable(Routes.SEND) {
+                    screen(Routes.SEND) {
                         SendScreen(
                             vm = sendVm,
                             onExit = { navController.popBackStack() },
@@ -179,7 +219,7 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onBalanceRefresh = { walletVm.refresh() },
                         )
                     }
-                    composable("${Routes.ASSET_DETAIL}/{key}") { entry ->
+                    screen("${Routes.ASSET_DETAIL}/{key}") { entry ->
                         AssetDetailScreen(
                             vm = walletVm,
                             assetKey = entry.arguments?.getString("key") ?: "",
@@ -192,19 +232,19 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onHistory = { symbol -> navController.navigate("${Routes.ASSET_HISTORY}/$symbol") },
                         )
                     }
-                    composable(Routes.ASSET_SEARCH) {
+                    screen(Routes.ASSET_SEARCH) {
                         AssetSearchScreen(onBack = { navController.popBackStack() }, onOpen = { key -> navController.navigate("${Routes.ASSET_DETAIL}/$key") })
                     }
-                    composable(Routes.ASSET_CUSTOMIZE) {
+                    screen(Routes.ASSET_CUSTOMIZE) {
                         AssetCustomizeScreen(vm = walletVm, onBack = { navController.popBackStack() })
                     }
-                    composable("${Routes.ASSET_HISTORY}/{symbol}") { entry ->
+                    screen("${Routes.ASSET_HISTORY}/{symbol}") { entry ->
                         AssetHistoryScreen(vm = activityVm, symbol = entry.arguments?.getString("symbol") ?: "", onBack = { navController.popBackStack() })
                     }
-                    composable(Routes.INBOX) {
+                    screen(Routes.INBOX) {
                         InboxScreen(vm = inboxVm, onOpen = { id -> navController.navigate("${Routes.DETAIL}/$id") })
                     }
-                    composable("${Routes.DETAIL}/{intentId}") { entry ->
+                    screen("${Routes.DETAIL}/{intentId}") { entry ->
                         DetailScreen(
                             vm = detailVm,
                             intentId = entry.arguments?.getString("intentId") ?: "",
@@ -217,13 +257,18 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             },
                         )
                     }
-                    composable(Routes.DOSSIER) {
+                    screen(Routes.DOSSIER) {
                         DossierScreen(vm = detailVm, onBack = { navController.popBackStack() })
                     }
-                    composable(Routes.AGENTS) {
-                        AgentsScreen(vm = agentsVm, onBack = { navController.popBackStack() }, onOpen = { id -> navController.navigate("${Routes.AGENT_DETAIL}/$id") })
+                    screen(Routes.AGENTS) {
+                        AgentsScreen(
+                            vm = agentsVm,
+                            onBack = { navController.popBackStack() },
+                            onOpen = { id -> navController.navigate("${Routes.AGENT_DETAIL}/$id") },
+                            onCreateConnectKey = { navController.navigate(Routes.CONNECT_KEY) },
+                        )
                     }
-                    composable("${Routes.AGENT_DETAIL}/{id}") { entry ->
+                    screen("${Routes.AGENT_DETAIL}/{id}") { entry ->
                         AgentDetailScreen(
                             vm = agentDetailVm,
                             connectionId = entry.arguments?.getString("id") ?: "",
@@ -231,7 +276,7 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onRevoked = { agentsVm.reload(); navController.popBackStack(Routes.AGENTS, inclusive = false) },
                         )
                     }
-                    composable(Routes.PAIRING) {
+                    screen(Routes.PAIRING) {
                         PairingScreen(
                             vm = pairingVm,
                             presetCode = pendingPairingCode,
@@ -239,7 +284,17 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onDone = { pendingPairingCode = ""; agentsVm.reload(); navController.popBackStack(Routes.HOME, inclusive = false) },
                         )
                     }
-                    composable(Routes.PROFILE) {
+                    screen(Routes.CONNECT_KEY) {
+                        ConnectKeyScreen(
+                            vm = connectKeyVm,
+                            onBack = { navController.popBackStack() },
+                            onReviewAgent = { pairingSessionId ->
+                                pendingPairingCode = pairingSessionId
+                                navController.navigate(Routes.PAIRING)
+                            },
+                        )
+                    }
+                    screen(Routes.PROFILE) {
                         ProfileScreen(
                             vm = identityVm,
                             onIdentity = { navController.navigate(Routes.WALLET_IDENTITY) },
@@ -249,14 +304,14 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onSettings = { navController.navigate(Routes.SETTINGS) },
                         )
                     }
-                    composable(Routes.WALLET_IDENTITY) {
+                    screen(Routes.WALLET_IDENTITY) {
                         WalletIdentityScreen(
                             vm = identityVm,
                             onBack = { navController.popBackStack() },
                             onSaved = { identityVm.load(); walletVm.refresh(); navController.popBackStack() },
                         )
                     }
-                    composable(Routes.SETTINGS) {
+                    screen(Routes.SETTINGS) {
                         SettingsScreen(
                             onBack = { navController.popBackStack() },
                             onSecurity = { navController.navigate(Routes.SECURITY) },
@@ -267,12 +322,12 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onActivity = { navController.navigate(Routes.ACTIVITY) },
                         )
                     }
-                    composable(Routes.SECURITY) { SecurityScreen(onBack = { navController.popBackStack() }) }
-                    composable(Routes.DISPLAY_LANGUAGE) { DisplayLanguageScreen(onBack = { navController.popBackStack() }) }
-                    composable(Routes.NOTIFICATIONS) { NotificationsScreen(onBack = { navController.popBackStack() }) }
-                    composable(Routes.NETWORKS) { NetworksScreen(vm = networksVm, onBack = { navController.popBackStack() }) }
-                    composable(Routes.ACTIVITY) { ActivityScreen(vm = activityVm, onBack = { navController.popBackStack() }) }
-                    composable(Routes.DEVELOPER) {
+                    screen(Routes.SECURITY) { SecurityScreen(onBack = { navController.popBackStack() }) }
+                    screen(Routes.DISPLAY_LANGUAGE) { DisplayLanguageScreen(onBack = { navController.popBackStack() }) }
+                    screen(Routes.NOTIFICATIONS) { NotificationsScreen(onBack = { navController.popBackStack() }) }
+                    screen(Routes.NETWORKS) { NetworksScreen(vm = networksVm, onBack = { navController.popBackStack() }) }
+                    screen(Routes.ACTIVITY) { ActivityScreen(vm = activityVm, onBack = { navController.popBackStack() }) }
+                    screen(Routes.DEVELOPER) {
                         DeveloperScreen(vm = developerVm, onBack = { navController.popBackStack() }, onPair = { navController.navigate(Routes.PAIRING) })
                     }
                 }

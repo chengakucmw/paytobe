@@ -1,5 +1,9 @@
 # VelarumPay Platform API Deployment
 
+> **Last modified**
+> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-07-21 13:50:07 UTC
+
 This folder contains the minimal managed runtime assets for the Platform API.
 
 ## Required Production Environment

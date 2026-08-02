@@ -99,6 +99,7 @@ struct PaymentDetailView: View {
                         state: displayState,
                         canSign: canSign,
                         requiresWarningStepUp: requiresWarningStepUp,
+                        isProcessing: app.isProcessingIntent,
                         onReject: { app.reject(intent) },
                         onSign: { app.pay(intent) },
                         onReviewWarnings: { showingWarningReview = true },
@@ -324,6 +325,7 @@ struct PaymentDetailActions: View {
     let state: String
     let canSign: Bool
     let requiresWarningStepUp: Bool
+    let isProcessing: Bool
     let onReject: () -> Void
     let onSign: () -> Void
     let onReviewWarnings: () -> Void
@@ -340,10 +342,12 @@ struct PaymentDetailActions: View {
                         Text("Reject")
                     }
                     .buttonStyle(VPButtonStyle(kind: .secondary))
+                    .disabled(isProcessing)
                     Button(action: requiresWarningStepUp ? onReviewWarnings : onSign) {
                         Text(requiresWarningStepUp ? "Review warnings" : intent.payButtonTitle)
                     }
                     .buttonStyle(VPButtonStyle(kind: requiresWarningStepUp ? .danger : .primary))
+                    .disabled(isProcessing)
                 }
             } else {
                 nonSigningActions

@@ -2,7 +2,7 @@ import XCTest
 @testable import VelarumPay
 
 // Conformance test for the SHARED Rust wallet core (crates/velarum-wallet-core),
-// reached from iOS through the generated UniFFI bindings + VelarumWalletCore.xcframework.
+// reached from iOS through the stable C ABI + VelarumWalletCore.xcframework.
 //
 // Proves two things on the real iOS toolchain:
 //  1. iOS builds against and successfully calls the shared core, and
@@ -10,8 +10,10 @@ import XCTest
 //     on Android and as the independent SEP-0005 reference
 //     (tests/fixtures/hd-derivation-golden.json).
 //
-// The app's own StellarService is intentionally left unchanged for now; this test
-// only exercises the shared core so integration is proven with zero production risk.
+// Production StellarService now routes derivation, signing, and amount conversion
+// through this shared core by default (the useSharedCore* flags in StellarService.swift
+// default to true). The native Swift paths are retained only as a flag-gated fallback,
+// which the cross-check tests below pin byte-for-byte against the core.
 final class VelarumWalletCoreConformanceTests: XCTestCase {
     private let goldenMnemonic =
         "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -111,6 +113,31 @@ final class VelarumWalletCoreConformanceTests: XCTestCase {
                 "envelope prefix (pre-signature) differs for amount=\(amount)")
         }
         StellarService.useSharedCoreSigning = true
+    }
+
+    /// Gate for the amount-conversion flip: the shared core must parse XLM→stroops
+    /// to the exact same value as the native Swift routine for representative
+    /// inputs, and reject the same invalid inputs.
+    func testCoreAmountConversionMatchesNative() async throws {
+        let service = StellarService()
+        let amounts = ["1.5", "0.0000001", "100", "10", "2.5", "0.1", "9999.9999999"]
+        for amount in amounts {
+            StellarService.useSharedCoreAmountConversion = false
+            let native = try await service.xlmToStroops(amount)
+            StellarService.useSharedCoreAmountConversion = true
+            let core = try await service.xlmToStroops(amount)
+            XCTAssertEqual(native, core, "core vs native stroops differ for amount=\(amount)")
+        }
+        for bad in ["0", "abc", "1.12345678", "-5"] {
+            StellarService.useSharedCoreAmountConversion = false
+            var nativeThrew = false
+            do { _ = try await service.xlmToStroops(bad) } catch { nativeThrew = true }
+            StellarService.useSharedCoreAmountConversion = true
+            var coreThrew = false
+            do { _ = try await service.xlmToStroops(bad) } catch { coreThrew = true }
+            XCTAssertTrue(nativeThrew && coreThrew, "core vs native disagree on rejecting amount=\(bad)")
+        }
+        StellarService.useSharedCoreAmountConversion = true
     }
 
     /// iOS gains EVM + Solana via the shared core (Android already had them).

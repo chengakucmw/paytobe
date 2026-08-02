@@ -23,6 +23,7 @@ object Routes {
     const val AGENTS = "agents"
     const val AGENT_DETAIL = "agentDetail"
     const val PAIRING = "pairing"
+    const val CONNECT_KEY = "connectKey"
 
     // 设置簇（从 Profile 进入，无底部导航）
     const val WALLET_IDENTITY = "walletIdentity"
@@ -38,6 +39,7 @@ object Routes {
     const val CREATE_WALLET = "createWallet"
     const val KEY_IMPORT = "keyImport"
     const val KEY_BACKUP = "keyBackup"
+    const val KEY_VERIFY = "keyVerify"
     const val DEVICE_RISK = "deviceRisk"
 
     /** 只有处于这些顶层路由时才显示底部导航（对照 web 的 showBottomNav）。 */

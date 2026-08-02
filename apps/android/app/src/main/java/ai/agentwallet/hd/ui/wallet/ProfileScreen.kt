@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ai.agentwallet.hd.BuildConfig
 import ai.agentwallet.hd.ui.components.VpBadge
 import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpChip
@@ -71,7 +72,9 @@ fun ProfileScreen(
             }
             VpMenuRow("Connected agents", "Manage agent permissions and revocation", onAgents)
             VpMenuRow("Activity history", "Signed, broadcast, and recorded transfers", onActivity)
-            VpMenuRow("Developer quickstart", "Payment Requests and agent pairing", onDeveloper, badgeText = "v0.1")
+            if (!BuildConfig.MANAGED_PLATFORM_SERVICE) {
+                VpMenuRow("Developer quickstart", "Payment Requests and local pairing", onDeveloper, badgeText = "v0.2")
+            }
             VpMenuRow("Settings", "Security, notifications, networks, language", onSettings)
         }
     }

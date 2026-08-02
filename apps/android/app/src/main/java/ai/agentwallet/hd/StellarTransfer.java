@@ -71,7 +71,29 @@ final class StellarTransfer {
             TransactionProgress progress,
             String memo
     ) throws Exception {
+        return sendXlm(horizonUrl, testnet, sourceSeed, sourcePublic, destinationAddress, amountXlm, progress, memo, "");
+    }
+
+    static String sendXlm(
+            String horizonUrl,
+            boolean testnet,
+            byte[] sourceSeed,
+            byte[] sourcePublic,
+            String destinationAddress,
+            String amountXlm,
+            TransactionProgress progress,
+            String memo,
+            String memoType
+    ) throws Exception {
         horizonUrl = normalizeHorizonUrl(horizonUrl, testnet);
+        // Final fail-closed check immediately before sequence lookup, signing, and
+        // broadcast. Testnet is unaffected; public-network use is build-gated.
+        StellarMainnetPolicy.assertAllowed(testnet, horizonUrl, destinationAddress, amountXlm);
+        // M-3: defense in depth at the signing boundary. The passphrase chosen later
+        // (mainnet = real funds, testnet = test funds) MUST agree with the Horizon
+        // host we are about to broadcast to. Refuse to sign if a recognized host
+        // contradicts the testnet flag, mirroring iOS StellarService.assertNetworkConsistency.
+        assertNetworkConsistency(horizonUrl, testnet);
         String sourceAddress = StellarStrKey.encodePublicKey(sourcePublic);
         long sequence = fetchSequence(horizonUrl, sourceAddress) + 1;
         StellarStrKey.decodePublicKey(destinationAddress); // validate destination up front
@@ -87,7 +109,7 @@ final class StellarTransfer {
                 );
             }
         }
-        SignedEnvelope signed = buildSignedEnvelope(sourceSeed, sourcePublic, sequence, destinationAddress, amountXlm, createAccount, memo, testnet);
+        SignedEnvelope signed = buildSignedEnvelope(sourceSeed, sourcePublic, sequence, destinationAddress, amountXlm, createAccount, memo, memoType, testnet);
         String envelope64 = signed.envelope64;
         String txHash = signed.txHash;
         if (progress != null) progress.onGenerated("Signed Stellar transaction");
@@ -179,13 +201,24 @@ final class StellarTransfer {
             String amountXlm,
             boolean createAccount,
             String memo,
+            String memoType,
             boolean testnet
     ) throws Exception {
         if (USE_SHARED_CORE_SIGNING) {
             String passphrase = testnet ? TESTNET_PASSPHRASE : PUBLIC_PASSPHRASE;
             SignedStellarCore s = WalletCoreBridge.signStellar(
-                    sourceSeed, passphrase, sequence, destinationAddress, amountXlm, memo, "", createAccount);
+                    sourceSeed, passphrase, sequence, destinationAddress, amountXlm, memo, memoType, createAccount);
             return new SignedEnvelope(s.envelopeBase64, s.txHashHex);
+        }
+        // C-1: the native fallback below only encodes MEMO_TEXT. Fail closed on a
+        // numeric / hash memo type rather than silently downgrading an exchange
+        // MEMO_ID to text (which loses the deposit). The shared core path above
+        // handles every memo type; this branch is fallback-only.
+        String mt = memoType == null ? "" : memoType.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!mt.isEmpty() && !mt.equals("text")) {
+            throw new IllegalStateException(
+                    "Stellar memo type \"" + memoType + "\" requires the shared signing core. "
+                            + "Enable USE_SHARED_CORE_SIGNING to send a non-text memo.");
         }
         byte[] destinationPublic = StellarStrKey.decodePublicKey(destinationAddress);
         long amount = xlmToStroops(amountXlm);
@@ -246,7 +279,29 @@ final class StellarTransfer {
             if (baseReserve <= 0L) return FALLBACK_MIN_CREATE_ACCOUNT_STROOPS;
             return baseReserve * 2L;
         } catch (Exception ignored) {
+            VpLog.w("StellarTransfer", "min-balance fetch failed; using fallback reserve", ignored);
             return FALLBACK_MIN_CREATE_ACCOUNT_STROOPS;
+        }
+    }
+
+    /**
+     * Read-only live fee estimate (no signing, no broadcast): the per-operation base fee from
+     * Horizon's /fee_stats. A simple XLM payment is a single operation, so this is the fee the
+     * transaction will pay. Falls back to the protocol minimum (100 stroops) on any error.
+     */
+    static long estimateFeeStroops(String horizonUrl, boolean testnet) {
+        String url = normalizeHorizonUrl(horizonUrl, testnet);
+        Request request = new Request.Builder().url(url + "/fee_stats").get().build();
+        try (Response response = HTTP.newCall(request).execute()) {
+            String text = response.body() == null ? "" : response.body().string();
+            if (!response.isSuccessful()) return 100L;
+            JSONObject root = new JSONObject(text);
+            // Horizon returns these as numeric strings (e.g. "100"); optLong coerces them.
+            long base = root.optLong("last_ledger_base_fee", 100L);
+            return base <= 0L ? 100L : base;
+        } catch (Exception ignored) {
+            VpLog.w("StellarTransfer", "fee_stats fetch failed; using base fee 100 stroops", ignored);
+            return 100L;
         }
     }
 
@@ -262,6 +317,24 @@ final class StellarTransfer {
             }
         }
         return false;
+    }
+
+    /**
+     * M-3: extract the host from the (already normalized) Horizon URL and ask the
+     * shared core whether it contradicts the declared network. Throws
+     * IllegalStateException (fail closed) on a recognized mismatch; a malformed or
+     * custom host yields an empty host string, which the core treats as
+     * unrecognized and allows through on the declared flag.
+     */
+    private static void assertNetworkConsistency(String horizonUrl, boolean testnet) {
+        String host;
+        try {
+            host = new java.net.URI(horizonUrl).getHost();
+        } catch (Exception e) {
+            VpLog.w("StellarTransfer", "horizon host parse failed; treating as unrecognized", e);
+            host = null;
+        }
+        WalletCoreBridge.assertStellarNetwork(host == null ? "" : host, testnet);
     }
 
     private static String normalizeHorizonUrl(String horizonUrl, boolean testnet) {
@@ -288,6 +361,7 @@ final class StellarTransfer {
                         + (detail.length() > 0 ? ": " + shorten(detail) : "");
             }
         } catch (Exception ignored) {
+            VpLog.w("StellarTransfer", "parse horizon error body failed; using generic message", ignored);
         }
         return "Stellar Horizon HTTP " + httpCode + ": " + shorten(text);
     }
@@ -406,24 +480,9 @@ final class StellarTransfer {
     }
 
     private static long xlmToStroops(String xlm) {
-        // Validate with clear messages instead of leaking raw NumberFormatException /
-        // ArithmeticException to the user (e.g. when the amount has more than the 7
-        // decimal places Stellar supports, is non-numeric, or overflows).
-        String raw = xlm == null ? "" : xlm.trim();
-        if (raw.isEmpty()) throw new IllegalStateException("Enter an amount of XLM to send.");
-        BigDecimal value;
-        try {
-            value = new BigDecimal(raw);
-        } catch (NumberFormatException e) {
-            throw new IllegalStateException("Enter a valid XLM amount, for example 1.5.");
-        }
-        if (value.signum() <= 0) throw new IllegalStateException("XLM amount must be greater than 0.");
-        try {
-            return value.multiply(new BigDecimal("10000000")).toBigIntegerExact().longValueExact();
-        } catch (ArithmeticException e) {
-            throw new IllegalStateException(
-                    "XLM supports at most 7 decimal places (1 stroop = 0.0000001 XLM) and must be within range. Adjust the amount.");
-        }
+        // Delegates to the shared AmountUnits (D9/Q4, 2026-06-20): single home for
+        // decimal -> base-unit money conversion. Behaviour is unchanged.
+        return AmountUnits.xlmToStroops(xlm);
     }
 
     private static String stroopsToXlm(long stroops) {

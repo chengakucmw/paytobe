@@ -4,6 +4,28 @@ plugins {
     id "org.jetbrains.kotlin.plugin.compose"
 }
 
+def firebaseConfigValue = { String propertyName, String environmentName ->
+    def propertyValue = project.findProperty(propertyName)
+    propertyValue != null ? propertyValue.toString() : (System.getenv(environmentName) ?: "")
+}
+def buildConfigString = { String value ->
+    '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+}
+def buildConfigBoolean = { String value ->
+    ["1", "true", "yes", "on"].contains(value.trim().toLowerCase()) ? "true" : "false"
+}
+
+// --- Release 签名配置加载 -----------------------------------------------------
+// 默认：release 用 debug 签名 → 打出来的 APK 可【直接装真机】，无需任何手动设置。
+// 升级：当 apps/android/keystore.properties 存在时（你自己的正式签名，已被 .gitignore
+//      忽略、不会进 git），自动改用它来签 release，可用于正式分发/上架。
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def hasReleaseKeystore = keystorePropertiesFile.exists()
+def keystoreProperties = new Properties()
+if (hasReleaseKeystore) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
 android {
     namespace "ai.agentwallet.hd"
     compileSdk 35
@@ -12,9 +34,39 @@ android {
         applicationId "com.velarumpay.wallet"
         minSdk 26
         targetSdk 35
-        versionCode 18
-        versionName "0.1.0-velarumpay"
+        versionCode 21
+        versionName "0.2.0-velarumpay"
         resourceConfigurations += ["en"]
+        buildConfigField "String", "FIREBASE_APPLICATION_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.applicationId", "VELARUMPAY_FIREBASE_APPLICATION_ID"))
+        buildConfigField "String", "FIREBASE_API_KEY", buildConfigString(firebaseConfigValue("velarumpay.firebase.apiKey", "VELARUMPAY_FIREBASE_API_KEY"))
+        buildConfigField "String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.projectId", "VELARUMPAY_FIREBASE_PROJECT_ID"))
+        buildConfigField "String", "FIREBASE_SENDER_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.senderId", "VELARUMPAY_FIREBASE_SENDER_ID"))
+        buildConfigField "boolean", "STELLAR_MAINNET_ENABLED", buildConfigBoolean(firebaseConfigValue("velarumpay.stellar.mainnetEnabled", "VELARUMPAY_STELLAR_MAINNET_ENABLED"))
+        buildConfigField "String", "STELLAR_MAINNET_MAX_XLM", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetMaxXlm", "VELARUMPAY_STELLAR_MAINNET_MAX_XLM") ?: "1")
+        buildConfigField "String", "STELLAR_MAINNET_HORIZON_URL", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetHorizonUrl", "VELARUMPAY_STELLAR_MAINNET_HORIZON_URL") ?: "https://horizon.stellar.org")
+        buildConfigField "String", "STELLAR_MAINNET_RECIPIENTS", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetRecipients", "VELARUMPAY_STELLAR_MAINNET_RECIPIENTS"))
+        buildConfigField "String", "DEFAULT_PLATFORM_API_URL", '"https://api-testnet.velarumpay.com"'
+        buildConfigField "boolean", "MANAGED_PLATFORM_SERVICE", "true"
+        buildConfigField "boolean", "PLATFORM_WEBSOCKET_ENABLED", "false"
+        buildConfigField "boolean", "INTERNAL_PLATFORM_OVERRIDE_ENABLED", "false"
+        buildConfigField "boolean", "OFFICIAL_TESTNET_ONLY", "true"
+    }
+
+    flavorDimensions += "network"
+    productFlavors {
+        standard {
+            dimension "network"
+            buildConfigField "boolean", "TESTNET_ONLY", "true"
+            manifestPlaceholders = [appLabel: "VelarumPay"]
+        }
+        stellarTestnet {
+            dimension "network"
+            applicationIdSuffix ".testnet"
+            versionCode 24
+            versionNameSuffix "-testnet"
+            buildConfigField "boolean", "TESTNET_ONLY", "true"
+            manifestPlaceholders = [appLabel: "VelarumPay Testnet"]
+        }
     }
 
     compileOptions {
@@ -27,17 +79,16 @@ android {
         jvmTarget = "17"
     }
 
-    // --- VelarumPay shared Rust wallet core (UniFFI) ---
-    // The generated Kotlin bindings compile into the app (main) so production
-    // HDWallet can call the shared core. On device the core ships as
+    // --- VelarumPay shared Rust wallet core (stable C ABI) ---
+    // WalletCoreBridge calls the native library through JNA. On device the core ships as
     // src/main/jniLibs/*/libvelarum_wallet_core.so (built by build-android.sh);
     // JVM unit tests load the host build via jna.library.path below.
-    sourceSets {
-        main {
-            java.srcDirs += "uniffi-generated"
-        }
-    }
     testOptions {
+        // Return defaults (not "not mocked" exceptions) for android.* stubs in plain JVM
+        // unit tests, so VpLog breadcrumbs (which call android.util.Log) inside catch
+        // blocks don't blow up pure-logic parser/expiry tests. Production logging on a real
+        // device is unaffected; this only changes the unit-test JVM stub behaviour.
+        unitTests.returnDefaultValues = true
         unitTests.all {
             systemProperty "jna.library.path", "${rootDir}/../../crates/velarum-wallet-core/target/release"
         }
@@ -45,6 +96,49 @@ android {
 
     buildFeatures {
         compose true
+        buildConfig true
+    }
+
+    // --- 签名配置：release 默认复用 debug 签名；放了 keystore.properties 则改用正式签名 ---
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
+    // --- 出厂打包模式（性能关键）-------------------------------------------------
+    // 此前没有 release 配置 → 平时点 Run 装的是 debug「草稿版」，Compose 在 debug 下
+    // 关闭了大量优化、还带调试插桩，体感会比 release「正式版」慢数倍。这正是「换原生后
+    // 反而觉得卡」的头号原因。release 打开 R8（代码优化），配合 Baseline Profile 后，
+    // 流畅度通常明显反超旧 WebView。proguard-rules.pro 里已对 JNA/web3j/bitcoinj/
+    // BouncyCastle 等反射/原生库写了 keep 规则，避免 R8 误删导致 release 崩溃。
+    buildTypes {
+        release {
+            minifyEnabled true            // 开启 R8：去无用代码 + 优化（性能/体积的主力）
+            shrinkResources false         // 资源压缩先关，确保安全；真机验证 release 无误后可改 true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            // 自动签名：默认用 debug 签名 → release 也能一键装真机；放了 keystore.properties 后自动切到你的正式签名。
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+        }
+        debug {
+            // 草稿版保持不混淆、构建快，方便日常开发调试（慢是正常的，别据此评判性能）。
+            minifyEnabled false
+        }
+        internalDebug {
+            initWith debug
+            matchingFallbacks = ["debug"]
+            applicationIdSuffix ".internal"
+            versionNameSuffix "-internal"
+            buildConfigField "boolean", "MANAGED_PLATFORM_SERVICE", "false"
+            buildConfigField "boolean", "PLATFORM_WEBSOCKET_ENABLED", "true"
+            buildConfigField "boolean", "INTERNAL_PLATFORM_OVERRIDE_ENABLED", "true"
+            manifestPlaceholders = [appLabel: "VelarumPay Internal · Unofficial"]
+        }
     }
 
     packaging {
@@ -73,11 +167,23 @@ android {
 }
 
 dependencies {
+    // Owner-approved Rule 0 exception: FCM 25.1.1 and its reviewed, locked
+    // Google Play Services runtime graph. Do not upgrade without a new review.
+    implementation "com.google.firebase:firebase-messaging:25.1.1"
+    constraints {
+        implementation("com.google.android.gms:play-services-base:18.9.0") { version { strictly("18.9.0") } }
+        implementation("com.google.android.gms:play-services-basement:18.9.0") { version { strictly("18.9.0") } }
+        implementation("com.google.android.gms:play-services-tasks:18.4.0") { version { strictly("18.4.0") } }
+        implementation("com.google.android.gms:play-services-cloud-messaging:17.4.0") { version { strictly("17.4.0") } }
+        implementation("com.google.android.gms:play-services-stats:17.0.2") { version { strictly("17.0.2") } }
+    }
     implementation "androidx.biometric:biometric:1.1.0"
+    // Apache-2.0. Biometric 1.1.0 otherwise pins Fragment 1.2.5, which is
+    // incompatible with the Activity Result APIs used by Activity 1.9.3.
+    implementation "androidx.fragment:fragment:1.8.9"
     implementation "androidx.camera:camera-camera2:1.4.2"
     implementation "androidx.camera:camera-lifecycle:1.4.2"
     implementation "androidx.camera:camera-view:1.4.2"
-    implementation "com.google.mlkit:barcode-scanning:17.3.0"
     implementation "com.google.zxing:core:3.5.3"
     implementation("org.bitcoinj:bitcoinj-core:0.16.3") {
         exclude group: "org.bouncycastle", module: "bcprov-jdk15to18"
@@ -101,6 +207,11 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-runtime-compose:2.8.7"
     debugImplementation "androidx.compose.ui:ui-tooling"
 
+    // --- Baseline Profile（提速地图）安装器 ----------------------------------------
+    // 让 App 自带的 src/main/baseline-prof.txt 在安装时把高频路径提前编译（AOT），
+    // 头几次启动/滚动就直接顺滑，而不是「用着用着才变快」。也为日后 Play 云端 Profile 铺路。
+    implementation "androidx.profileinstaller:profileinstaller:1.4.1"
+
     testImplementation "junit:junit:4.13.2"
     testImplementation "org.json:json:20250517"
     implementation "net.java.dev.jna:jna:5.14.0@aar"   // Android jnidispatch (device)
@@ -108,22 +219,11 @@ dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }
 
-// --- VelarumPay shared Rust wallet-core (UniFFI) build wiring ----------------
-// Two artifacts are derived from crates/velarum-wallet-core and MUST stay in
-// lock-step, or the app crashes on first use (e.g. creating a wallet) with:
-//     "Error looking up function 'uniffi_..._fn_func_xxx': undefined symbol".
-//   (a) Kotlin bindings    : uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt
-//   (b) device native libs : src/main/jniLibs/<abi>/libvelarum_wallet_core.so
-// (a) is cheap to build (host cargo, no NDK). (b) needs the Android NDK + cargo-ndk.
-//
-// The old wiring only regenerated (a), and only when it was missing. So editing
-// the Rust core (e.g. adding evm_sign_transaction) advanced the bindings while
-// the bundled .so stayed stale -> the APK shipped a binding that referenced a
-// symbol the .so did not export -> runtime crash. The tasks below keep (a) and
-// (b) in sync and FAIL THE BUILD if they ever drift apart.
+// --- VelarumPay shared Rust wallet-core (stable C ABI) build wiring -----------
+// The host library supports JVM conformance tests. Device libraries are rebuilt
+// for every Android ABI and checked for the complete version-1 symbol surface.
 
 ext.wcCrateDir = file("${rootDir}/../../crates/velarum-wallet-core")
-ext.wcBindings = file("${projectDir}/uniffi-generated/uniffi/velarum_wallet_core/velarum_wallet_core.kt")
 ext.wcJniLibs  = file("${projectDir}/src/main/jniLibs")
 ext.wcAbis     = ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"]
 
@@ -131,27 +231,23 @@ def wcHasExe = { String exe ->
     (System.getenv("PATH") ?: "").split(File.pathSeparator).any { new File(it, exe).canExecute() }
 }
 
-// (a) Kotlin bindings + host lib (for JVM unit tests). No NDK needed. Regenerates
-//     whenever the Rust source changes (real up-to-date checks) — this replaces
-//     the old `onlyIf { !exists }` that pinned stale bindings forever.
-tasks.register("generateWalletCoreBindings", Exec) {
+// Host library for JVM unit tests. No NDK is needed.
+tasks.register("buildWalletCoreHostLibrary", Exec) {
     workingDir rootDir
     commandLine "bash", "${wcCrateDir}/scripts/build-android-host.sh"
     inputs.dir("${wcCrateDir}/src")
     inputs.file("${wcCrateDir}/Cargo.toml")
-    outputs.file(wcBindings)
+    outputs.dir("${wcCrateDir}/target/release")
     onlyIf {
         if (wcHasExe("cargo")) return true
-        if (wcBindings.exists()) { logger.warn("wallet-core: 'cargo' not on PATH; reusing existing Kotlin bindings."); return false }
-        throw new GradleException("wallet-core: 'cargo' is required to generate the Kotlin bindings on a fresh checkout. Install Rust: https://rustup.rs")
+        throw new GradleException("wallet-core: 'cargo' is required to build the host C ABI library. Install Rust: https://rustup.rs")
     }
 }
-tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "generateWalletCoreBindings" }
+tasks.matching { it.name == "preBuild" }.configureEach { dependsOn "buildWalletCoreHostLibrary" }
 
-// (b) Device .so for every ABI (needs NDK + cargo-ndk). Wired into native-lib
-//     PACKAGING (not preBuild) so JVM unit tests still run without an NDK.
+// Device .so for every ABI (needs NDK + cargo-ndk).
 tasks.register("buildWalletCoreDeviceLibs", Exec) {
-    dependsOn "generateWalletCoreBindings"
+    dependsOn "buildWalletCoreHostLibrary"
     workingDir rootDir
     commandLine "bash", "${wcCrateDir}/scripts/build-android.sh"
     inputs.dir("${wcCrateDir}/src")
@@ -166,30 +262,30 @@ tasks.register("buildWalletCoreDeviceLibs", Exec) {
     }
 }
 
-// (c) Safety gate: every native symbol the bindings reference MUST exist in the
-//     packaged .so. This is exactly the check that would have caught the crash.
+// Safety gate: all stable C ABI v1 symbols must exist in the packaged library.
 tasks.register("verifyWalletCoreNativeLibs") {
     dependsOn "buildWalletCoreDeviceLibs"
     doLast {
-        if (!wcBindings.exists())
-            throw new GradleException("wallet-core: Kotlin bindings missing — run generateWalletCoreBindings.")
         def so = new File("${wcJniLibs}/arm64-v8a/libvelarum_wallet_core.so")   // real-device ABI
         if (!so.exists()) so = wcAbis.collect { new File("${wcJniLibs}/${it}/libvelarum_wallet_core.so") }.find { it.exists() }
         if (so == null)
             throw new GradleException("wallet-core: no libvelarum_wallet_core.so in src/main/jniLibs. " +
                 "Build it (needs Android NDK + cargo-ndk): crates/velarum-wallet-core/scripts/build-android.sh")
-        def referenced = []
-        def m = (wcBindings.getText("UTF-8") =~ /uniffi_velarum_wallet_core_(?:fn_func|checksum_func|fn_method|fn_constructor|fn_clone|fn_free|checksum_method|checksum_constructor)_[A-Za-z0-9_]+/)
-        while (m.find()) referenced << m.group()
-        referenced = referenced.unique()
+        def referenced = [
+            "velarum_wallet_core_abi_version",
+            "velarum_wallet_core_call",
+            "velarum_wallet_core_result_data",
+            "velarum_wallet_core_result_len",
+            "velarum_wallet_core_result_free",
+        ]
         def haystack = new String(so.bytes, "ISO-8859-1")
         def missing = referenced.findAll { !haystack.contains(it) }
         if (!missing.isEmpty())
             throw new GradleException("wallet-core: ${so.parentFile.name}/${so.name} is OUT OF SYNC with the " +
-                "Kotlin bindings — missing ${missing.size()} symbol(s), e.g.:\n  " + missing.take(6).join("\n  ") +
+                "stable C ABI — missing ${missing.size()} symbol(s), e.g.:\n  " + missing.take(6).join("\n  ") +
                 "\nThe app would crash at runtime with 'undefined symbol'. Rebuild the native libs:\n" +
                 "  crates/velarum-wallet-core/scripts/build-android.sh")
-        logger.lifecycle("wallet-core: verified ${referenced.size()} UniFFI symbols present in ${so.parentFile.name}/${so.name} ✓")
+        logger.lifecycle("wallet-core: verified ${referenced.size()} stable C ABI symbols present in ${so.parentFile.name}/${so.name} ✓")
     }
 }
 

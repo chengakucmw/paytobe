@@ -10,10 +10,10 @@
         android:required="false" />
 
     <application
+        android:name=".VelarumPayApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="VelarumPay"
-        android:networkSecurityConfig="@xml/network_security_config"
+        android:label="${appLabel}"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
@@ -21,7 +21,17 @@
         <service
             android:name=".RelayPushService"
             android:exported="false"
+            android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
+        <service
+            android:name=".VelarumFirebaseMessagingService"
+            android:directBootAware="false"
+            android:exported="false"
+            android:stopWithTask="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
 
         <!--
             原生 (Compose) 宿主 + LAUNCHER + 通知/深链入口（退役 MainActivity 后接管）。

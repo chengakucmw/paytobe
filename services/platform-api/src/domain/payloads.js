@@ -3,8 +3,6 @@
 // Extracted verbatim from server.js. These shape an inbound HTTP body into the
 // canonical payload the store/normalizers expect; they do not touch the store.
 
-import { id } from "../crypto.js";
-
 const DEFAULT_PAYMENT_REQUEST_TTL_MS = 5 * 60 * 1000;
 
 export function buildTransactionContextPayload(body, connection) {
@@ -19,7 +17,7 @@ export function buildTransactionContextPayload(body, connection) {
   };
 }
 
-export function buildPaymentRequestPayload(body, connection, idempotencyKey) {
+export function buildPaymentRequestPayload(body, connection, idempotencyKey, runtime = {}) {
   const {
     connection_token: _connectionToken,
     device_id: _deviceId,
@@ -27,12 +25,13 @@ export function buildPaymentRequestPayload(body, connection, idempotencyKey) {
     token: _token,
     ...payload
   } = body || {};
-  const now = new Date();
+  const now = runtime.clock?.now?.() || new Date();
+  const requestId = runtime.random?.id?.("prq");
   const connectionId = connection?.connection_id || payload.connection_id || "";
   return {
     ...payload,
     protocol: payload.protocol || "velarum.payment_request.v1",
-    request_id: payload.request_id || id("prq"),
+    request_id: payload.request_id || requestId || requiredRuntimeId(),
     connection_id: connectionId,
     created_at: payload.created_at || now.toISOString(),
     expires_at: payload.expires_at || new Date(now.getTime() + DEFAULT_PAYMENT_REQUEST_TTL_MS).toISOString(),
@@ -42,6 +41,10 @@ export function buildPaymentRequestPayload(body, connection, idempotencyKey) {
     payee: payload.payee || inferPayee(payload),
     policy: payload.policy || { requires_user_approval: true }
   };
+}
+
+function requiredRuntimeId() {
+  throw new TypeError("A Random port is required when request_id is absent");
 }
 
 export function sourceFromConnection(connection) {

@@ -10,6 +10,7 @@ final class PaymentExecutor {
     }
 
     static String execute(Context context, HDWallet wallet, PaymentIntent intent, TransactionProgress progress) throws Exception {
+        BuildNetworkPolicy.assertAllowed(intent);
         RiskPolicy.Result risk = RiskPolicy.evaluate(context, intent);
         if (!risk.allowed) throw new IllegalStateException(join(risk.errors));
         if (intent.isBaseUsdc()) {
@@ -25,6 +26,14 @@ final class PaymentExecutor {
             );
         }
         if (intent.isStellarXlm()) {
+            // Re-check at the signing boundary so a caller cannot bypass the UI/risk
+            // review and directly broadcast a mainnet transaction.
+            StellarMainnetPolicy.assertAllowed(
+                    intent.stellarTestnet,
+                    intent.horizonUrl,
+                    intent.to,
+                    intent.amount
+            );
             return StellarTransfer.sendXlm(
                     intent.horizonUrl,
                     intent.stellarTestnet,
@@ -33,7 +42,8 @@ final class PaymentExecutor {
                     intent.to,
                     intent.amount,
                     progress,
-                    intent.memo
+                    intent.memo,
+                    intent.memoType
             );
         }
         if (intent.isStellarAsset()) {

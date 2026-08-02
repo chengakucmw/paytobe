@@ -2,6 +2,7 @@ package ai.agentwallet.hd.ui.onboarding
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,8 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import ai.agentwallet.hd.ui.navigation.screen
 import ai.agentwallet.hd.R
 import ai.agentwallet.hd.ui.components.VpBadge
 import ai.agentwallet.hd.ui.components.VpCard
@@ -57,6 +58,10 @@ import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTextField
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.navigation.Routes
+import ai.agentwallet.hd.ui.navigation.appEnter
+import ai.agentwallet.hd.ui.navigation.appExit
+import ai.agentwallet.hd.ui.navigation.appPopEnter
+import ai.agentwallet.hd.ui.navigation.appPopExit
 import ai.agentwallet.hd.ui.theme.Spacing
 import ai.agentwallet.hd.ui.theme.VelarumRadii
 import ai.agentwallet.hd.ui.theme.VelarumTheme
@@ -77,8 +82,12 @@ fun OnboardingHost(startRoute: String, onFinished: () -> Unit) {
             navController = navController,
             startDestination = startRoute,
             modifier = Modifier.padding(inner),
+            enterTransition = { appEnter() },
+            exitTransition = { appExit() },
+            popEnterTransition = { appPopEnter() },
+            popExitTransition = { appPopExit() },
         ) {
-            composable(Routes.CREATE_WALLET) {
+            screen(Routes.CREATE_WALLET) {
                 CreateWalletScreen(
                     vm = vm,
                     onImport = { navController.navigate(Routes.KEY_IMPORT) },
@@ -91,13 +100,24 @@ fun OnboardingHost(startRoute: String, onFinished: () -> Unit) {
                     },
                 )
             }
-            composable(Routes.KEY_IMPORT) {
+            screen(Routes.KEY_IMPORT) {
                 KeyImportScreen(vm = vm, onBack = { navController.popBackStack() }, onImported = onFinished)
             }
-            composable(Routes.KEY_BACKUP) {
-                KeyBackupScreen(vm = vm, onConfirmed = onFinished)
+            screen(Routes.KEY_BACKUP) {
+                KeyBackupScreen(
+                    vm = vm,
+                    onVerify = { navController.navigate(Routes.KEY_VERIFY) },
+                )
             }
-            composable(Routes.DEVICE_RISK) {
+            screen(Routes.KEY_VERIFY) {
+                KeyVerifyScreen(
+                    vm = vm,
+                    onVerified = onFinished,
+                    // 点错 / 主动复习 → 回到备份页重新核对助记词。
+                    onReview = { navController.popBackStack(Routes.KEY_BACKUP, inclusive = false) },
+                )
+            }
+            screen(Routes.DEVICE_RISK) {
                 DeviceRiskScreen(onBack = { navController.popBackStack() })
             }
         }
@@ -223,7 +243,7 @@ private fun KeyImportScreen(vm: OnboardingViewModel, onBack: () -> Unit, onImpor
 }
 
 @Composable
-private fun KeyBackupScreen(vm: OnboardingViewModel, onConfirmed: () -> Unit) {
+private fun KeyBackupScreen(vm: OnboardingViewModel, onVerify: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     // 展示助记词时开启 FLAG_SECURE，阻止截屏/录屏与任务切换器预览（UI 层安全，未改业务逻辑）。
@@ -233,7 +253,6 @@ private fun KeyBackupScreen(vm: OnboardingViewModel, onConfirmed: () -> Unit) {
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
     }
     LaunchedEffect(Unit) { vm.ensureMnemonicLoaded() }
-    LaunchedEffect(ui.backupConfirmed) { if (ui.backupConfirmed) onConfirmed() }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         VpSubheader(eyebrow = "Security", title = "Recovery phrase backup")
         Column(
@@ -245,6 +264,14 @@ private fun KeyBackupScreen(vm: OnboardingViewModel, onConfirmed: () -> Unit) {
                 "Write these words offline",
                 "Anyone with this phrase can control the wallet. Do not screenshot, copy, upload, or send it.",
             )
+            // 从验证页点错回来时提示用户重新核对（决策：点错回到备份页复习）。
+            if (ui.verifyMismatch) {
+                VpRiskBanner(
+                    VpTone.CAUTION,
+                    "That didn't match",
+                    "Re-read your phrase in order, then tap Verify again.",
+                )
+            }
             WordGrid(words = ui.mnemonic)
             VpCard(modifier = Modifier.fillMaxWidth()) {
                 Text("Backup controls", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
@@ -253,13 +280,172 @@ private fun KeyBackupScreen(vm: OnboardingViewModel, onConfirmed: () -> Unit) {
                 VpFactRow("Clipboard copy", "Disabled", VpTone.SAFE)
                 VpFactRow("Stored as", "Encrypted keyring", VpTone.SAFE)
             }
+            // 不再「点一下即完成」：必须进入验证页按顺序点选正确单词，对了才放行进入钱包。
             VpPrimaryButton(
-                text = "I have written it down",
-                onClick = { vm.confirmBackup() },
+                text = "I've written it down — Verify",
+                onClick = onVerify,
                 enabled = ui.mnemonic.isNotEmpty(),
                 modifier = Modifier.fillMaxWidth(),
             )
         }
+    }
+}
+
+/**
+ * 助记词验证页（OKX 风格「按顺序点选」）：给出若干编号空位 + 打乱的候选词池，
+ * 用户必须为每个空位按顺序点中正确的词。全部正确 → confirmBackup() 放行进入钱包；
+ * 点错 → 标记并回到备份页复习后重试（验证用纯函数 SeedVerification，不碰任何密钥/签名逻辑）。
+ */
+@Composable
+private fun KeyVerifyScreen(
+    vm: OnboardingViewModel,
+    onVerified: () -> Unit,
+    onReview: () -> Unit,
+) {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val window = (context as? Activity)?.window
+        window?.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+    }
+    LaunchedEffect(Unit) {
+        vm.ensureMnemonicLoaded()
+        vm.clearVerifyMismatch()
+    }
+    LaunchedEffect(ui.backupConfirmed) { if (ui.backupConfirmed) onVerified() }
+
+    val words = ui.mnemonic
+    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        VpSubheader(eyebrow = "Security", title = "Verify recovery phrase", onBack = onReview)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
+            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+        ) {
+            if (words.isEmpty()) {
+                Box(Modifier.fillMaxWidth().padding(Spacing.s6), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else {
+                // 每次进入该屏生成一次新挑战（位置 + 候选池打乱）。
+                val challenge = remember(words) { SeedVerification.create(words) }
+                var selectedIds by remember(challenge) { mutableStateOf(emptyList<Int>()) }
+                val positions = challenge.positions
+                val selectedWords = selectedIds.map { id -> challenge.options.first { it.id == id }.word }
+                val complete = selectedWords.size == positions.size
+
+                VpRiskBanner(
+                    VpTone.INFO,
+                    "Confirm your backup",
+                    "Tap the right word for each numbered blank, in order. This proves the phrase was saved correctly.",
+                )
+
+                // 编号空位（按升序，用户从上往下依次填）。
+                VpCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "Fill " + positions.joinToString(", ") { "#${it + 1}" } + " in order",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = VelarumTheme.colors.textStrong,
+                    )
+                    Spacer(Modifier.height(Spacing.s3))
+                    positions.forEachIndexed { i, p ->
+                        VerifySlot(
+                            index = p + 1,
+                            word = selectedWords.getOrNull(i),
+                            active = i == selectedWords.size,
+                            onClick = { if (i < selectedWords.size) selectedIds = selectedIds.take(i) },
+                        )
+                        if (i != positions.lastIndex) Spacer(Modifier.height(Spacing.s2))
+                    }
+                }
+
+                // 候选词池（3 列）。已选中的 chip 置灰且不可再点。
+                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                    challenge.options.chunked(3).forEach { rowChips ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
+                            rowChips.forEach { opt ->
+                                val used = opt.id in selectedIds
+                                WordOption(
+                                    word = opt.word,
+                                    used = used,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        if (!used && selectedIds.size < positions.size) {
+                                            selectedIds = selectedIds + opt.id
+                                        }
+                                    },
+                                )
+                            }
+                            repeat(3 - rowChips.size) { Spacer(Modifier.weight(1f)) }
+                        }
+                    }
+                }
+
+                VpPrimaryButton(
+                    text = "Confirm",
+                    onClick = {
+                        if (SeedVerification.isCorrect(words, positions, selectedWords)) {
+                            vm.confirmBackup()
+                        } else {
+                            vm.flagVerifyMismatch()
+                            onReview()
+                        }
+                    },
+                    enabled = complete,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                VpOutlineButton(
+                    text = "Review phrase again",
+                    onClick = onReview,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    }
+}
+
+/** 验证页的单个编号空位：未填显示提示，已填显示所选词；点已填的空位可撤销它及其后的选择。 */
+@Composable
+private fun VerifySlot(index: Int, word: String?, active: Boolean, onClick: () -> Unit) {
+    val outline = if (word != null || active) VelarumTheme.colors.primary else VelarumTheme.colors.borderDefault
+    Surface(
+        shape = VelarumRadii.sm,
+        color = if (word != null) VelarumTheme.colors.primarySoft else VelarumTheme.colors.surfaceCard,
+        border = BorderStroke(1.dp, outline),
+        modifier = Modifier.fillMaxWidth().clickable(enabled = word != null) { onClick() },
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s3),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("#$index", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text(
+                word ?: "Tap a word",
+                style = MaterialTheme.typography.titleMedium,
+                color = if (word != null) VelarumTheme.colors.textStrong else VelarumTheme.colors.textFaint,
+            )
+        }
+    }
+}
+
+/** 候选词池里的单枚胶囊 chip。已选则置灰且不可点。 */
+@Composable
+private fun WordOption(word: String, used: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        shape = VelarumRadii.pill,
+        color = if (used) VelarumTheme.colors.surfaceSunken else VelarumTheme.colors.surfaceCard,
+        border = BorderStroke(1.dp, if (used) VelarumTheme.colors.borderSubtle else VelarumTheme.colors.borderDefault),
+        modifier = modifier.clickable(enabled = !used) { onClick() },
+    ) {
+        Text(
+            text = word,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (used) VelarumTheme.colors.textFaint else VelarumTheme.colors.textStrong,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s2, vertical = Spacing.s3),
+        )
     }
 }
 

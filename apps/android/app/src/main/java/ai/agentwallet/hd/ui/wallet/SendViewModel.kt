@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import ai.agentwallet.hd.SendForm
 import ai.agentwallet.hd.SendPreparation
+import ai.agentwallet.hd.TransferAssetOption
 import ai.agentwallet.hd.WalletRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,9 +29,17 @@ data class SendUiState(
     val step: SendStep = SendStep.ENTRY,
     val symbol: String = "XLM",
     val network: String = "Stellar",
+    /** 选中链的唯一 rail（路由权威，避免符号歧义如 ETH 跨多条链）。 */
+    val rail: String = "stellar_xlm",
+    /** 该链是否已具备设备端签名（direct_broadcast）；false → “Feature is under development”。 */
+    val sendable: Boolean = true,
     val recipient: String = "",
     val amount: String = "",
     val memo: String = "",
+    /** 选链浮层是否展开。 */
+    val showChainPicker: Boolean = false,
+    /** 扫码/地址校验给出的提示（如“此地址匹配多条链，请确认”）。 */
+    val chainHint: String = "",
     /** prepareSend 返回的风险提示（warnings）；非空时 RISK 步骤呈现并要求显式确认。 */
     val riskWarnings: List<String> = emptyList(),
     val riskAccepted: Boolean = false,
@@ -39,6 +48,10 @@ data class SendUiState(
     val error: String? = null,
     val txHash: String? = null,
     val done: Boolean = false,
+    /** 实时网络费用拉取中（进入 CONFIRM 时后台拉取，只读 RPC）。 */
+    val feeLoading: Boolean = false,
+    /** 已取到的实时网络费用展示串（如 “≈ 0.000005 SOL”）；null 表示未取到 → UI 回退旧文案。 */
+    val networkFee: String? = null,
 )
 
 /**
@@ -57,6 +70,11 @@ class SendViewModel(app: Application) : AndroidViewModel(app) {
     private val _ui = MutableStateFlow(SendUiState())
     val ui: StateFlow<SendUiState> = _ui.asStateFlow()
 
+    /** 全部 30 条链（注册表驱动）。一次取用，UI 分组展示 Available / Under development。 */
+    val assets: List<TransferAssetOption> = WalletRepository.transferAssets()
+    val sendableAssets: List<TransferAssetOption> get() = assets.filter { it.sendable }
+    val comingSoonAssets: List<TransferAssetOption> get() = assets.filter { !it.sendable }
+
     /** 上一次 prepareSend 通过(allowed)的结果，供 CONFIRM 的 confirmSend 复用（同一份 intent）。 */
     private var prepared: SendPreparation? = null
 
@@ -65,31 +83,96 @@ class SendViewModel(app: Application) : AndroidViewModel(app) {
         _ui.value = SendUiState()
     }
 
-    /** 由扫码结果预填（symbol/network 为空则保留默认 XLM/Stellar，让用户在 Send 选）。 */
+    /**
+     * 由扫码结果或资产详情页预填。核心新增：**提前校验地址类型**——
+     *  - 给了明确 symbol（资产详情页 Send）→ 用它解析链；
+     *  - 只有地址（扫码）→ 用注册表的地址正则探测候选链：唯一→直接预选；多条→预选首个可发送并展开选链浮层让用户确认；
+     *  - 完全无法识别 → 保持默认并提示用户手动选链。
+     */
     fun prefill(symbol: String, network: String, recipient: String, amount: String, memo: String) {
         prepared = null
         val base = SendUiState()
-        _ui.value = base.copy(
-            symbol = symbol.ifBlank { base.symbol },
-            network = network.ifBlank { base.network },
-            recipient = recipient,
-            amount = amount,
-            memo = memo,
+        val explicit = if (symbol.isNotBlank()) optionFor(symbol, network) else null
+        val candidates = if (recipient.isNotBlank()) WalletRepository.chainsForAddress(recipient) else emptyList()
+        val sendableCandidates = candidates.filter { it.sendable }
+        val chosen = explicit ?: sendableCandidates.firstOrNull() ?: candidates.firstOrNull()
+        // 仅在「确有多条可发送链」或「一条都不可发送」时才强制让用户选链，避免对干净地址（如
+        // Stellar 地址恰好也符合 Algorand 字符集）产生多余的确认弹层。
+        val needChoice = explicit == null &&
+            (sendableCandidates.size > 1 || (sendableCandidates.isEmpty() && candidates.isNotEmpty()))
+        _ui.value = if (chosen != null) {
+            base.copy(
+                symbol = chosen.symbol,
+                network = chosen.chain,
+                rail = chosen.rail,
+                sendable = chosen.sendable,
+                recipient = recipient,
+                amount = amount,
+                memo = memo,
+                showChainPicker = needChoice,
+                chainHint = when {
+                    needChoice && sendableCandidates.size > 1 ->
+                        "This address works on several chains — confirm the right one before sending."
+                    needChoice ->
+                        "This address type isn't supported for sending yet — pick an asset to see options."
+                    else -> ""
+                },
+            )
+        } else {
+            // 地址类型无法识别：不臆测网络，提示用户手动选资产。
+            base.copy(
+                recipient = recipient,
+                amount = amount,
+                memo = memo,
+                showChainPicker = recipient.isNotBlank(),
+                chainHint = if (recipient.isNotBlank())
+                    "We couldn't recognize this address type — choose the network it belongs to."
+                else "",
+            )
+        }
+    }
+
+    /** 选资产（来自选资产浮层）。重置错误与提示，并收起浮层。 */
+    fun selectAsset(option: TransferAssetOption) = _ui.update {
+        it.copy(
+            symbol = option.symbol,
+            network = option.chain,
+            rail = option.rail,
+            sendable = option.sendable,
+            showChainPicker = false,
+            chainHint = "",
+            error = null,
         )
     }
 
-    fun selectAsset(symbol: String, network: String) = _ui.update { it.copy(symbol = symbol, network = network, error = null) }
+    fun openChainPicker() = _ui.update { it.copy(showChainPicker = true) }
+    fun closeChainPicker() = _ui.update { it.copy(showChainPicker = false) }
+
     fun setRecipient(value: String) = _ui.update { it.copy(recipient = value, error = null) }
     fun setAmount(value: String) = _ui.update { it.copy(amount = value, error = null) }
     fun setMemo(value: String) = _ui.update { it.copy(memo = value, error = null) }
 
+    /** 收款地址与所选链是否匹配（“提前校验地址类型”）。空地址不算错误（按钮另有判空）。 */
+    fun recipientError(): String? {
+        val s = _ui.value
+        val r = s.recipient.trim()
+        if (r.isEmpty()) return null
+        if (!WalletRepository.addressMatchesChain(r, s.rail)) {
+            return "This doesn't look like a valid ${s.symbol} address on ${s.network}."
+        }
+        return null
+    }
+
     /** 客户端最小校验（仅用于启用「Continue」按钮）；权威校验在 prepareSend/RiskPolicy。 */
     fun canReview(): Boolean {
         val s = _ui.value
+        if (!s.sendable) return false
         // 仅用于显示态的展示估值会用 Double，但这里只判断「是否为正数」，金额本身仍以 String 传递给 prepareSend。
         val amount = s.amount.trim().toDoubleOrNull()
         val memoOk = s.symbol != "XLM" || s.memo.trim().isNotEmpty()
-        return s.recipient.trim().isNotEmpty() && amount != null && amount > 0.0 && memoOk
+        val recipient = s.recipient.trim()
+        val recipientOk = recipient.isNotEmpty() && WalletRepository.addressMatchesChain(recipient, s.rail)
+        return recipientOk && amount != null && amount > 0.0 && memoOk
     }
 
     /** 用户在 RISK 步骤勾选「我已理解并接受」。 */
@@ -102,12 +185,16 @@ class SendViewModel(app: Application) : AndroidViewModel(app) {
     fun proceedFromEntry() {
         val s = _ui.value
         if (s.preparing || s.submitting) return
+        if (!s.sendable) {
+            _ui.update { it.copy(error = "${it.symbol} on ${it.network} — Feature is under development.") }
+            return
+        }
         _ui.update { it.copy(preparing = true, error = null) }
         viewModelScope.launch {
             val prep = withContext(Dispatchers.IO) {
                 WalletRepository.prepareSend(
                     getApplication(),
-                    SendForm(s.symbol, s.network, s.recipient.trim(), s.amount.trim(), s.memo.trim()),
+                    SendForm(s.symbol, s.network, s.recipient.trim(), s.amount.trim(), s.memo.trim(), s.rail),
                 )
             }
             if (!prep.allowed) {
@@ -127,6 +214,23 @@ class SendViewModel(app: Application) : AndroidViewModel(app) {
                     step = if (warnings.isNotEmpty()) SendStep.RISK else SendStep.CONFIRM,
                 )
             }
+            // CONFIRM 展示真实网络费用：在此后台拉取（只读，不阻塞步骤切换/签名）。
+            startFeeEstimate(prep)
+        }
+    }
+
+    /**
+     * 后台拉取实时网络费用（只读 RPC，不签名、不阻塞流程）：Stellar fee_stats / Solana
+     * getFeeForMessage / EVM gasPrice×gasLimit。任何失败都安全回退（networkFee=null →
+     * UI 显示 “Calculated at broadcast”）。
+     */
+    private fun startFeeEstimate(prep: SendPreparation) {
+        _ui.update { it.copy(feeLoading = true, networkFee = null) }
+        viewModelScope.launch {
+            val fee = withContext(Dispatchers.IO) {
+                runCatching { WalletRepository.estimateNetworkFee(getApplication(), prep) }.getOrNull()
+            }
+            _ui.update { it.copy(feeLoading = false, networkFee = fee) }
         }
     }
 
@@ -203,5 +307,14 @@ class SendViewModel(app: Application) : AndroidViewModel(app) {
     fun retryFromProgress() {
         if (_ui.value.submitting) return
         _ui.update { it.copy(step = SendStep.CONFIRM, error = null) }
+    }
+
+    /** 把 (symbol, chain 展示名) 解析为某条链；找不到精确匹配时退回该 symbol 的首条链。 */
+    private fun optionFor(symbol: String, chain: String): TransferAssetOption? {
+        val sym = symbol.trim()
+        val ch = chain.trim()
+        if (sym.isBlank()) return null
+        return assets.firstOrNull { it.symbol.equals(sym, true) && it.chain.equals(ch, true) }
+            ?: assets.firstOrNull { it.symbol.equals(sym, true) }
     }
 }

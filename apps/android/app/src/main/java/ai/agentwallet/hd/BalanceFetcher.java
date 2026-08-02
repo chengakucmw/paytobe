@@ -13,6 +13,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
@@ -25,7 +28,9 @@ final class BalanceFetcher {
     private static final String BASE_RPC_URL = "https://mainnet.base.org";
     private static final String POLYGON_RPC_URL = "https://polygon-bor-rpc.publicnode.com";
     private static final String SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
-    private static final String STELLAR_HORIZON_URL = "https://horizon.stellar.org";
+    private static final String STELLAR_HORIZON_URL = BuildConfig.TESTNET_ONLY
+            ? BuildNetworkPolicy.STELLAR_TESTNET_HORIZON
+            : "https://horizon.stellar.org";
     private static final String BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
     private static final String ERC20_BALANCE_OF = "70a08231";
     private static final OkHttpClient HTTP = WalletHttp.oneShot();
@@ -34,16 +39,40 @@ final class BalanceFetcher {
     private BalanceFetcher() {}
 
     static JSONObject fetch(HDWallet wallet) throws Exception {
-        JSONObject assets = new JSONObject();
-        assets.put("eth", safe(() -> nativeEvm(wallet, ETHEREUM_RPC_URL, "Ethereum", "ETH")));
-        assets.put("base_eth", safe(() -> baseEth(wallet)));
-        assets.put("polygon_matic", safe(() -> nativeEvm(wallet, POLYGON_RPC_URL, "Polygon", "MATIC")));
-        assets.put("base_usdc", safe(() -> baseUsdc(wallet)));
-        assets.put("sol", safe(() -> sol(wallet)));
-        assets.put("xlm", safe(() -> xlm(wallet)));
-        return new JSONObject()
-                .put("updated_at", Instant.now().toString())
-                .put("assets", assets);
+        if (BuildConfig.TESTNET_ONLY) {
+            JSONObject assets = new JSONObject().put("xlm", safe("xlm", () -> xlm(wallet)));
+            return new JSONObject()
+                    .put("updated_at", Instant.now().toString())
+                    .put("assets", assets);
+        }
+        // Fan the six independent balance reads out concurrently instead of running
+        // them one after another. Sequentially, one slow or dead RPC endpoint stalls
+        // the whole refresh for up to its full 60s call timeout — and those stack
+        // (~6×), leaving Home on "Refreshing balances…" far longer than necessary.
+        // Running in parallel makes total latency ≈ the slowest single call. safe()
+        // already captures per-asset errors, so one failure never fails the batch,
+        // and the shared OkHttp client is built for concurrent calls.
+        ExecutorService pool = Executors.newFixedThreadPool(6);
+        try {
+            Future<JSONObject> ethF = pool.submit(() -> safe("eth", () -> nativeEvm(wallet, ETHEREUM_RPC_URL, "Ethereum", "ETH")));
+            Future<JSONObject> baseEthF = pool.submit(() -> safe("base_eth", () -> baseEth(wallet)));
+            Future<JSONObject> polygonF = pool.submit(() -> safe("polygon_matic", () -> nativeEvm(wallet, POLYGON_RPC_URL, "Polygon", "MATIC")));
+            Future<JSONObject> baseUsdcF = pool.submit(() -> safe("base_usdc", () -> baseUsdc(wallet)));
+            Future<JSONObject> solF = pool.submit(() -> safe("sol", () -> sol(wallet)));
+            Future<JSONObject> xlmF = pool.submit(() -> safe("xlm", () -> xlm(wallet)));
+            JSONObject assets = new JSONObject();
+            assets.put("eth", ethF.get());
+            assets.put("base_eth", baseEthF.get());
+            assets.put("polygon_matic", polygonF.get());
+            assets.put("base_usdc", baseUsdcF.get());
+            assets.put("sol", solF.get());
+            assets.put("xlm", xlmF.get());
+            return new JSONObject()
+                    .put("updated_at", Instant.now().toString())
+                    .put("assets", assets);
+        } finally {
+            pool.shutdown();
+        }
     }
 
     private static JSONObject baseEth(HDWallet wallet) throws Exception {
@@ -104,16 +133,21 @@ final class BalanceFetcher {
         }
     }
 
-    private static JSONObject safe(FetchCall call) {
+    private static JSONObject safe(String assetKey, FetchCall call) {
         try {
             return call.run();
         } catch (Exception e) {
+            // Preserve the failure in both logcat and the cached payload. The UI renders a
+            // safe, user-facing retry state, while logcat retains the concrete DNS/TLS/HTTP
+            // cause needed to diagnose device-specific failures.
+            VpLog.w("BalanceFetcher", "balance fetch failed for " + assetKey, e);
             JSONObject out = new JSONObject();
             try {
                 out.put("balance", "--");
                 out.put("status", "error");
                 out.put("error", e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             } catch (Exception ignored) {
+                VpLog.w("BalanceFetcher", "building per-asset error payload failed", ignored);
             }
             return out;
         }

@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -16,7 +17,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.camera.core.CameraSelector;
-import androidx.camera.core.ExperimentalGetImage;
 import androidx.camera.core.ImageAnalysis;
 import androidx.camera.core.ImageProxy;
 import androidx.camera.core.Preview;
@@ -26,13 +26,14 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.mlkit.vision.barcode.BarcodeScanner;
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions;
-import com.google.mlkit.vision.barcode.BarcodeScanning;
-import com.google.mlkit.vision.barcode.common.Barcode;
-import com.google.mlkit.vision.common.InputImage;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.PlanarYUVLuminanceSource;
+import com.google.zxing.ReaderException;
+import com.google.zxing.Result;
+import com.google.zxing.common.HybridBinarizer;
+import com.google.zxing.qrcode.QRCodeReader;
 
-import java.util.List;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -45,8 +46,8 @@ public class QrScannerActivity extends FragmentActivity {
 
     private PreviewView previewView;
     private ExecutorService cameraExecutor;
-    private BarcodeScanner scanner;
-    private boolean finished;
+    private final QRCodeReader scanner = new QRCodeReader();
+    private volatile boolean finished;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,9 +56,6 @@ public class QrScannerActivity extends FragmentActivity {
         window.setStatusBarColor(Color.BLACK);
         window.setNavigationBarColor(Color.BLACK);
         cameraExecutor = Executors.newSingleThreadExecutor();
-        scanner = BarcodeScanning.getClient(new BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build());
         setContentView(screen());
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera();
@@ -121,33 +119,59 @@ public class QrScannerActivity extends FragmentActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
-    @ExperimentalGetImage
     private void analyze(ImageProxy imageProxy) {
-        if (finished || imageProxy.getImage() == null) {
+        if (finished) {
             imageProxy.close();
             return;
         }
-        InputImage image = InputImage.fromMediaImage(imageProxy.getImage(), imageProxy.getImageInfo().getRotationDegrees());
-        scanner.process(image)
-                .addOnSuccessListener(this::handleBarcodes)
-                .addOnFailureListener(ignored -> {
-                })
-                .addOnCompleteListener(task -> imageProxy.close());
+        try {
+            String value = decodeQr(imageProxy);
+            if (value != null && !value.trim().isEmpty()) {
+                finished = true;
+                runOnUiThread(() -> finishWithPayload(value));
+            }
+        } catch (ReaderException | IllegalArgumentException ignored) {
+            // Most camera frames do not contain a complete QR code. Keep scanning.
+        } finally {
+            scanner.reset();
+            imageProxy.close();
+        }
     }
 
-    private void handleBarcodes(List<Barcode> barcodes) {
-        if (finished) return;
-        for (Barcode barcode : barcodes) {
-            String value = barcode.getRawValue();
-            if (value != null && value.trim().length() > 0) {
-                finished = true;
-                Intent data = new Intent();
-                data.putExtra(EXTRA_PAYLOAD, value.trim());
-                setResult(RESULT_OK, data);
-                finish();
-                return;
+    private String decodeQr(ImageProxy imageProxy) throws ReaderException {
+        ImageProxy.PlaneProxy[] planes = imageProxy.getPlanes();
+        if (planes.length == 0) return null;
+
+        Rect crop = imageProxy.getCropRect();
+        int width = crop.width();
+        int height = crop.height();
+        ImageProxy.PlaneProxy yPlane = planes[0];
+        ByteBuffer buffer = yPlane.getBuffer().duplicate();
+        int rowStride = yPlane.getRowStride();
+        int pixelStride = yPlane.getPixelStride();
+        int bufferStart = buffer.position();
+        byte[] luminance = new byte[width * height];
+
+        for (int y = 0; y < height; y++) {
+            int rowOffset = bufferStart + (crop.top + y) * rowStride + crop.left * pixelStride;
+            int outputOffset = y * width;
+            for (int x = 0; x < width; x++) {
+                luminance[outputOffset + x] = buffer.get(rowOffset + x * pixelStride);
             }
         }
+
+        PlanarYUVLuminanceSource source = new PlanarYUVLuminanceSource(
+                luminance, width, height, 0, 0, width, height, false);
+        BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+        Result result = scanner.decode(bitmap);
+        return result.getText();
+    }
+
+    private void finishWithPayload(String value) {
+        Intent data = new Intent();
+        data.putExtra(EXTRA_PAYLOAD, value.trim());
+        setResult(RESULT_OK, data);
+        finish();
     }
 
     @Override
@@ -166,7 +190,7 @@ public class QrScannerActivity extends FragmentActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (scanner != null) scanner.close();
+        scanner.reset();
         if (cameraExecutor != null) cameraExecutor.shutdown();
     }
 

@@ -150,7 +150,7 @@ final class TransactionDossier {
                     request.payeeVerified ? TONE_SAFE : TONE_INFO
             ));
         }
-        for (PaymentIntent.OrderItem orderItem : intent.orderItems) {
+        for (DemoOrderMetadata.OrderItem orderItem : intent.demo.orderItems) {
             String meta = firstNonEmpty(
                     joinDisplay(orderItem.lineTotalUsd, isUseful(orderItem.lineTotalUsd) ? "USDC" : ""),
                     orderItem.description,
@@ -159,8 +159,8 @@ final class TransactionDossier {
             items.add(new EvidenceItem(orderItem.name, meta, isUseful(orderItem.imageUrl) ? TONE_INFO : TONE_CAUTION));
             if (items.size() >= 4) break;
         }
-        if (isUseful(intent.orderId)) {
-            items.add(new EvidenceItem("Order receipt", firstNonEmpty(intent.orderTotalUsd, intent.orderId), TONE_SAFE));
+        if (isUseful(intent.demo.orderId)) {
+            items.add(new EvidenceItem("Order receipt", firstNonEmpty(intent.demo.orderTotalUsd, intent.demo.orderId), TONE_SAFE));
         }
         for (int i = 0; i < request.evidence.length(); i++) {
             JSONObject evidence = request.evidence.optJSONObject(i);
@@ -189,7 +189,7 @@ final class TransactionDossier {
                 firstNonEmpty(
                         request.transactionContextSnapshot.optString("user_intent", ""),
                         request.context.optString("user_intent", ""),
-                        intent.agentPrompt,
+                        intent.demo.agentPrompt,
                         intent.summary(),
                         "Payment Request created by agent"
                 ),
@@ -219,7 +219,7 @@ final class TransactionDossier {
 
     private static List<Row> itemRows(PaymentIntent intent) {
         List<Row> rows = new ArrayList<>();
-        for (PaymentIntent.OrderItem item : intent.orderItems) {
+        for (DemoOrderMetadata.OrderItem item : intent.demo.orderItems) {
             rows.add(new Row(
                     item.quantity + "x " + item.name,
                     firstNonEmpty(item.lineTotalUsd, item.description, "Item attached"),
@@ -266,11 +266,11 @@ final class TransactionDossier {
                 intent.request.context.optJSONArray("ai_task_trace"),
                 intent.request.context.optJSONArray("agent_steps")
         ));
-        if (steps.isEmpty() && isUseful(intent.agentPrompt)) {
-            steps.add(new TraceStep("Read user intent", intent.agentPrompt, TONE_INFO));
+        if (steps.isEmpty() && isUseful(intent.demo.agentPrompt)) {
+            steps.add(new TraceStep("Read user intent", intent.demo.agentPrompt, TONE_INFO));
         }
-        if (steps.isEmpty() && intent.hasOrderDetails()) {
-            steps.add(new TraceStep("Built transaction context", firstNonEmpty(intent.itemSummary, "Order evidence attached"), TONE_INFO));
+        if (steps.isEmpty() && intent.demo.hasOrderDetails()) {
+            steps.add(new TraceStep("Built transaction context", firstNonEmpty(intent.demo.itemSummary, "Order evidence attached"), TONE_INFO));
         }
         if (steps.isEmpty()) {
             steps.add(new TraceStep("Created Payment Request", "Agent prepared a request for wallet review.", TONE_INFO));
@@ -463,9 +463,8 @@ final class TransactionDossier {
     }
 
     private static String shortAddress(String value) {
-        if (value == null) return "";
-        if (value.length() <= 18) return value;
-        return value.substring(0, 10) + "..." + value.substring(value.length() - 8);
+        // Delegates to the shared AddressFormat (D9/Q5) — unified 10…8 form.
+        return AddressFormat.medium(value);
     }
 
     private static String titleize(String value, String fallback) {

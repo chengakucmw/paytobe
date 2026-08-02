@@ -1,0 +1,14 @@
+{
+  "name": "@velarumpay/agentfood-platform-demo",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "build": "node scripts/build-site.mjs",
+    "check": "node --check server.mjs && node --check src/agent.mjs && node --check public/app.js && node --check cloud/real-connect-store.mjs && node --check cloud/real-connect-api.mjs && node --check cloud/worker-template.mjs && node --check scripts/build-site.mjs",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs"
+  }
+}

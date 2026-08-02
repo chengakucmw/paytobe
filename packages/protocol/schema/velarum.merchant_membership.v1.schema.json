@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.velarumpay.com/velarum.merchant_membership.v1.schema.json",
+  "title": "VelarumPay Merchant Membership v1",
+  "type": "object",
+  "required": ["membership_id", "merchant_id", "account_id", "role", "status", "version", "created_at", "updated_at"],
+  "properties": {
+    "membership_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "merchant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "account_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "email_normalized": {"type": "string", "format": "email", "maxLength": 254},
+    "role": {"type": "string", "enum": ["owner", "admin", "developer", "viewer"]},
+    "status": {"type": "string", "enum": ["invited", "active", "suspended", "removed"]},
+    "version": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false,
+  "x-velarumpay-contract-version": "velarum.control-plane.v1"
+}

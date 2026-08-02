@@ -25,11 +25,16 @@ final class ScannedPaymentRequestParser {
 
     static PaymentIntent parseIntent(String raw) throws Exception {
         JSONObject embedded = parseEmbeddedPaymentRequest(raw);
-        if (embedded != null) return PaymentIntent.parse(embedded);
+        if (embedded != null) return enforceBuildNetwork(PaymentIntent.parse(embedded));
 
         Draft draft = parseDraft(raw);
         if (draft == null || !draft.isCompleteTransfer()) return null;
-        return PaymentIntent.parse(buildPaymentRequest(raw, draft));
+        return enforceBuildNetwork(PaymentIntent.parse(buildPaymentRequest(raw, draft)));
+    }
+
+    private static PaymentIntent enforceBuildNetwork(PaymentIntent intent) {
+        BuildNetworkPolicy.assertAllowed(intent);
+        return intent;
     }
 
     static Draft parseDraft(String raw) {
@@ -88,6 +93,7 @@ final class ScannedPaymentRequestParser {
                 JSONObject parsed = parsePaymentRequestJson(new String(decoded, StandardCharsets.UTF_8));
                 if (parsed != null) return parsed;
             } catch (Exception ignored) {
+                VpLog.d("ScannedPaymentRequestParser", "base64 decode attempt failed; trying next: " + ignored);
             }
         }
         return null;
@@ -487,6 +493,7 @@ final class ScannedPaymentRequestParser {
             if (clean.startsWith("0x")) return Long.parseLong(clean.substring(2), 16);
             return Long.parseLong(clean);
         } catch (Exception ignored) {
+            VpLog.d("ScannedPaymentRequestParser", "parse chain id failed; defaulting 0: " + ignored);
             return 0L;
         }
     }
@@ -495,6 +502,7 @@ final class ScannedPaymentRequestParser {
         try {
             return Integer.parseInt(clean(value));
         } catch (Exception ignored) {
+            VpLog.d("ScannedPaymentRequestParser", "parse int failed; using fallback: " + ignored);
             return fallback;
         }
     }
@@ -506,6 +514,7 @@ final class ScannedPaymentRequestParser {
             String text = value.toPlainString();
             return text.equals("-0") ? "0" : text;
         } catch (Exception ignored) {
+            VpLog.d("ScannedPaymentRequestParser", "units-to-decimal conversion failed; returning empty: " + ignored);
             return "";
         }
     }
@@ -520,6 +529,7 @@ final class ScannedPaymentRequestParser {
         try {
             return URLDecoder.decode(value == null ? "" : value, "UTF-8");
         } catch (Exception ignored) {
+            VpLog.d("ScannedPaymentRequestParser", "url decode failed; using raw value: " + ignored);
             return value == null ? "" : value;
         }
     }
@@ -529,6 +539,7 @@ final class ScannedPaymentRequestParser {
         try {
             return new BigDecimal(value).compareTo(BigDecimal.ZERO) > 0;
         } catch (Exception ignored) {
+            VpLog.d("ScannedPaymentRequestParser", "decimal compare failed; treating as not positive: " + ignored);
             return false;
         }
     }

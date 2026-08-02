@@ -10,7 +10,9 @@
 // Every operation here stays in BigInt minor units, so totals are exact no
 // matter how many payments accumulate over a day.
 
-const DECIMAL_STRING = /^(0|[1-9]\d*)(\.\d+)?$/;
+// DECIMAL_STRING lives in the protocol package so the validator and this money
+// arithmetic share ONE canonical pattern that cannot drift (F4).
+import { DECIMAL_STRING } from "../../../packages/protocol/src/decimal-format.js";
 
 // True only for an already-canonical, non-negative decimal string. Kept
 // strict (no trimming) so existing risk.js call sites behave identically.

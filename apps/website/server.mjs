@@ -1,5 +1,5 @@
 import http from "node:http";
-import { createReadStream, existsSync, statSync } from "node:fs";
+import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,8 +22,21 @@ const mime = {
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
-  ".ico": "image/x-icon"
+  ".ico": "image/x-icon",
+  ".ttf": "font/ttf",
+  ".txt": "text/plain; charset=utf-8",
+  ".xml": "application/xml; charset=utf-8"
 };
+
+const pageRoutes = new Map([
+  ["/", "/index.html"],
+  ["/demo", "/index.html"],
+  ["/personal", "/personal.html"],
+  ["/business", "/business.html"],
+  ["/security", "/security.html"],
+  ["/support", "/support.html"],
+  ["/preview", "/preview.html"]
+]);
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${port}`}`);
@@ -53,16 +66,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  serveStatic(url.pathname, res);
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    sendJson(res, 405, { ok: false, error: "Method not allowed" });
+    return;
+  }
+
+  serveStatic(url.pathname, url.origin, req.method === "HEAD", res);
 });
 
 server.listen(port, () => {
   console.log(`VelarumPay site listening on http://localhost:${port}`);
 });
 
-function serveStatic(pathname, res) {
+function serveStatic(pathname, origin, headOnly, res) {
   const clean = decodeURIComponent(pathname).replace(/\\/g, "/");
-  const requested = clean === "/" || clean === "/demo" ? "/index.html" : clean;
+  const requested = pageRoutes.get(clean) || clean;
   const filePath = path.normalize(path.join(publicDir, requested));
 
   if (!filePath.startsWith(publicDir)) {
@@ -70,19 +88,45 @@ function serveStatic(pathname, res) {
     return;
   }
 
-  const finalPath = existsSync(filePath) && statSync(filePath).isFile() ? filePath : path.join(publicDir, "index.html");
-  const ext = path.extname(finalPath).toLowerCase();
-  res.writeHead(200, {
+  if (!existsSync(filePath) || !statSync(filePath).isFile()) {
+    sendJson(res, 404, { ok: false, error: "Not found" });
+    return;
+  }
+
+  const ext = path.extname(filePath).toLowerCase();
+  const headers = securityHeaders({
     "content-type": mime[ext] || "application/octet-stream",
     "cache-control": ext === ".html" ? "no-store" : "public, max-age=86400"
   });
-  createReadStream(finalPath).pipe(res);
+
+  if (ext === ".html") {
+    const body = readFileSync(filePath, "utf8").replaceAll("__SITE_ORIGIN__", origin);
+    res.writeHead(200, { ...headers, "content-length": Buffer.byteLength(body) });
+    res.end(headOnly ? undefined : body);
+    return;
+  }
+
+  const size = statSync(filePath).size;
+  res.writeHead(200, { ...headers, "content-length": size });
+  if (headOnly) res.end();
+  else createReadStream(filePath).pipe(res);
 }
 
 function sendJson(res, status, payload) {
-  res.writeHead(status, {
+  res.writeHead(status, securityHeaders({
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store"
-  });
+  }));
   res.end(JSON.stringify(payload, null, 2));
+}
+
+function securityHeaders(headers) {
+  return {
+    ...headers,
+    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY"
+  };
 }

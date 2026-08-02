@@ -57,13 +57,51 @@ final class RelayClient {
     private var connectionTask: Task<Void, Never>?
     private var shouldReconnect = false
     private var currentConfig: Config?
+    // Long-lived session for the WebSocket: no aggressive per-request timeout, so
+    // an open but idle socket is not torn down between relay pushes.
     private let session = URLSession(configuration: .default)
+    // Dedicated session for one-shot REST calls (register / sync / pairing /
+    // status). Bounds every request so a slow or unreachable relay fails fast
+    // instead of freezing the inbox, pairing, or pay flow on URLSession's default
+    // 60s timeout (the single biggest source of perceived "frozen" UI).
+    private let restSession: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 20
+        config.timeoutIntervalForResource = 40
+        config.waitsForConnectivity = false
+        return URLSession(configuration: config)
+    }()
 
     func register(config: Config) async throws {
         _ = try await post(config: config, path: "/v1/devices/app", body: [
             "device_id": config.deviceId,
             "token": config.token
         ])
+    }
+
+    func createConnectInvitation(config: Config) async throws -> ConnectInvitation {
+        // Registration is idempotent and makes the one-button flow work on a new install.
+        try await register(config: config)
+        let response = try await post(config: config, path: "/v1/connect-invitations", body: [
+            "device_id": config.deviceId,
+            "token": config.token,
+            "expires_in_seconds": 300
+        ])
+        return try ConnectInvitation.parse(response)
+    }
+
+    func fetchConnectInvitation(config: Config, invitation: ConnectInvitation) async throws -> ConnectInvitation {
+        let path = "/v1/connect-invitations/\(urlEscape(invitation.connectInvitationId))?device_id=\(urlEscape(config.deviceId))&token=\(urlEscape(config.token))"
+        let response = try await get(config: config, path: path)
+        return try ConnectInvitation.parse(response, preservingKey: invitation.connectKey)
+    }
+
+    func cancelConnectInvitation(config: Config, invitation: ConnectInvitation) async throws -> ConnectInvitation {
+        let response = try await delete(config: config, path: "/v1/connect-invitations/\(urlEscape(invitation.connectInvitationId))", body: [
+            "device_id": config.deviceId,
+            "token": config.token
+        ])
+        return try ConnectInvitation.parse(response, preservingKey: invitation.connectKey)
     }
 
     func fetchPairingSession(config: Config, input: String) async throws -> PairingSession {
@@ -306,7 +344,7 @@ final class RelayClient {
 
     private func get(config: Config, path: String) async throws -> [String: Any] {
         let url = try endpoint(config: config, path: path)
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await restSession.data(from: url)
         guard let http = response as? HTTPURLResponse else { throw AppError.invalidResponse("Missing relay response.") }
         guard (200..<300).contains(http.statusCode) else {
             throw AppError.invalidResponse("Relay HTTP \(http.statusCode): \(String(data: data, encoding: .utf8) ?? "")")
@@ -331,7 +369,7 @@ final class RelayClient {
         request.httpMethod = method
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await restSession.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw AppError.invalidResponse("Missing relay response.") }
         guard (200..<300).contains(http.statusCode) else {
             throw AppError.invalidResponse("Relay HTTP \(http.statusCode): \(String(data: data, encoding: .utf8) ?? "")")

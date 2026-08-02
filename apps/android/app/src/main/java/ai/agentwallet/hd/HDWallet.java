@@ -69,7 +69,11 @@ final class HDWallet {
     }
 
     static List<String> mnemonicWords(String mnemonic) {
-        String clean = mnemonic == null ? "" : mnemonic.trim().toLowerCase();
+        // Locale.ROOT: BIP-39 normalization must be locale-independent. A bare
+        // toLowerCase() follows the device locale, so on tr/az an uppercase "I"
+        // becomes dotless "ı" and diverges from the Rust core / iOS — breaking
+        // import of mixed-case phrases on those devices.
+        String clean = mnemonic == null ? "" : mnemonic.trim().toLowerCase(java.util.Locale.ROOT);
         if (clean.isEmpty()) return Collections.emptyList();
         return Arrays.asList(clean.split("\\s+"));
     }

@@ -15,9 +15,11 @@ export function apiWarning(code, message, details = {}) {
 
 export function createResponders({ observability }) {
   function sendApiError(res, status, code, message, options = {}) {
+    const requestId = String(res.getHeader?.("x-request-id") || options.requestId || "unknown");
     const error = {
       code,
       message,
+      request_id: requestId,
       severity: options.severity || "blocker"
     };
     if (options.field) error.field = options.field;

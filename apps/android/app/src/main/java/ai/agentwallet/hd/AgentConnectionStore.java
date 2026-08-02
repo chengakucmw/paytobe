@@ -1,7 +1,6 @@
 package ai.agentwallet.hd;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 
 import org.json.JSONArray;
 
@@ -9,20 +8,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class AgentConnectionStore {
-    private static final String PREFS = "agentwallet_agent_connections";
-    private static final String KEY_CONNECTIONS = "connections";
-
     private AgentConnectionStore() {}
 
     static List<AgentConnection> list(Context context) {
         List<AgentConnection> out = new ArrayList<>();
-        String raw = prefs(context).getString(KEY_CONNECTIONS, "[]");
         try {
+            String raw = SecureWalletStore.connectionRecords(context);
             JSONArray array = new JSONArray(raw);
             for (int i = 0; i < array.length(); i++) {
                 out.add(AgentConnection.parse(array.getJSONObject(i)));
             }
         } catch (Exception ignored) {
+            // Legacy JSON parser messages can echo the record being parsed. Never attach
+            // that throwable because a damaged legacy record may still contain a token.
+            VpLog.w("AgentConnectionStore", "read connections failed; reconnect may be required");
         }
         return out;
     }
@@ -62,11 +61,15 @@ final class AgentConnectionStore {
 
     private static void save(Context context, List<AgentConnection> items) throws Exception {
         JSONArray array = new JSONArray();
-        for (AgentConnection connection : items) array.put(connection.toJson());
-        prefs(context).edit().putString(KEY_CONNECTIONS, array.toString()).apply();
+        for (AgentConnection connection : items) {
+            org.json.JSONObject item = connection.toJson();
+            if (connection.isRevoked()) item.put("connection_token", "");
+            array.put(item);
+        }
+        SecureWalletStore.saveConnectionRecords(context, array.toString());
     }
 
-    private static SharedPreferences prefs(Context context) {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    static void clear(Context context) {
+        SecureWalletStore.clearConnectionRecords(context);
     }
 }

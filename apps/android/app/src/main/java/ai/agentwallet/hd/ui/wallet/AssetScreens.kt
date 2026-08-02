@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
@@ -29,6 +32,7 @@ import ai.agentwallet.hd.ui.components.VpFactRow
 import ai.agentwallet.hd.ui.components.VpMenuRow
 import ai.agentwallet.hd.ui.components.VpOutlineButton
 import ai.agentwallet.hd.ui.components.VpPrimaryButton
+import ai.agentwallet.hd.ui.components.VpRiskBanner
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.components.vpToneOf
@@ -61,15 +65,24 @@ fun AssetDetailScreen(
     val ui by vm.ui.collectAsStateWithLifecycle()
     val asset = assetByKey(assetKey)
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        VpSubheader(eyebrow = "Asset details", title = asset?.let { "${it.symbol} on ${it.chain}" } ?: "Asset", onBack = onBack)
+        VpSubheader(eyebrow = "Asset details", title = asset?.let { "${it.symbol} · ${it.chain}" } ?: "Asset", onBack = onBack)
         if (asset == null) {
             Box(Modifier.fillMaxWidth().padding(Spacing.s8), contentAlignment = Alignment.Center) {
                 Text("Asset not found.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
             }
         } else {
             val wallet = ui.wallet
-            val balance = displayBalance(wallet.balances[asset.balanceKey])
+            val assetBalance = wallet.balances[asset.balanceKey]
+            val condition = balanceCondition(assetBalance)
+            val balance = displayBalance(assetBalance)
             val address = addressFor(asset.addressKind, wallet)
+            val statusTone = when (condition) {
+                BalanceCondition.AVAILABLE -> VpTone.SAFE
+                BalanceCondition.ZERO -> VpTone.INFO
+                BalanceCondition.INACTIVE -> VpTone.CAUTION
+                BalanceCondition.ERROR -> VpTone.DANGER
+                BalanceCondition.UNKNOWN -> VpTone.INFO
+            }
             Column(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
                 verticalArrangement = Arrangement.spacedBy(Spacing.s4),
@@ -77,9 +90,44 @@ fun AssetDetailScreen(
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("$balance ${asset.symbol}", style = MaterialTheme.typography.displaySmall, color = VelarumTheme.colors.textStrong)
-                        Text("≈ $${formatUsd(fiatUsd(asset.symbol, balance))}", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                        Text(
+                            if (condition in setOf(BalanceCondition.AVAILABLE, BalanceCondition.ZERO)) {
+                                "≈ $${formatUsd(fiatUsd(asset.symbol, balance))}"
+                            } else if (ui.refreshing) {
+                                "Refreshing balance…"
+                            } else {
+                                balanceStatusLabel(assetBalance)
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = VelarumTheme.colors.textMuted,
+                        )
                     }
                 }
+                if (ui.refreshing) {
+                    VpRiskBanner(
+                        tone = VpTone.INFO,
+                        title = "Refreshing balance",
+                        body = "Checking the latest confirmed balance on Stellar Testnet.",
+                    )
+                } else if (condition == BalanceCondition.ERROR || ui.refreshError != null) {
+                    VpRiskBanner(
+                        tone = VpTone.DANGER,
+                        title = "Balance refresh failed",
+                        body = "The wallet could not reach Stellar Testnet. Check your connection and try again.",
+                    )
+                } else if (condition == BalanceCondition.INACTIVE) {
+                    VpRiskBanner(
+                        tone = VpTone.CAUTION,
+                        title = "Account not activated",
+                        body = "The latest refresh did not find this account on Stellar Testnet. After funding it, refresh again.",
+                    )
+                }
+                VpOutlineButton(
+                    text = if (ui.refreshing) "Refreshing…" else "Refresh balance",
+                    onClick = vm::refresh,
+                    enabled = !ui.refreshing,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 PriceChartCard(symbol = asset.symbol)
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                     VpPrimaryButton("Send", onClick = { onSend(asset.symbol, asset.chain) }, modifier = Modifier.weight(1f))
@@ -88,7 +136,11 @@ fun AssetDetailScreen(
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     VpFactRow("Network", asset.chain)
                     VpFactRow("Wallet address", shortAddress(address))
-                    VpFactRow("Status", if (balance != "0") "In wallet" else "No balance yet", if (balance != "0") VpTone.SAFE else VpTone.INFO)
+                    VpFactRow(
+                        "Status",
+                        if (ui.refreshing) "Refreshing" else balanceStatusLabel(assetBalance),
+                        if (ui.refreshing) VpTone.INFO else statusTone,
+                    )
                     VpFactRow("Signing", "Local approval required")
                 }
                 VpCard(modifier = Modifier.fillMaxWidth()) {
@@ -169,14 +221,14 @@ fun AssetSearchScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8).imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
-            ai.agentwallet.hd.ui.components.VpTextField(value = query, onValueChange = { query = it }, label = "Search token or chain")
+            ai.agentwallet.hd.ui.components.VpTextField(value = query, onValueChange = { query = it }, label = "Search token or network")
             if (results.isEmpty()) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     Text("No asset found", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                    Text("Try XLM, SOL, ETH, USDC, or a chain like Base.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("Try XLM, SOL, ETH, USDC, or a network like Base.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
                 }
             } else {
-                results.forEach { a -> VpMenuRow("${a.symbol} on ${a.chain}", "View details", onClick = { onOpen(a.balanceKey) }) }
+                results.forEach { a -> VpMenuRow("${a.symbol} · ${a.chain}", "View details", onClick = { onOpen(a.balanceKey) }) }
             }
         }
     }
@@ -188,26 +240,27 @@ fun AssetCustomizeScreen(vm: WalletViewModel, onBack: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val displayed = ui.displayedKeys.toSet()
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        VpSubheader(eyebrow = "Crypto assets", title = "Customize list", onBack = onBack)
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-        ) {
-            HOME_ASSETS.forEach { a ->
-                val on = a.balanceKey in displayed
-                VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("${a.symbol} on ${a.chain}", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                            Text(if (on) "Shown on Home" else "Hidden", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
-                        }
-                        VpChip(if (on) "Shown" else "Add", on) {
-                            val next = if (on) displayed - a.balanceKey else displayed + a.balanceKey
-                            if (next.isNotEmpty()) {
-                                SettingsRepository.setDisplayedKeys(context, HOME_ASSETS.map { it.balanceKey }.filter { it in next })
-                                vm.refresh()
-                            }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        item {
+            VpSubheader(eyebrow = "Crypto assets", title = "Customize list", onBack = onBack)
+        }
+        items(HOME_ASSETS) { a ->
+            val on = a.balanceKey in displayed
+            VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("${a.symbol} · ${a.chain}", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                        Text(if (on) "Shown on Home" else "Hidden", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    }
+                    VpChip(if (on) "Shown" else "Add", on) {
+                        val next = if (on) displayed - a.balanceKey else displayed + a.balanceKey
+                        if (next.isNotEmpty()) {
+                            SettingsRepository.setDisplayedKeys(context, HOME_ASSETS.map { it.balanceKey }.filter { it in next })
+                            vm.refresh()
                         }
                     }
                 }
@@ -220,30 +273,33 @@ fun AssetCustomizeScreen(vm: WalletViewModel, onBack: () -> Unit) {
 @Composable
 fun AssetHistoryScreen(vm: ActivityViewModel, symbol: String, onBack: () -> Unit) {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    val items = ui.items.filter { it.asset.equals(symbol, true) }
-    Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-        VpSubheader(eyebrow = "Asset", title = "$symbol history", onBack = onBack)
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8),
-            verticalArrangement = Arrangement.spacedBy(Spacing.s4),
-        ) {
-            if (items.isEmpty()) {
-                VpCard(modifier = Modifier.fillMaxWidth()) {
+    val rows = ui.items.filter { it.asset.equals(symbol, true) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(Spacing.s4),
+    ) {
+        item {
+            VpSubheader(eyebrow = "Asset", title = "$symbol history", onBack = onBack)
+        }
+        if (rows.isEmpty()) {
+            item {
+                VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
                     Text("No activity yet", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
                     Text("Transfers of $symbol you sign on this device will appear here.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
                 }
-            } else {
-                items.forEach { item ->
-                    VpCard(modifier = Modifier.fillMaxWidth()) {
-                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(item.title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                                if (item.subtitle.isNotBlank()) {
-                                    Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
-                                }
+            }
+        } else {
+            items(rows) { item ->
+                VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(item.title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                            if (item.subtitle.isNotBlank()) {
+                                Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
                             }
-                            VpBadge(item.amount.ifBlank { "—" }, vpToneOf(item.tone))
                         }
+                        VpBadge(item.amount.ifBlank { "—" }, vpToneOf(item.tone))
                     }
                 }
             }

@@ -174,6 +174,98 @@ struct WalletNetworkConfig: Identifiable, Codable, Equatable {
                 source: sourceBuiltIn,
                 verificationStatus: statusVerified,
                 verifiedAtMs: 0
+            ),
+            // The remaining EVM chains in the transfer registry share the generic EVM signer
+            // (secp256k1); they only lacked a built-in RPC. Wiring verified public endpoints
+            // here makes every direct-broadcast EVM chain send-ready and selectable (chain-id
+            // is what matches(network:chainId:) keys on). Mirrors Android WalletNetworkStore.
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Arbitrum One",
+                defaultRPCURL: "https://arb1.arbitrum.io/rpc",
+                chainId: 42161,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://arbiscan.io",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Optimism",
+                defaultRPCURL: "https://mainnet.optimism.io",
+                chainId: 10,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://optimistic.etherscan.io",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "BNB Smart Chain",
+                defaultRPCURL: "https://bsc-dataseed.binance.org",
+                chainId: 56,
+                currencySymbol: "BNB",
+                blockExplorerURL: "https://bscscan.com",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Avalanche C-Chain",
+                defaultRPCURL: "https://api.avax.network/ext/bc/C/rpc",
+                chainId: 43114,
+                currencySymbol: "AVAX",
+                blockExplorerURL: "https://snowtrace.io",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Cronos",
+                defaultRPCURL: "https://evm.cronos.org",
+                chainId: 25,
+                currencySymbol: "CRO",
+                blockExplorerURL: "https://cronoscan.com",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Mantle",
+                defaultRPCURL: "https://rpc.mantle.xyz",
+                chainId: 5000,
+                currencySymbol: "MNT",
+                blockExplorerURL: "https://explorer.mantle.xyz",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "ZKsync Era",
+                defaultRPCURL: "https://mainnet.era.zksync.io",
+                chainId: 324,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://explorer.zksync.io",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
+            ),
+            WalletNetworkConfig(
+                family: familyEVM,
+                name: "Linea",
+                defaultRPCURL: "https://rpc.linea.build",
+                chainId: 59144,
+                currencySymbol: "ETH",
+                blockExplorerURL: "https://lineascan.build",
+                source: sourceBuiltIn,
+                verificationStatus: statusVerified,
+                verifiedAtMs: 0
             )
         ]
     }
@@ -1052,6 +1144,51 @@ struct PairingSession: Identifiable, Codable, Equatable {
     }
 }
 
+struct ConnectInvitation: Identifiable, Codable, Equatable {
+    var connectInvitationId: String
+    var connectKey: String
+    var status: String
+    var pairingSessionId: String
+    var connectionId: String
+    var agentId: String
+    var agentName: String
+    var runtime: String
+    var source: String
+    var identityAssurance: String
+    var requestedScopes: [String]
+    var expiresAtMs: Int64
+
+    var id: String { connectInvitationId }
+
+    var isTerminal: Bool {
+        ["connected", "rejected", "cancelled", "expired"].contains(status)
+    }
+
+    var hasClaimedAgent: Bool {
+        !pairingSessionId.isEmpty && !agentName.isEmpty
+    }
+
+    static func parse(_ response: [String: Any], preservingKey: String = "") throws -> ConnectInvitation {
+        let invitation = response["connect_invitation"] as? [String: Any] ?? response
+        let agent = invitation["agent_identity"] as? [String: Any] ?? [:]
+        let responseKey = string(response, "connect_key")
+        return ConnectInvitation(
+            connectInvitationId: string(invitation, "connect_invitation_id"),
+            connectKey: responseKey.isEmpty ? preservingKey : responseKey,
+            status: string(invitation, "status", fallback: "waiting").lowercased(),
+            pairingSessionId: string(invitation, "pairing_session_id"),
+            connectionId: string(invitation, "connection_id"),
+            agentId: string(agent, "agent_id"),
+            agentName: string(agent, "agent_name"),
+            runtime: string(agent, "runtime"),
+            source: string(agent, "source"),
+            identityAssurance: string(invitation, "identity_assurance", fallback: "unverified"),
+            requestedScopes: stringArray(invitation, "requested_scopes").filter { !isSigningScope($0) },
+            expiresAtMs: timeMs(invitation, "expires_at", fallback: 0)
+        )
+    }
+}
+
 struct AgentConnection: Identifiable, Codable, Equatable {
     var connectionId: String
     var connectionToken: String
@@ -1255,7 +1392,7 @@ func scopeDisplayName(_ scope: String) -> String {
     }
 }
 
+// Delegates to the shared AddressFormat (D9/Q5) — single home for address shortening.
 func shortAddress(_ value: String) -> String {
-    guard value.count > 18 else { return value }
-    return "\(value.prefix(10))...\(value.suffix(8))"
+    AddressFormat.shortAddress(value)
 }
