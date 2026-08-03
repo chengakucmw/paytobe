@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
 import worker from "../dist/server/index.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,7 +25,30 @@ test("all public pages render as a clearly labelled Preview", async () => {
     assert.match(html, /https:\/\/docs\.velarumai\.com/, route);
     assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|<script[^>]+src="https?:/i, route);
     assert.match(html, /https:\/\/velarumpay\.example\/og\.png/, route);
+    assert.match(html, /\/site\.js\?v=i18n-20260803-2/, route);
   }
+});
+
+test("the language picker navigates to the selected localized route", async () => {
+  const script = await (await call("/site.js")).text();
+  const listeners = {};
+  const picker = {
+    value: "/zh-hans/",
+    addEventListener(type, listener) {
+      listeners[type] = listener;
+    }
+  };
+  const location = { href: "/" };
+  vm.runInNewContext(script, {
+    document: {
+      querySelector() { return null; },
+      querySelectorAll(selector) { return selector === "[data-language-picker]" ? [picker] : []; }
+    },
+    window: { location }
+  });
+  assert.equal(typeof listeners.change, "function");
+  listeners.change();
+  assert.equal(location.href, "/zh-hans/");
 });
 
 test("local navigation targets resolve", async () => {
