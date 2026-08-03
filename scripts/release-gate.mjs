@@ -23,6 +23,38 @@ const sharedEnv = {
   VP_ALLOW_LISTEN_TESTS: "1"
 };
 
+const safeInheritedEnvKeys = [
+  "PATH",
+  "HOME",
+  "USER",
+  "LOGNAME",
+  "TMPDIR",
+  "SHELL",
+  "LANG",
+  "LC_ALL",
+  "TERM",
+  "JAVA_HOME",
+  "ANDROID_HOME",
+  "ANDROID_SDK_ROOT",
+  "NDK_HOME",
+  "CARGO_HOME",
+  "RUSTUP_HOME",
+  "DEVELOPER_DIR",
+  "SDKROOT",
+  "__CF_USER_TEXT_ENCODING"
+];
+
+const androidReleaseEnvKeys = [
+  "VELARUMPAY_ANDROID_KEYSTORE_PATH",
+  "VELARUMPAY_ANDROID_STORE_PASSWORD",
+  "VELARUMPAY_ANDROID_KEY_ALIAS",
+  "VELARUMPAY_ANDROID_KEY_PASSWORD",
+  "VELARUMPAY_FIREBASE_APPLICATION_ID",
+  "VELARUMPAY_FIREBASE_API_KEY",
+  "VELARUMPAY_FIREBASE_PROJECT_ID",
+  "VELARUMPAY_FIREBASE_SENDER_ID"
+];
+
 const args = new Set(process.argv.slice(2));
 const skipAndroid = args.has("--skip-android") || args.has("--skip-mobile") || process.env.RELEASE_GATE_SKIP_ANDROID === "true";
 const skipIos = args.has("--skip-ios") || args.has("--skip-mobile") || process.env.RELEASE_GATE_SKIP_IOS === "true";
@@ -84,6 +116,7 @@ const steps = [
     ],
     cwd: path.join(repoRoot, "apps/android"),
     env: androidEnv(),
+    allowAndroidReleaseEnv: true,
     timeoutMs: 30 * 60_000,
     skip: nodeOnly || skipAndroid
   },
@@ -201,11 +234,7 @@ function run(step) {
     let settled = false;
     const child = spawn(step.command, step.args, {
       cwd: step.cwd || repoRoot,
-      env: {
-        ...process.env,
-        ...sharedEnv,
-        ...(step.env || {})
-      },
+      env: childEnvironment(step),
       stdio: "inherit"
     });
     const timeout = setTimeout(() => {
@@ -223,6 +252,23 @@ function run(step) {
       resolve(code ?? 1);
     });
   });
+}
+
+function childEnvironment(step) {
+  const env = {};
+  for (const key of safeInheritedEnvKeys) {
+    if (process.env[key] !== undefined) env[key] = process.env[key];
+  }
+  if (step.allowAndroidReleaseEnv) {
+    for (const key of androidReleaseEnvKeys) {
+      if (process.env[key] !== undefined) env[key] = process.env[key];
+    }
+  }
+  return {
+    ...env,
+    ...sharedEnv,
+    ...(step.env || {})
+  };
 }
 
 function assertWritable(directory) {

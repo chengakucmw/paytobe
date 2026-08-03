@@ -72,6 +72,15 @@ test("the matrix names every release-blocking tenant resource and both runtime a
   assert.match(gate, /tests\/security\/cross-tenant-matrix\.test\.mjs/);
 });
 
+test("the release gate isolates Android signing and Firebase values from every non-Android child", () => {
+  const gate = fs.readFileSync(path.join(codeRoot, "scripts/release-gate.mjs"), "utf8");
+  assert.match(gate, /const safeInheritedEnvKeys = \[/);
+  assert.match(gate, /const androidReleaseEnvKeys = \[/);
+  assert.match(gate, /allowAndroidReleaseEnv: true/);
+  assert.match(gate, /env: childEnvironment\(step\)/);
+  assert.doesNotMatch(gate, /env:\s*\{\s*\.\.\.process\.env/);
+});
+
 async function seed(adapter, tenantScope, suffix) {
   const merchantId = tenantScope.merchant_id;
   await adapter.repository.create(tenantScope, "merchant", merchant(merchantId, `Merchant ${suffix.toUpperCase()}`));
