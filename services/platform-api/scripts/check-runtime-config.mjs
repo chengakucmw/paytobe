@@ -24,5 +24,8 @@ console.log(JSON.stringify({
   store_path: config.storage.path || "default",
   cors_allowlist_count: config.cors.allowed_origins.length,
   rate_limit_enabled: config.rate_limit.enabled,
-  openclaw_secrets_configured: config.openclaw.secrets.length
+  openclaw_secrets_configured: config.openclaw.secrets.length,
+  transactional_email_provider: config.email.provider,
+  transactional_email_configured: config.email.provider === "cloudflare"
+    && Boolean(config.email.account_id && config.email.api_token && config.email.from && config.email.portal_base_url)
 }, null, 2));

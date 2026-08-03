@@ -55,6 +55,9 @@ for (const [route, filename] of Object.entries(pageRoutes)) {
   }
 }
 
+assets["/zh-hans/legal.html"] = assets["/legal.zh-hans.html"];
+delete assets["/legal.zh-hans.html"];
+
 assets["/sitemap.xml"].body = buildSitemap();
 
 await fs.rm(outputDirectory, { recursive: true, force: true });

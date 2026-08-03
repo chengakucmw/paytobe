@@ -7,6 +7,7 @@ import { hmacHex, openClawCanonicalPayload } from "../../services/platform-api/s
 import {
   MemoryRateLimiter,
   ReplayGuard,
+  createTestnetOnlyMiddleware,
   isOriginAllowed,
   legacyUnsignedDecision,
   loadRuntimeConfig,
@@ -31,6 +32,7 @@ test("runtime config rejects unsafe production deployment settings", () => {
   assert(validation.errors.some((error) => error.includes("absolute durable path")));
   // B8: production must require a metrics token so /metrics is not publicly readable.
   assert(validation.errors.some((error) => error.includes("METRICS_TOKEN")));
+  assert(validation.errors.some((error) => error.includes("TRANSACTIONAL_EMAIL_PROVIDER")));
 });
 
 test("CORS origin checks allow explicit and localhost origins only by default", () => {
@@ -42,6 +44,27 @@ test("CORS origin checks allow explicit and localhost origins only by default", 
   assert.equal(isOriginAllowed("http://localhost:5173", config).ok, true);
   assert.equal(isOriginAllowed("https://evil.example", config).ok, false);
   assert.equal(isOriginAllowed("", config).ok, true);
+});
+
+test("official testnet middleware rejects every mainnet-shaped request before routing", () => {
+  const middleware = createTestnetOnlyMiddleware(loadRuntimeConfig({ OFFICIAL_TESTNET_ONLY: "true" }));
+  for (const body of [
+    { payment: { network: "stellar_public" } },
+    { network: "base_mainnet" },
+    { config: { horizon_url: "https://horizon.stellar.org" } }
+  ]) {
+    const response = mockResponse();
+    let nextCalled = false;
+    middleware({ body }, response, () => { nextCalled = true; });
+    assert.equal(nextCalled, false);
+    assert.equal(response.statusCode, 400);
+    assert.equal(response.payload.error.code, "validation_failed");
+    assert.equal(response.payload.error.details.reason, "mainnet_forbidden");
+  }
+
+  let nextCalled = false;
+  middleware({ body: { payment: { network: "stellar_testnet" } } }, mockResponse(), () => { nextCalled = true; });
+  assert.equal(nextCalled, true);
 });
 
 test("legacy unsigned OpenClaw mode is localhost-only", () => {
@@ -298,6 +321,21 @@ function mockReq({ ip = "127.0.0.1", rawBody = "", headers = {} } = {}) {
     path: "/v1/payment-intents",
     get(name) {
       return normalizedHeaders[String(name).toLowerCase()] || "";
+    }
+  };
+}
+
+function mockResponse() {
+  return {
+    statusCode: 200,
+    payload: null,
+    status(value) {
+      this.statusCode = value;
+      return this;
+    },
+    json(value) {
+      this.payload = value;
+      return this;
     }
   };
 }

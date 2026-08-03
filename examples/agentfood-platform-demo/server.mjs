@@ -118,14 +118,15 @@ async function serveStatic(pathname, res) {
     "/app.js": ["app.js", "text/javascript; charset=utf-8"],
     "/styles.css": ["styles.css", "text/css; charset=utf-8"],
     "/assets/agentfood-dishes-v2.jpg": ["assets/agentfood-dishes-v2.jpg", "image/jpeg"],
-    "/assets/agentfood-social-v2.jpg": ["assets/agentfood-social-v2.jpg", "image/jpeg"],
-    "/fonts/SchibstedGrotesk-Variable.ttf": ["fonts/SchibstedGrotesk-Variable.ttf", "font/ttf"],
-    "/fonts/HankenGrotesk-Variable.ttf": ["fonts/HankenGrotesk-Variable.ttf", "font/ttf"],
-    "/fonts/SpaceMono-Regular.ttf": ["fonts/SpaceMono-Regular.ttf", "font/ttf"],
-    "/fonts/SpaceMono-Bold.ttf": ["fonts/SpaceMono-Bold.ttf", "font/ttf"],
-    "/fonts/OFL-Schibsted-Grotesk.txt": ["fonts/OFL-Schibsted-Grotesk.txt", "text/plain; charset=utf-8"],
-    "/fonts/OFL-Hanken-Grotesk.txt": ["fonts/OFL-Hanken-Grotesk.txt", "text/plain; charset=utf-8"],
-    "/fonts/OFL-Space-Mono.txt": ["fonts/OFL-Space-Mono.txt", "text/plain; charset=utf-8"]
+    "/assets/agentfood-social-v3.png": ["assets/agentfood-social-v3.png", "image/png"],
+    "/fonts/Poppins-Regular.ttf": ["fonts/Poppins-Regular.ttf", "font/ttf"],
+    "/fonts/Poppins-SemiBold.ttf": ["fonts/Poppins-SemiBold.ttf", "font/ttf"],
+    "/fonts/Poppins-Bold.ttf": ["fonts/Poppins-Bold.ttf", "font/ttf"],
+    "/fonts/DMSans-Variable.ttf": ["fonts/DMSans-Variable.ttf", "font/ttf"],
+    "/fonts/JetBrainsMono-Variable.ttf": ["fonts/JetBrainsMono-Variable.ttf", "font/ttf"],
+    "/fonts/OFL-Poppins.txt": ["fonts/OFL-Poppins.txt", "text/plain; charset=utf-8"],
+    "/fonts/OFL-DM-Sans.txt": ["fonts/OFL-DM-Sans.txt", "text/plain; charset=utf-8"],
+    "/fonts/OFL-JetBrains-Mono.txt": ["fonts/OFL-JetBrains-Mono.txt", "text/plain; charset=utf-8"]
   };
   const entry = mapping[pathname] || ["index.html", "text/html; charset=utf-8"];
   const body = await fs.readFile(path.join(publicDirectory, entry[0]));

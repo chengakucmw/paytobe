@@ -31,6 +31,13 @@ export function createMerchantDomainsRouter(deps) {
         actor: { type: "merchant_account", id: auth.auth_context.actor_id },
         resource: { type: "merchant_domain", id: result.merchant_domain.domain_id }
       });
+      if (result.merchant_activated) {
+        observability.recordAuditEvent("merchant.activated", "success", {
+          actor: { type: "merchant_account", id: auth.auth_context.actor_id },
+          resource: { type: "merchant", id: result.merchant.merchant_id },
+          labels: { verification: "domain" }
+        });
+      }
       return res.json(result);
     } catch (error) { return next(error); }
   });

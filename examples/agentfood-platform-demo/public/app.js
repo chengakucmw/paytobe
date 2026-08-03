@@ -30,7 +30,7 @@ function escapeHtml(value) {
 function addMessage(text, role = "agent", order = null) {
   const article = document.createElement("article");
   article.className = `message ${role === "user" ? "user-message" : "agent-message"}${role === "error" ? " error" : ""}`;
-  const label = role === "user" ? "You" : role === "error" ? "Connection notice" : "AgentFood";
+  const label = role === "user" ? "You" : role === "error" ? "Connection notice" : "Food agent";
   article.innerHTML = `<span class="message-label">${label}</span><p>${escapeHtml(text)}</p>`;
   if (order) {
     const items = order.items.map((item) => `${escapeHtml(item.name)} · ${escapeHtml(item.price)} XLM`).join("<br>");
@@ -55,7 +55,7 @@ async function configureIdentity() {
   if (["localhost", "127.0.0.1"].includes(location.hostname)) {
     identityButton.addEventListener("click", (event) => {
       event.preventDefault();
-      addMessage("Google-backed sign-in is available on the public OpenAI Sites version through ChatGPT identity.");
+      addMessage("Google-backed sign-in is available on the hosted version through ChatGPT identity.");
     });
     return;
   }
@@ -134,6 +134,13 @@ function promptAgent(prompt, merchantId = "") {
   document.querySelector(".assistant-pane").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+document.querySelectorAll("[data-focus-chat]").forEach((button) => {
+  button.addEventListener("click", () => {
+    document.querySelector(".assistant-pane").scrollIntoView({ behavior: "smooth", block: "start" });
+    input.focus({ preventScroll: true });
+  });
+});
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   const message = input.value.trim();
@@ -176,7 +183,7 @@ form.addEventListener("submit", async (event) => {
 });
 
 demoConnectButton.addEventListener("click", () => {
-  addMessage("Open VelarumPay, create a fresh one-time Connect Key, and paste it here. AgentFood will consume it once, then wait for your approval in the wallet.");
+  addMessage("Open VelarumPay, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
   input.placeholder = "Paste velarumpay-connect:ck_…";
   input.focus();
 });
@@ -213,9 +220,9 @@ function renderMerchants(merchants) {
           <h3>${escapeHtml(merchant.name)}</h3>
           <span class="cuisine">${escapeHtml(merchant.cuisine)}</span>
           <p>${escapeHtml(merchant.description)}</p>
-          <div class="merchant-actions">
-            <strong>From ${escapeHtml(featuredItem.price)} XLM</strong>
-            <button type="button" data-ask-merchant="${escapeHtml(merchant.id)}" data-name="${escapeHtml(merchant.name)}">Ask AI</button>
+        <div class="merchant-actions">
+          <strong>From ${escapeHtml(featuredItem.price)} XLM</strong>
+            <button type="button" data-ask-merchant="${escapeHtml(merchant.id)}" data-name="${escapeHtml(merchant.name)}">Build an order</button>
           </div>
         </div>
       </article>`;
@@ -232,7 +239,7 @@ function configureHostedMode() {
   document.body.dataset.hostingMode = "cloud-real-connect";
   composerHint.textContent = "Create a one-time key in VelarumPay. Never share a device token or private key.";
   demoConnectButton.textContent = "Connect VelarumPay";
-  addMessage("This hosted version uses the VelarumPay Connect Platform. Create a key in VelarumPay, paste it here, then approve AgentFood's registered identity and scopes in the wallet.");
+  addMessage("This hosted version uses VelarumPay Connect. Create a key in VelarumPay, paste it here, then approve my registered identity and scopes in the wallet.");
 }
 
 async function start() {

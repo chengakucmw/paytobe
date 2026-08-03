@@ -115,7 +115,7 @@ test("published developer contract downloads are byte-identical to canonical sou
 
 test("merchant documentation contract covers the canonical testnet onboarding surface", () => {
   const document = readJson(openApiPath);
-  assert.equal(document.servers[0].url, "https://api-testnet.velarumpay.com");
+  assert.equal(document.servers[0].url, "https://api.velarumai.com");
   for (const endpoint of [
     "/v1/merchant-accounts/registrations", "/v1/merchant-accounts/email-verifications",
     "/v1/merchants", "/v1/merchant-sessions", "/v1/merchant-domains", "/v1/merchant-domains/{id}/verify",

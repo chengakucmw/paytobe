@@ -9,11 +9,15 @@ services:
       NODE_ENV: production
       RUNTIME_ENV: production
       PORT: "8787"
+      PUBLIC_BASE_URL: https://api.velarumai.com
+      OFFICIAL_TESTNET_ONLY: "true"
       RELAY_STORE_DRIVER: sqlite
       RELAY_STORE_PATH: /var/lib/velarumpay/relay-store.sqlite
       RELAY_STORE_LEGACY_JSON: /var/lib/velarumpay/relay-store.json
       ALLOW_UNSIGNED_OPENCLAW: "false"
       ALLOW_UNSIGNED_OPENCLAW_LOCAL_ONLY: "true"
+      STELLAR_PUBLIC_ENABLED: "false"
+      STELLAR_TESTNET_HORIZON_URL: https://horizon-testnet.stellar.org
     ports:
       - "8787:8787"
     volumes:

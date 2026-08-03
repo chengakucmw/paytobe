@@ -14,17 +14,40 @@ def buildConfigString = { String value ->
 def buildConfigBoolean = { String value ->
     ["1", "true", "yes", "on"].contains(value.trim().toLowerCase()) ? "true" : "false"
 }
+def generatedThirdPartyAssets = layout.buildDirectory.dir("generated/third-party-assets")
+def generateThirdPartyLicenseAssets = tasks.register("generateThirdPartyLicenseAssets", Copy) {
+    from(rootProject.file("../../LICENSE")) {
+        rename { "LICENSE.txt" }
+    }
+    from(rootProject.file("../../NOTICE")) {
+        rename { "NOTICE.txt" }
+    }
+    into(generatedThirdPartyAssets.map { it.dir("third_party") })
+}
 
-// --- Release 签名配置加载 -----------------------------------------------------
-// 默认：release 用 debug 签名 → 打出来的 APK 可【直接装真机】，无需任何手动设置。
-// 升级：当 apps/android/keystore.properties 存在时（你自己的正式签名，已被 .gitignore
-//      忽略、不会进 git），自动改用它来签 release，可用于正式分发/上架。
+// Release signing values may come from an ignored local properties file or
+// from the build environment. Official release builds never fall back to the
+// Android debug key.
 def keystorePropertiesFile = rootProject.file("keystore.properties")
-def hasReleaseKeystore = keystorePropertiesFile.exists()
 def keystoreProperties = new Properties()
-if (hasReleaseKeystore) {
+if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
 }
+def releaseSigningValue = { String propertyName, String environmentName ->
+    def environmentValue = System.getenv(environmentName)
+    environmentValue != null && !environmentValue.trim().isEmpty()
+        ? environmentValue
+        : (keystoreProperties[propertyName] ?: "").toString()
+}
+def releaseStorePath = releaseSigningValue("storeFile", "VELARUMPAY_ANDROID_KEYSTORE_PATH")
+def releaseStorePassword = releaseSigningValue("storePassword", "VELARUMPAY_ANDROID_STORE_PASSWORD")
+def releaseKeyAlias = releaseSigningValue("keyAlias", "VELARUMPAY_ANDROID_KEY_ALIAS")
+def releaseKeyPassword = releaseSigningValue("keyPassword", "VELARUMPAY_ANDROID_KEY_PASSWORD")
+def hasReleaseKeystore = !releaseStorePath.isEmpty()
+    && file(releaseStorePath).exists()
+    && !releaseStorePassword.isEmpty()
+    && !releaseKeyAlias.isEmpty()
+    && !releaseKeyPassword.isEmpty()
 
 android {
     namespace "ai.agentwallet.hd"
@@ -45,7 +68,7 @@ android {
         buildConfigField "String", "STELLAR_MAINNET_MAX_XLM", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetMaxXlm", "VELARUMPAY_STELLAR_MAINNET_MAX_XLM") ?: "1")
         buildConfigField "String", "STELLAR_MAINNET_HORIZON_URL", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetHorizonUrl", "VELARUMPAY_STELLAR_MAINNET_HORIZON_URL") ?: "https://horizon.stellar.org")
         buildConfigField "String", "STELLAR_MAINNET_RECIPIENTS", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetRecipients", "VELARUMPAY_STELLAR_MAINNET_RECIPIENTS"))
-        buildConfigField "String", "DEFAULT_PLATFORM_API_URL", '"https://api-testnet.velarumpay.com"'
+        buildConfigField "String", "DEFAULT_PLATFORM_API_URL", '"https://api.velarumai.com"'
         buildConfigField "boolean", "MANAGED_PLATFORM_SERVICE", "true"
         buildConfigField "boolean", "PLATFORM_WEBSOCKET_ENABLED", "false"
         buildConfigField "boolean", "INTERNAL_PLATFORM_OVERRIDE_ENABLED", "false"
@@ -99,14 +122,17 @@ android {
         buildConfig true
     }
 
-    // --- 签名配置：release 默认复用 debug 签名；放了 keystore.properties 则改用正式签名 ---
+    sourceSets {
+        main.assets.srcDir(generatedThirdPartyAssets)
+    }
+
     signingConfigs {
         release {
             if (hasReleaseKeystore) {
-                storeFile file(keystoreProperties["storeFile"])
-                storePassword keystoreProperties["storePassword"]
-                keyAlias keystoreProperties["keyAlias"]
-                keyPassword keystoreProperties["keyPassword"]
+                storeFile file(releaseStorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
@@ -122,8 +148,9 @@ android {
             minifyEnabled true            // 开启 R8：去无用代码 + 优化（性能/体积的主力）
             shrinkResources false         // 资源压缩先关，确保安全；真机验证 release 无误后可改 true
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
-            // 自动签名：默认用 debug 签名 → release 也能一键装真机；放了 keystore.properties 后自动切到你的正式签名。
-            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             // 草稿版保持不混淆、构建快，方便日常开发调试（慢是正常的，别据此评判性能）。
@@ -154,6 +181,7 @@ android {
                     "META-INF/DISCLAIMER",
                     "META-INF/FastDoubleParser-LICENSE",
                     "META-INF/FastDoubleParser-NOTICE",
+                    "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
                     "META-INF/*.kotlin_module"
             ]
         }
@@ -164,6 +192,21 @@ android {
             outputFileName = "VelarumPay-${variant.name}.apk"
         }
     }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def requestedReleaseArtifact = graph.allTasks.any { task ->
+        task.name ==~ /(?i)(assemble|bundle).*Release/
+    }
+    if (requestedReleaseArtifact && !hasReleaseKeystore) {
+        throw new GradleException(
+            "Release signing is not configured. Provide the VELARUMPAY_ANDROID_* signing environment variables or apps/android/keystore.properties."
+        )
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(generateThirdPartyLicenseAssets)
 }
 
 dependencies {
@@ -177,6 +220,9 @@ dependencies {
         implementation("com.google.android.gms:play-services-cloud-messaging:17.4.0") { version { strictly("17.4.0") } }
         implementation("com.google.android.gms:play-services-stats:17.0.2") { version { strictly("17.0.2") } }
     }
+    // Apache-2.0. FCM callbacks only enqueue bounded authenticated REST sync;
+    // WorkManager owns retries when Android gives the callback a short lifetime.
+    implementation "androidx.work:work-runtime:2.11.2"
     implementation "androidx.biometric:biometric:1.1.0"
     // Apache-2.0. Biometric 1.1.0 otherwise pins Fragment 1.2.5, which is
     // incompatible with the Activity Result APIs used by Activity 1.9.3.

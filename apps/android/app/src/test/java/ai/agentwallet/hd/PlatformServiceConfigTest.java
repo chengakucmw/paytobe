@@ -41,7 +41,7 @@ public final class PlatformServiceConfigTest {
         assertThrows(IllegalStateException.class,
                 () -> PlatformServiceConfig.baseUrl("https://temporary.example", "", false));
         assertThrows(IllegalStateException.class,
-                () -> PlatformServiceConfig.baseUrl("http://api-testnet.velarumpay.com", "", false));
+                () -> PlatformServiceConfig.baseUrl("http://api.velarumai.com", "", false));
     }
 
     @Test
@@ -50,7 +50,7 @@ public final class PlatformServiceConfigTest {
                 "http://127.0.0.1:8787",
                 "https://192.168.1.10",
                 "https://velarumpay-connect-testnet.chengakucmw.chatgpt.site",
-                "https://api.velarumpay.com"
+                "https://api.velarumai.com"
         }) {
             assertEquals(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN,
                     PlatformServiceConfig.baseUrl(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN, override, false));

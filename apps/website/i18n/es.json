@@ -16,6 +16,10 @@
   "Amount": "Monto",
   "Amount and asset": "Monto y activo",
   "Android Preview distribution may be invitation-based. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "La distribución de Android Preview puede ser por invitación. La disponibilidad en iOS puede usar una vía controlada de TestFlight. No instales paquetes desde una fuente no verificada.",
+  "Android Preview APK · Testnet only. This fixed link always downloads the current published build.": "APK de Android Preview · Solo Testnet. Este enlace fijo siempre descarga la compilación publicada actual.",
+  "Download Android APK": "Descargar APK de Android",
+  "Download the Android Preview APK only from the Personal page on this official site. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Descarga el APK de Android Preview únicamente desde la página Personal de este sitio oficial. La disponibilidad en iOS puede usar una vía controlada de TestFlight. No instales paquetes desde una fuente no verificada.",
+  "The Android Preview APK is available from the Personal page. The same official download link is kept when the published build changes.": "El APK de Android Preview está disponible en la página Personal. El mismo enlace oficial de descarga se mantiene cuando cambia la compilación publicada.",
   "App availability": "Disponibilidad de la app",
   "App version, operating system version, approximate time, test or sandbox environment, screen name, redacted request ID, expected behavior, and observed behavior.": "Versión de la app, versión del sistema operativo, hora aproximada, entorno de prueba o sandbox, nombre de pantalla, ID de solicitud redactado, comportamiento esperado y comportamiento observado.",
   "Approval": "Aprobación",
@@ -414,5 +418,11 @@
   "Your responsibilities": "Tus responsabilidades",
   "Your system requests. The customer's wallet decides.": "Tu sistema solicita. La wallet del cliente decide.",
   "Your wallet presents the amount, asset, network, recipient, fee, and transaction context.": "Tu wallet presenta el monto, activo, red, destinatario, comisión y contexto de la transacción.",
+  "Effective August 3, 2026": "Vigente desde el 3 de agosto de 2026",
+  "Effective terms now govern the official testnet.": "Los términos vigentes ya rigen la testnet oficial.",
+  "Legal documents": "Documentos legales",
+  "Open the Legal Center →": "Abrir el Centro Legal →",
+  "The official environment remains testnet-only. Test assets have no monetary value, and the server does not hold recovery phrases, private keys, or signing material.": "El entorno oficial sigue siendo exclusivamente de testnet. Los activos de prueba no tienen valor monetario y el servidor no conserva frases de recuperación, claves privadas ni material de firma.",
+  "Vivbase LLC operates the live Stellar testnet service under the Terms, Privacy Policy, Risk Disclosure, Acceptable Use Policy, Cookie Notice, Business Terms, DPA, and Subprocessor List.": "Vivbase LLC opera el servicio activo de la testnet de Stellar conforme a los Términos, la Política de privacidad, la Divulgación de riesgos, la Política de uso aceptable, el Aviso de cookies, los Términos comerciales, el DPA y la Lista de subprocesadores.",
   "© 2026 VelarumPay. Brand identifiers are separately protected.": "© 2026 VelarumPay. Los identificadores de marca están protegidos por separado."
 }

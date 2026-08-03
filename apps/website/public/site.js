@@ -98,6 +98,6 @@ if (pilotForm) {
 
     const status = pilotForm.querySelector("[data-form-status]");
     if (status) status.textContent = copy("i18nStatus", "Opening your email app. This website has not stored your answers.");
-    window.location.href = `mailto:pilot@velarumpay.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:pilot@velarumai.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   });
 }

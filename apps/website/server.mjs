@@ -6,12 +6,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const builtPublicDir = path.join(__dirname, "dist", "public");
 const publicDir = existsSync(builtPublicDir) ? builtPublicDir : path.join(__dirname, "public");
-// Configurable APK source. Defaults to a repo-local downloads dir; the /download/android
-// route already 404s gracefully when the file is absent. (Previously hardcoded to an
-// external workspace path that does not exist in this repo.)
+const apkDownloadName = "VelarumPay-Android-Preview.apk";
+// APKs stay outside the public code repository. Operators replace the stable file in
+// releases/android, while the public /download/android URL remains unchanged.
 const apkPath = process.env.VELARUMPAY_APK_PATH
   ? path.resolve(process.env.VELARUMPAY_APK_PATH)
-  : path.join(publicDir, "downloads", "VelarumPay-android-demo.apk");
+  : path.resolve(__dirname, "..", "..", "..", "releases", "android", "VelarumPay-latest.apk");
 const port = Number(process.env.PORT || 8091);
 
 const mime = {
@@ -36,7 +36,8 @@ const pageRoutes = new Map([
   ["/business", "/business.html"],
   ["/security", "/security.html"],
   ["/support", "/support.html"],
-  ["/preview", "/preview.html"]
+  ["/preview", "/preview.html"],
+  ["/legal", "/legal.html"]
 ]);
 const localePaths = new Set(["zh-hans", "zh-hant", "ja", "ko", "es", "pt-br", "fr"]);
 
@@ -47,24 +48,9 @@ const server = http.createServer((req, res) => {
     sendJson(res, 200, {
       ok: true,
       service: "VelarumPay-site",
+      android_apk_available: isAvailableApk(),
       time: new Date().toISOString()
     });
-    return;
-  }
-
-  if (url.pathname === "/download/android") {
-    if (!existsSync(apkPath)) {
-      sendJson(res, 404, { ok: false, error: "Android APK is not available yet" });
-      return;
-    }
-    const size = statSync(apkPath).size;
-    res.writeHead(200, {
-      "content-type": "application/vnd.android.package-archive",
-      "content-length": size,
-      "cache-control": "public, max-age=300",
-      "content-disposition": 'attachment; filename="VelarumPay-android-demo.apk"'
-    });
-    createReadStream(apkPath).pipe(res);
     return;
   }
 
@@ -73,12 +59,36 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (url.pathname === "/download/android") {
+    if (!isAvailableApk()) {
+      sendJson(res, 404, { ok: false, error: "Android APK is not available yet" });
+      return;
+    }
+    const apkStat = statSync(apkPath);
+    res.writeHead(200, securityHeaders({
+      "content-type": "application/vnd.android.package-archive",
+      "content-length": apkStat.size,
+      "cache-control": "no-cache, must-revalidate",
+      "content-disposition": `attachment; filename="${apkDownloadName}"`,
+      "last-modified": apkStat.mtime.toUTCString()
+    }));
+    if (req.method === "HEAD") res.end();
+    else createReadStream(apkPath).pipe(res);
+    return;
+  }
+
   serveStatic(url.pathname, url.origin, req.method === "HEAD", res);
 });
 
 server.listen(port, () => {
-  console.log(`VelarumPay site listening on http://localhost:${port}`);
+  const address = server.address();
+  const boundPort = typeof address === "object" && address ? address.port : port;
+  console.log(`VelarumPay site listening on http://localhost:${boundPort}`);
 });
+
+function isAvailableApk() {
+  return existsSync(apkPath) && statSync(apkPath).isFile();
+}
 
 function serveStatic(pathname, origin, headOnly, res) {
   const clean = decodeURIComponent(pathname).replace(/\\/g, "/");

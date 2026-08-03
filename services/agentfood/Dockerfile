@@ -8,9 +8,12 @@ ENV NODE_ENV=production \
 WORKDIR /app
 COPY services/agentfood/package.json ./services/agentfood/package.json
 COPY packages/protocol ./packages/protocol
+COPY packages/sdk-js ./packages/sdk-js
 COPY services/agentfood/src ./services/agentfood/src
+COPY services/agentfood/public ./services/agentfood/public
 
-RUN mkdir -p /var/lib/agentfood \
+RUN mkdir -p /var/lib/agentfood /app/node_modules/@velarumpay \
+  && ln -s /app/packages/protocol /app/node_modules/@velarumpay/protocol \
   && chown -R node:node /app /var/lib/agentfood
 
 USER node

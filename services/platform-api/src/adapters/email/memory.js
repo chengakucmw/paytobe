@@ -2,8 +2,8 @@ export function createMemoryEmailAdapter() {
   const deliveries = [];
   const stepUps = [];
   return Object.freeze({
-    async sendVerification({ to, token, expires_at }) {
-      deliveries.push(Object.freeze({ to, token, expires_at }));
+    async sendVerification({ to, token, expires_at, purpose = "verification" }) {
+      deliveries.push(Object.freeze({ to, token, expires_at, purpose }));
       return { accepted: true };
     },
     latest(to = "") {

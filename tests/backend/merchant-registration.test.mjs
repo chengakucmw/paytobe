@@ -46,7 +46,7 @@ test("registration normalizes email, returns a generic response, stores only a h
   assert.deepEqual(response.body, {
     ok: true,
     accepted: true,
-    message: "If the address can be registered, a verification email will be sent."
+    message: "If the address can be used, a one-time email link will be sent."
   });
   const delivery = merchantEmail.latest("owner@example.com");
   assert.match(delivery.token, /^mverify_[A-Za-z0-9_-]{43}$/);
@@ -81,13 +81,42 @@ test("a newer token supersedes the old token and the active token verifies exact
 
 test("existing verified accounts and unknown addresses have the same public registration response", async () => {
   const existing = await post("/v1/merchant-accounts/registrations", { email: "owner@example.com" });
+  const existingDelivery = merchantEmail.latest("owner@example.com");
   const unknown = await post("/v1/merchant-accounts/registrations", { email: "new@example.com" });
   assert.equal(existing.status, 202);
   assert.equal(unknown.status, 202);
   assert.deepEqual(existing.body, unknown.body);
+  assert.equal(existingDelivery.purpose, "access");
+  const resumed = await post("/v1/merchant-accounts/email-verifications", { token: existingDelivery.token });
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.account.status, "active");
+  assert.deepEqual(resumed.body.merchants, []);
+  assert.match(resumed.body.session_grant, /^msgrant_[A-Za-z0-9_-]{43}$/);
+
+  const created = await post("/v1/merchants", {
+    session_grant: resumed.body.session_grant,
+    display_name: "Recovery Test Shop"
+  });
+  assert.equal(created.status, 201);
+  const returning = await post("/v1/merchant-accounts/registrations", { email: "owner@example.com" });
+  assert.equal(returning.status, 202);
+  const returningDelivery = merchantEmail.latest("owner@example.com");
+  assert.equal(returningDelivery.purpose, "access");
+  const returningVerified = await post("/v1/merchant-accounts/email-verifications", { token: returningDelivery.token });
+  assert.deepEqual(returningVerified.body.merchants, [{
+    merchant_id: created.body.merchant.merchant_id,
+    display_name: "Recovery Test Shop",
+    role: "owner"
+  }]);
+  const login = await post("/v1/merchant-sessions", {
+    merchant_id: created.body.merchant.merchant_id,
+    session_grant: returningVerified.body.session_grant
+  });
+  assert.equal(login.status, 201);
 });
 
 test("wrong and expired tokens fail with one error and failed verification does not create an account session", async () => {
+  const sessionCountBefore = store.db.prepare("SELECT COUNT(*) AS count FROM merchant_sessions").get().count;
   const wrong = await post("/v1/merchant-accounts/email-verifications", { token: "mverify_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" });
   assert.equal(wrong.status, 400);
   assert.equal(wrong.body.error.code, "invalid_verification_token");
@@ -98,7 +127,7 @@ test("wrong and expired tokens fail with one error and failed verification does 
   const expired = await post("/v1/merchant-accounts/email-verifications", { token: delivery.token });
   assert.equal(expired.status, 400);
   assert.equal(expired.body.error.code, "invalid_verification_token");
-  assert.equal(store.db.prepare("SELECT COUNT(*) AS count FROM merchant_sessions").get().count, 0);
+  assert.equal(store.db.prepare("SELECT COUNT(*) AS count FROM merchant_sessions").get().count, sessionCountBefore);
 });
 
 test("the application service is exposed only for test inspection and never returns the plaintext token", async () => {

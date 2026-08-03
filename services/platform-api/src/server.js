@@ -32,6 +32,7 @@ import {
   createCorsOptions,
   createRateLimitMiddleware,
   createSecurityHeadersMiddleware,
+  createTestnetOnlyMiddleware,
   isOriginAllowed,
   loadRuntimeConfig,
   ReplayGuard,
@@ -59,6 +60,7 @@ import {
   SqliteMerchantAccountRepository
 } from "./application/merchant-accounts/service.js";
 import { createMemoryEmailAdapter } from "./adapters/email/memory.js";
+import { createCloudflareEmailAdapter } from "./adapters/email/cloudflare.js";
 import {
   MerchantSessionService,
   MemoryMerchantSessionRepository,
@@ -176,7 +178,9 @@ const wsHub = createWsHub();
 const { appSockets, openclawSockets, addSocket, removeSocket, notifyApp, notifyOpenClaw } = wsHub;
 
 const { sendApiError, sendAuthFailure } = createResponders({ observability });
-const merchantEmail = createMemoryEmailAdapter();
+const merchantEmail = runtimeConfig.email.provider === "cloudflare"
+  ? createCloudflareEmailAdapter(runtimeConfig.email)
+  : createMemoryEmailAdapter();
 const merchantAccountService = new MerchantAccountService({
   repository: store.db ? new SqliteMerchantAccountRepository(store.db) : new MemoryMerchantAccountRepository(),
   email: merchantEmail,
@@ -337,7 +341,9 @@ app.use([
   "/v1/connect-invitations",
   "/v1/connections",
   "/v1/payment-intents",
-  "/v1/openclaw"
+  "/v1/openclaw",
+  "/v1/merchant-accounts",
+  "/v1/merchant-sessions"
 ], createRateLimitMiddleware(runtimeConfig, {
   name: "auth",
   max: runtimeConfig.rate_limit.auth_max
@@ -347,6 +353,15 @@ app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf.toString("utf8");
   }
+}));
+app.use("/v1", createTestnetOnlyMiddleware(runtimeConfig, {
+  onViolation: (res, field) => sendApiError(
+    res,
+    400,
+    "validation_failed",
+    "The official VelarumPay environment accepts Stellar testnet only.",
+    { field, details: { reason: "mainnet_forbidden", field } }
+  )
 }));
 
 // ---------------------------------------------------------------------------

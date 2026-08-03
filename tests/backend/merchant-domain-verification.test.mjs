@@ -23,6 +23,15 @@ for (const merchantId of ["merchant_a", "merchant_b"]) {
     (merchant_id, display_name, status, verification_state, version, created_at, updated_at)
     VALUES (?, ?, 'active', 'verified', 1, ?, ?)`).run(merchantId, merchantId, at, at);
 }
+for (const [merchantId, verificationState] of [
+  ["merchant_pending", "email_verified"],
+  ["merchant_pending_bad_state", "unverified"],
+  ["merchant_pending_no_proof", "email_verified"]
+]) {
+  store.db.prepare(`INSERT INTO merchants
+    (merchant_id, display_name, status, verification_state, version, created_at, updated_at)
+    VALUES (?, ?, 'pending_verification', ?, 1, ?, ?)`).run(merchantId, merchantId, verificationState, at, at);
+}
 const scopeA = scope("merchant_a");
 const scopeB = scope("merchant_b");
 
@@ -73,6 +82,49 @@ test("DNS TXT verification stores only challenge/evidence hashes and supports sa
   const reverified = await domains.verify(scopeA, created.merchant_domain.domain_id);
   assert.equal(reverified.ok, true);
   assert.equal(reverified.merchant_domain.status, "verified");
+});
+
+test("first verified domain atomically activates an email-verified merchant exactly once", async () => {
+  const pendingScope = scope("merchant_pending");
+  const resolver = new FakeResolver(["93.184.216.34"]);
+  const domains = service(resolver);
+  const created = domains.create(pendingScope, { domain: "pilot.velarumai.com", method: "dns_txt" });
+  resolver.txt = [created.challenge];
+
+  const verified = await domains.verify(pendingScope, created.merchant_domain.domain_id);
+  assert.equal(verified.ok, true);
+  assert.equal(verified.merchant_activated, true);
+  assert.equal(verified.merchant.status, "active");
+  assert.equal(verified.merchant.verification_state, "verified");
+  assert.equal(verified.merchant.version, 2);
+  assert.equal(store.db.prepare("SELECT status FROM merchant_domains WHERE domain_id = ?").get(created.merchant_domain.domain_id).status, "verified");
+
+  const replacement = domains.beginReverification(pendingScope, created.merchant_domain.domain_id);
+  resolver.txt = [replacement.challenge];
+  const reverified = await domains.verify(pendingScope, created.merchant_domain.domain_id);
+  assert.equal(reverified.ok, true);
+  assert.equal(reverified.merchant_activated, false);
+  assert.equal(reverified.merchant.version, 2);
+});
+
+test("failed proof or invalid merchant verification state cannot partially activate", async () => {
+  const noProofScope = scope("merchant_pending_no_proof");
+  const noProofDomains = service(new FakeResolver(["8.8.8.8"]));
+  const noProof = noProofDomains.create(noProofScope, { domain: "no-proof.velarumai.com", method: "dns_txt" });
+  const rejected = await noProofDomains.verify(noProofScope, noProof.merchant_domain.domain_id);
+  assert.equal(rejected.ok, false);
+  assert.equal(store.db.prepare("SELECT status FROM merchants WHERE merchant_id = ?").get("merchant_pending_no_proof").status, "pending_verification");
+  assert.equal(store.db.prepare("SELECT status FROM merchant_domains WHERE domain_id = ?").get(noProof.merchant_domain.domain_id).status, "pending");
+
+  const invalidStateScope = scope("merchant_pending_bad_state");
+  const resolver = new FakeResolver(["8.8.4.4"]);
+  const invalidStateDomains = service(resolver);
+  const invalidState = invalidStateDomains.create(invalidStateScope, { domain: "bad-state.velarumai.com", method: "dns_txt" });
+  resolver.txt = [invalidState.challenge];
+  const conflict = await invalidStateDomains.verify(invalidStateScope, invalidState.merchant_domain.domain_id);
+  assert.equal(conflict.ok, false);
+  assert.equal(conflict.code, "merchant_not_activatable");
+  assert.equal(store.db.prepare("SELECT status FROM merchant_domains WHERE domain_id = ?").get(invalidState.merchant_domain.domain_id).status, "pending");
 });
 
 test("HTTPS well-known verification requires an exact challenge and persists method evidence", async () => {

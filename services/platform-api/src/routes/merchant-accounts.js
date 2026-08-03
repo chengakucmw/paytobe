@@ -3,7 +3,7 @@ import express from "express";
 const GENERIC_REGISTRATION_RESPONSE = Object.freeze({
   ok: true,
   accepted: true,
-  message: "If the address can be registered, a verification email will be sent."
+  message: "If the address can be used, a one-time email link will be sent."
 });
 
 export function createMerchantAccountsRouter(deps) {
@@ -32,7 +32,12 @@ export function createMerchantAccountsRouter(deps) {
         actor: { type: "merchant_account", id: result.account.account_id },
         resource: { type: "merchant_account", id: result.account.account_id }
       });
-      return res.json({ ok: true, account: result.account, session_grant: result.session_grant });
+      return res.json({
+        ok: true,
+        account: result.account,
+        merchants: result.merchants,
+        session_grant: result.session_grant
+      });
     } catch (error) {
       return next(error);
     }

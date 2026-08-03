@@ -1,8 +1,8 @@
 # AgentFood Platform Agent Reference Demo
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-02 08:20:29 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-02 00:20:29 UTC
+> - **Taipei Time:** 2026-08-03 14:23:45 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-08-03 06:23:45 UTC
 
 This dependency-free example is a runnable external food-delivery platform and platform-owned Agent. It demonstrates the wallet-created, one-time Connect Key flow against a local VelarumPay Platform API.
 
@@ -24,7 +24,9 @@ The browser calls only the AgentFood site's same-origin `/api/chat` and `/api/co
 
 The hosted deployment uses public Sites access so VelarumPay mobile clients can call the same cloud API without a Sites bypass credential.
 
-Its desktop interface keeps the food catalog in a two-thirds browsing pane and the AgentFood conversation in a prominent one-third assistant pane. The visual system uses an original mustard, olive, cream, and fine-grid treatment. Food and social-card imagery was generated specifically for this demo and is stored locally; the site has no external image or font dependency.
+Its interface now follows the AgentFood design system: the conversation is the primary product surface, supported by a focused restaurant list and payment-safety context. Desktop keeps the product and the food agent side by side; narrow screens place the conversation first. The visual system uses warm near-black and maroon surfaces, a single crimson-pink accent, pill controls, inset hairlines, restrained glow, and sentence-case product copy. Food and social-card imagery was generated specifically for this demo and is stored locally.
+
+The site self-hosts Poppins, DM Sans, and JetBrains Mono from the official Google Fonts repository. All three are licensed under OFL-1.1, and their license files are preserved in `public/fonts/`. The site has no external image, font, icon, or runtime UI dependency.
 
 OpenAI Sites provides the hosted browser sign-in boundary. The page's **Continue with Google** action starts the real Sign in with ChatGPT flow, where a visitor may use a Google-backed ChatGPT account. After sign-in, the dispatcher forwards the verified visitor identity to the worker and the header shows the visitor's name and email with a working sign-out action. This is not a separate app-owned Google OAuth client: Google credentials never reach AgentFood. Browser identity does not grant wallet authority and remains separate from the Connect Key capability flow.
 

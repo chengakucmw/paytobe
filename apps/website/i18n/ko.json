@@ -16,6 +16,10 @@
   "Amount": "금액",
   "Amount and asset": "금액 및 자산",
   "Android Preview distribution may be invitation-based. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Android Preview 배포는 초대 기반일 수 있습니다. iOS 제공은 제한된 TestFlight 경로를 사용할 수 있습니다. 검증되지 않은 출처의 패키지는 설치하지 마세요.",
+  "Android Preview APK · Testnet only. This fixed link always downloads the current published build.": "Android Preview APK · Testnet 전용. 이 고정 링크에서는 항상 현재 게시된 빌드를 다운로드합니다.",
+  "Download Android APK": "Android APK 다운로드",
+  "Download the Android Preview APK only from the Personal page on this official site. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Android Preview APK는 이 공식 사이트의 개인 페이지에서만 다운로드하세요. iOS는 제한된 TestFlight 경로로 제공될 수 있습니다. 검증되지 않은 출처의 패키지는 설치하지 마세요.",
+  "The Android Preview APK is available from the Personal page. The same official download link is kept when the published build changes.": "Android Preview APK는 개인 페이지에서 다운로드할 수 있습니다. 게시 빌드가 변경되어도 동일한 공식 다운로드 링크가 유지됩니다.",
   "App availability": "앱 제공 여부",
   "App version, operating system version, approximate time, test or sandbox environment, screen name, redacted request ID, expected behavior, and observed behavior.": "앱 버전, 운영체제 버전, 대략적인 시간, 테스트 또는 샌드박스 환경, 화면 이름, 일부 가린 요청 ID, 기대한 동작, 실제 관찰된 동작.",
   "Approval": "승인",
@@ -414,5 +418,11 @@
   "Your responsibilities": "귀하의 책임",
   "Your system requests. The customer's wallet decides.": "귀하의 시스템은 요청하고, 고객의 지갑이 결정합니다.",
   "Your wallet presents the amount, asset, network, recipient, fee, and transaction context.": "귀하의 지갑은 금액, 자산, 네트워크, 수취인, 수수료, 거래 컨텍스트를 표시합니다.",
+  "Effective August 3, 2026": "2026년 8월 3일 발효",
+  "Effective terms now govern the official testnet.": "정식으로 발효된 약관이 공식 테스트넷에 적용됩니다.",
+  "Legal documents": "법률 문서",
+  "Open the Legal Center →": "법률 센터 열기 →",
+  "The official environment remains testnet-only. Test assets have no monetary value, and the server does not hold recovery phrases, private keys, or signing material.": "공식 환경은 계속 테스트넷 전용입니다. 테스트 자산에는 금전적 가치가 없으며 서버는 복구 문구, 개인 키 또는 서명 자료를 보유하지 않습니다.",
+  "Vivbase LLC operates the live Stellar testnet service under the Terms, Privacy Policy, Risk Disclosure, Acceptable Use Policy, Cookie Notice, Business Terms, DPA, and Subprocessor List.": "Vivbase LLC는 이용약관, 개인정보 처리방침, 위험 고지, 허용되는 사용 정책, Cookie 고지, 비즈니스 약관, DPA 및 하위 처리자 목록에 따라 운영 중인 Stellar 테스트넷 서비스를 제공합니다.",
   "© 2026 VelarumPay. Brand identifiers are separately protected.": "© 2026 VelarumPay. 브랜드 식별자는 별도로 보호됩니다."
 }

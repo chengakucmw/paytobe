@@ -127,6 +127,7 @@ export function buildSitemap() {
       locations.push(`${origin}${routePath(route, locale.path)}`);
     }
   }
+  locations.push(`${origin}/legal`, `${origin}/zh-hans/legal`);
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${locations.map((location) => `  <url><loc>${location}</loc></url>`).join("\n")}\n</urlset>\n`;
 }
 
@@ -151,6 +152,9 @@ function routePath(route, localePath) {
 
 function localizedHref(href, localePath) {
   const [pathname, suffix = ""] = href.split(/(?=[?#])/u, 2);
+  if (pathname === "/legal") {
+    return `${localePath === "zh-hans" ? "/zh-hans/legal" : "/legal"}${suffix}`;
+  }
   if (!Object.prototype.hasOwnProperty.call(pageRoutes, pathname.replace(/^\//, ""))) return href;
   return `${routePath(pathname.replace(/^\//, ""), localePath)}${suffix}`;
 }

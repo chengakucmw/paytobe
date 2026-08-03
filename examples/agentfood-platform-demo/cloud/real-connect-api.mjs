@@ -93,7 +93,7 @@ async function remoteAgentAccessToken(config) {
   const claims = {
     iss: config.agentId,
     sub: config.clientId,
-    aud: "https://api-testnet.velarumpay.com/v1/agent-auth/token",
+    aud: "https://api.velarumai.com/v1/agent-auth/token",
     iat: now,
     exp: now + 300,
     jti: crypto.randomUUID(),

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#120a0d">
+    <meta name="description" content="Explore a mock food order and experience a real VelarumPay payment flow using Stellar testnet XLM.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="agentfood — order by saying it">
+    <meta property="og:description" content="One conversation finds the food, builds the order and hands the payment request to your wallet.">
+    <meta property="og:image" content="__SITE_ORIGIN__/assets/agentfood-social-v3.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <title>agentfood — order by saying it</title>
+    <link rel="stylesheet" href="/styles.css?v=agentfood-ds-20260803b">
+  </head>
+  <body>
+    <a class="skip-link" href="#chat-input">Skip to the conversation</a>
+
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="wordmark" href="/" aria-label="agentfood home">
+          <span class="wordmark-dot" aria-hidden="true"></span>
+          <span>agentfood</span>
+        </a>
+
+        <nav class="main-nav" aria-label="Primary navigation">
+          <a href="#discover">Tonight's picks</a>
+          <a href="#how-it-works">How it works</a>
+          <a href="#safety">Wallet safety</a>
+        </nav>
+
+        <a class="identity-button" id="identity-button" href="#safety" aria-label="Public AgentFood testnet">
+          <span class="identity-mark" aria-hidden="true">G</span>
+          <span class="identity-copy">
+            <strong id="identity-label">Public testnet</strong>
+            <small id="identity-detail">No account required</small>
+          </span>
+        </a>
+      </div>
+    </header>
+
+    <div class="demo-notice" role="note">
+      <span class="notice-pulse" aria-hidden="true"></span>
+      <span>Production site</span>
+      <span aria-hidden="true">·</span>
+      <span>Mock menus</span>
+      <span aria-hidden="true">·</span>
+      <span>Mock recommendations</span>
+      <span aria-hidden="true">·</span>
+      <span>Real testnet payment flow</span>
+    </div>
+
+    <main class="product-workspace">
+      <section class="browse-pane af-scroll" id="discover" aria-labelledby="browse-title">
+        <section class="browse-intro">
+          <div class="hero-copy">
+            <p class="eyebrow">Dinner, arranged in one conversation</p>
+            <h1 id="browse-title">Order by<br>just saying it.</h1>
+            <p class="intro-copy">Tell your food agent the craving, budget, dietary need or deadline. It compares these demo kitchens, then creates a real VelarumPay Payment Request for 0.1 Stellar testnet XLM after you connect.</p>
+            <div class="hero-actions">
+              <button type="button" class="primary-button" data-focus-chat>Start an order</button>
+              <a class="secondary-button" href="#how-it-works">See how it works</a>
+            </div>
+          </div>
+
+          <figure class="hero-media">
+            <img src="/assets/agentfood-dishes-v2.jpg" alt="A vegetable bowl, chili noodles and salmon bento arranged on a warm table">
+            <div class="media-protection" aria-hidden="true"></div>
+            <figcaption>
+              <span class="caps-label">Three open kitchens</span>
+              <strong>One clear recommendation</strong>
+            </figcaption>
+          </figure>
+        </section>
+
+        <div class="category-bar af-scroll" aria-label="Food categories">
+          <button class="category-button active" type="button" data-filter="all">all picks</button>
+          <button class="category-button" type="button" data-filter="vegetarian">vegetarian</button>
+          <button class="category-button" type="button" data-filter="spicy">something spicy</button>
+          <button class="category-button" type="button" data-filter="noodles">noodles</button>
+          <button class="category-button" type="button" data-filter="bento">bento</button>
+        </div>
+
+        <section class="restaurant-section" aria-labelledby="restaurant-title">
+          <header class="section-heading">
+            <div>
+              <p class="eyebrow">Open demo kitchens</p>
+              <h2 id="restaurant-title">A short list, not an endless feed.</h2>
+            </div>
+            <p id="result-count">3 restaurants</p>
+          </header>
+          <div class="merchant-grid" id="merchant-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="how-section" id="how-it-works" aria-labelledby="how-title">
+          <header class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">How it works</p>
+              <h2 id="how-title">Three steps. One conversation.</h2>
+            </div>
+          </header>
+          <div class="how-grid">
+            <article>
+              <span>01</span>
+              <h3>Say what you want</h3>
+              <p>Budget, craving, dietary needs and timing—all in plain language.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>The agent shops</h3>
+              <p>It compares the demo menus and explains one complete order.</p>
+            </article>
+            <article id="safety">
+              <span>03</span>
+              <h3>You review once</h3>
+              <p>The real testnet payment facts move to VelarumPay. Only you can approve and sign in your wallet.</p>
+            </article>
+          </div>
+        </section>
+
+        <footer class="browse-footer">
+          <div class="wordmark footer-wordmark"><span class="wordmark-dot" aria-hidden="true"></span><span>agentfood</span></div>
+          <p>Merchants, food, prices, orders and fulfillment are representative demo data. The Recipient is official and the payment process can broadcast testnet XLM.</p>
+          <p>VelarumPay Connect and Payment Request are enabled. Mainnet is forbidden in this environment.</p>
+        </footer>
+      </section>
+
+      <aside class="assistant-pane" aria-labelledby="agent-title">
+        <header class="assistant-header">
+          <div class="agent-identity">
+            <span class="agent-orb" aria-hidden="true"><span></span></span>
+            <div>
+              <p>Food agent</p>
+              <h2 id="agent-title">What are you in the mood for?</h2>
+            </div>
+          </div>
+          <span class="status-dot" id="connection-status">Not connected</span>
+        </header>
+
+        <div class="assistant-trust" aria-label="Wallet safety">
+          <span>Keys stay in wallet</span>
+          <span>Agent cannot sign</span>
+          <span>You approve</span>
+        </div>
+
+        <div class="messages af-scroll" id="messages" aria-live="polite" aria-label="Conversation with your food agent">
+          <article class="message agent-message">
+            <span class="message-label">Food agent</span>
+            <p>Evening. Tell me the craving, budget or dietary need. I’ll compare the three mock kitchens and explain one recommendation.</p>
+          </article>
+        </div>
+
+        <div class="quick-prompts af-scroll" aria-label="Suggested prompts">
+          <button type="button" data-prompt="Find me a spicy vegetarian dinner under 20 credits">spicy and vegetarian</button>
+          <button type="button" data-prompt="I want a high-protein meal that arrives in under 30 minutes">high protein, under 30 min</button>
+          <button type="button" data-prompt="Compare the noodle and bento options for me">compare noodles and bento</button>
+        </div>
+
+        <div class="connect-card" id="connect-card">
+          <div class="connect-copy">
+            <span class="caps-label">Wallet connection</span>
+            <strong>Connect to create a real testnet Payment Request.</strong>
+            <span id="composer-hint">Menus are mock; the payment workflow is real.</span>
+          </div>
+          <button type="button" class="primary-button" id="demo-connect-button">Connect VelarumPay</button>
+        </div>
+
+        <form class="composer" id="chat-form">
+          <label for="chat-input">Message your food agent</label>
+          <div class="composer-field">
+            <textarea id="chat-input" rows="2" placeholder="something spicy under 20 credits" required></textarea>
+            <button type="submit" aria-label="Send message"><span aria-hidden="true">↑</span></button>
+          </div>
+          <div class="composer-footer">
+            <span>0.1 XLM · Stellar testnet only</span>
+            <span>Real wallet approval</span>
+          </div>
+        </form>
+      </aside>
+    </main>
+    <script type="module" src="/app.js?v=agentfood-ds-20260803d"></script>
+  </body>
+</html>

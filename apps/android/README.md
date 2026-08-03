@@ -1,8 +1,8 @@
 # VelarumPay Android Build and Test
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-02 08:24:05 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-02 00:24:05 UTC
+> - **Taipei Time:** 2026-08-03 23:55:28 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-08-03 15:55:28 UTC
 
 This app is built with Android Gradle Plugin 8.7.3 and the Gradle wrapper pinned to Gradle 8.9.
 
@@ -46,6 +46,19 @@ export VELARUMPAY_FIREBASE_SENDER_ID='...'
 ```
 
 FCM is only a wake-up signal and contains opaque synchronization coordinates. After every push, and when the app resumes, the wallet uses authenticated REST synchronization to fetch the complete Payment Request. The REST cursor advances only after a successful sync and performs a full inbox refresh when the server reports that retained events no longer cover the cursor.
+
+## Release Signing
+
+Official release artifacts require a persistent release key and never fall back to the Android debug key. Supply the signing material through an ignored `keystore.properties` file or through these environment variables:
+
+```sh
+export VELARUMPAY_ANDROID_KEYSTORE_PATH=/absolute/path/to/velarumpay-release.jks
+export VELARUMPAY_ANDROID_STORE_PASSWORD='...'
+export VELARUMPAY_ANDROID_KEY_ALIAS=velarumpay
+export VELARUMPAY_ANDROID_KEY_PASSWORD='...'
+```
+
+The keystore and passwords must remain outside Git, be backed up in an access-controlled secret store, and be recoverable before an APK is published. Gradle fails `assemble*Release` and `bundle*Release` tasks when this configuration is absent or incomplete.
 
 ## Stellar Public-Network Build Gate
 

@@ -16,7 +16,7 @@ test("fact panel always shows full immutable facts and ignores display or metada
   assert.ok(html.indexOf("Primary treasury") < html.indexOf("Immutable payment facts"));
 });
 
-test("create and critical fact change create separate versions with 24-hour cooling", async () => {
+test("create and critical fact change use the server-provided cooling policy", async () => {
   const calls = [];
   const model = createRecipientsModel({ api: mockApi({ calls }), session: session("developer") });
   await model.load();
@@ -46,7 +46,7 @@ test("verification, Owner notification, cooling, step-up activation, and revocat
   const html = renderRecipients(model.getState(), true, now);
   assert.match(html, /Domain proof|valid|pending/i);
   await model.activate(true);
-  assert.match(model.getState().message, /24-hour cooling/);
+  assert.match(model.getState().message, /cooling period/);
   now = Date.parse("2026-08-03T01:00:00Z");
   await model.activate(true);
   assert.equal(model.getState().stepUpRequired, true);

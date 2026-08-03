@@ -1,8 +1,8 @@
 # VelarumPay Platform API Deployment
 
 > **Last modified**
-> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-07-21 13:50:07 UTC
+> - **Taipei Time:** 2026-08-03 18:06:25 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-08-03 10:06:25 UTC
 
 This folder contains the minimal managed runtime assets for the Platform API.
 
@@ -13,8 +13,10 @@ Use `/etc/velarumpay/platform-api.env`, Docker Compose `../.env`, or equivalent 
 ```bash
 NODE_ENV=production
 RUNTIME_ENV=production
-PUBLIC_BASE_URL=https://api.example.com
-CORS_ALLOWED_ORIGINS=https://wallet.example.com,https://ops.example.com
+PUBLIC_BASE_URL=https://api.velarumai.com
+OFFICIAL_TESTNET_ONLY=true
+CORS_ALLOWED_ORIGINS=https://velarumai.com,https://www.velarumai.com,https://portal.velarumai.com,https://agentfood.velarumai.com
+CORS_ALLOW_CREDENTIALS=true
 OPENCLAW_DEVICE_SECRET=replace-with-32-byte-random-secret
 ALLOW_UNSIGNED_OPENCLAW=false
 RELAY_STORE_DRIVER=sqlite
@@ -22,6 +24,13 @@ RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite
 RELAY_STORE_LEGACY_JSON=/var/lib/velarumpay/relay-store.json
 METRICS_TOKEN=replace-with-metrics-token
 AUDIT_LOG_READ_TOKEN=replace-with-audit-token
+STELLAR_PUBLIC_ENABLED=false
+STELLAR_TESTNET_HORIZON_URL=https://horizon-testnet.stellar.org
+TRANSACTIONAL_EMAIL_PROVIDER=cloudflare
+CLOUDFLARE_EMAIL_ACCOUNT_ID=replace-with-account-id
+CLOUDFLARE_EMAIL_API_TOKEN=replace-with-email-sending-token
+TRANSACTIONAL_EMAIL_FROM=security@velarumai.com
+MERCHANT_PORTAL_PUBLIC_URL=https://portal.velarumai.com
 ```
 
 Run the preflight before starting production:

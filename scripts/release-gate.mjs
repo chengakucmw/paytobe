@@ -1,12 +1,27 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { accessSync, constants, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..");
+const releaseCacheRoot = path.join(repoRoot, "tmp", "release-gate");
+const npmCache = path.join(releaseCacheRoot, "npm");
+const gradleCache = path.join(repoRoot, "apps", "android", ".gradle-cache");
+mkdirSync(npmCache, { recursive: true });
+mkdirSync(gradleCache, { recursive: true });
+assertWritable(npmCache);
+assertWritable(gradleCache);
+
+const sharedEnv = {
+  NPM_CONFIG_CACHE: npmCache,
+  GRADLE_USER_HOME: gradleCache,
+  VP_ALLOW_LISTEN_TESTS: "1"
+};
 
 const args = new Set(process.argv.slice(2));
 const skipAndroid = args.has("--skip-android") || args.has("--skip-mobile") || process.env.RELEASE_GATE_SKIP_ANDROID === "true";
@@ -17,44 +32,59 @@ const steps = [
   {
     name: "license policy",
     command: "npm",
-    args: ["run", "license:check"]
+    args: ["run", "license:check"],
+    timeoutMs: 5 * 60_000
   },
   {
     name: "workspace checks",
     command: "npm",
-    args: ["run", "check"]
+    args: ["run", "check"],
+    timeoutMs: 10 * 60_000
   },
   {
     name: "cross-tenant security matrix",
     command: "node",
-    args: ["--test", "tests/security/cross-tenant-matrix.test.mjs"]
+    args: ["--test", "tests/security/cross-tenant-matrix.test.mjs"],
+    timeoutMs: 5 * 60_000
   },
   {
     name: "unit tests",
     command: "npm",
-    args: ["test"]
+    args: ["test"],
+    timeoutMs: 15 * 60_000
   },
   {
     name: "quickstart smoke",
     command: "npm",
-    args: ["run", "smoke:quickstart"]
+    args: ["run", "smoke:quickstart"],
+    timeoutMs: 5 * 60_000
   },
   {
     name: "cross-component smoke",
     command: "npm",
-    args: ["run", "smoke:cross-component"]
+    args: ["run", "smoke:cross-component"],
+    timeoutMs: 5 * 60_000
   },
   {
-    name: "Android unit tests and debug build",
+    name: "release SBOM",
+    command: "node",
+    args: ["scripts/generate-release-sbom.mjs"],
+    timeoutMs: 10 * 60_000,
+    skip: nodeOnly || skipAndroid
+  },
+  {
+    name: "Android unit tests and signed testnet release build",
     command: platformCommand("./gradlew"),
     args: [
       "testStandardDebugUnitTest",
       "assembleStandardDebug",
       "testStellarTestnetDebugUnitTest",
-      "assembleStellarTestnetDebug"
+      "assembleStellarTestnetDebug",
+      "assembleStellarTestnetRelease"
     ],
     cwd: path.join(repoRoot, "apps/android"),
     env: androidEnv(),
+    timeoutMs: 30 * 60_000,
     skip: nodeOnly || skipAndroid
   },
   {
@@ -65,6 +95,7 @@ const steps = [
     name: "iOS simulator unit tests",
     command: "xcodebuild",
     args: [],
+    timeoutMs: 30 * 60_000,
     skip: nodeOnly || skipIos
   }
 ];
@@ -78,6 +109,7 @@ Default behavior runs every v0.1 release gate:
 - quickstart smoke
 - cross-component smoke
 - Android standard and stellarTestnet Debug unit tests + builds
+- signed stellarTestnet Release APK (release signing configuration is mandatory)
 - iOS simulator unit tests (xcodebuild test)
 `);
   process.exit(0);
@@ -103,6 +135,7 @@ for (const step of steps) {
 }
 
 printSummary(results, Date.now() - startedAt);
+printEvidence();
 
 function assertRunnable(step) {
   if (step.command === platformCommand("./gradlew")) {
@@ -165,16 +198,65 @@ function resolveIosSimulatorDestination() {
 
 function run(step) {
   return new Promise((resolve) => {
+    let settled = false;
     const child = spawn(step.command, step.args, {
       cwd: step.cwd || repoRoot,
       env: {
         ...process.env,
+        ...sharedEnv,
         ...(step.env || {})
       },
       stdio: "inherit"
     });
-    child.on("close", resolve);
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      console.error(`[release-gate] timeout ${step.name} after ${step.timeoutMs}ms`);
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        if (!settled) child.kill("SIGKILL");
+      }, 5_000).unref();
+    }, step.timeoutMs);
+    child.on("close", (code, signal) => {
+      settled = true;
+      clearTimeout(timeout);
+      if (signal) console.error(`[release-gate] ${step.name} terminated by ${signal}`);
+      resolve(code ?? 1);
+    });
   });
+}
+
+function assertWritable(directory) {
+  accessSync(directory, constants.R_OK | constants.W_OK);
+}
+
+function printEvidence() {
+  const commit = spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" });
+  const dirty = spawnSync("git", ["status", "--porcelain"], { cwd: repoRoot, encoding: "utf8" });
+  console.log("\n[release-gate] evidence");
+  console.log(`- git_commit: ${commit.status === 0 ? commit.stdout.trim() : "unavailable"}`);
+  console.log(`- git_worktree_clean: ${dirty.status === 0 && dirty.stdout.trim() === ""}`);
+  const artifacts = [
+    "services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json",
+    "packages/protocol/schema/velarum.payment_request.v1.schema.json",
+    "packages/protocol/schema/velarum.transaction_context.v1.schema.json"
+  ];
+  if (!nodeOnly && !skipAndroid) {
+    artifacts.push(
+      "tmp/release-gate/velarumpay-sbom.cdx.json",
+      "apps/android/app/build/outputs/apk/standard/debug/VelarumPay-standardDebug.apk",
+      "apps/android/app/build/outputs/apk/stellarTestnet/debug/VelarumPay-stellarTestnetDebug.apk",
+      "apps/android/app/build/outputs/apk/stellarTestnet/release/VelarumPay-stellarTestnetRelease.apk"
+    );
+  }
+  for (const relative of artifacts) {
+    const absolute = path.join(repoRoot, relative);
+    if (!existsSync(absolute)) throw new Error(`Release evidence artifact is missing: ${relative}`);
+    console.log(`- sha256 ${hashFile(absolute)} ${relative}`);
+  }
+}
+
+function hashFile(file) {
+  return createHash("sha256").update(readFileSync(file)).digest("hex");
 }
 
 function commandExists(command) {

@@ -97,6 +97,8 @@ test("onboarding grant creates a pending merchant and the verified account as th
     payload: { session_grant: created.body.session_grant, merchant_id: merchantId }
   });
   assert.equal(login.status, 201);
+  assert.equal(login.body.session.step_up_fresh, true);
+  assert.equal(merchantEmail.latestStepUp("owner@example.com"), null);
   cookie = login.setCookie.split(";")[0];
   csrf = login.body.csrf_token;
 });
@@ -132,6 +134,8 @@ test("verified activation, suspension propagation, reactivation, and terminal cl
   assert.equal(activated.merchant.status, "active");
   assert.equal(merchantCapabilityAllowed(activated.merchant, "agent_token"), true);
 
+  store.db.prepare("UPDATE merchant_sessions SET step_up_at = ? WHERE status = 'active'")
+    .run(new Date(Date.now() - 11 * 60 * 1000).toISOString());
   const withoutStepUp = await request(`/v1/merchants/${merchantId}`, {
     method: "PATCH", cookieHeader: cookie, csrfToken: csrf, payload: { status: "suspended", version: 3 }
   });

@@ -21,13 +21,16 @@ export class PortalApiError extends Error {
   }
 }
 
-export function createApiClient({ fetchImpl = globalThis.fetch } = {}) {
+export const OFFICIAL_API_ORIGIN = "https://api.velarumai.com";
+
+export function createApiClient({ fetchImpl = globalThis.fetch, baseUrl = OFFICIAL_API_ORIGIN } = {}) {
   if (typeof fetchImpl !== "function") throw new TypeError("fetch implementation is required");
+  const origin = String(baseUrl || "").replace(/\/+$/, "");
   let csrfToken = "";
 
   async function request(pathname, { method = "GET", body, requireCsrf = false } = {}) {
     if (requireCsrf && !csrfToken) throw new ReauthenticationRequiredError();
-    const response = await fetchImpl(pathname, {
+    const response = await fetchImpl(`${origin}${pathname}`, {
       method,
       credentials: "include",
       redirect: "error",
@@ -54,6 +57,32 @@ export function createApiClient({ fetchImpl = globalThis.fetch } = {}) {
   }
 
   return Object.freeze({
+    async register(email) {
+      return request("/v1/merchant-accounts/registrations", {
+        method: "POST", body: { email: String(email || "").trim() }
+      });
+    },
+    async verifyEmail(token) {
+      const payload = await request("/v1/merchant-accounts/email-verifications", {
+        method: "POST", body: { token: String(token || "").trim() }
+      });
+      return {
+        account: payload.account,
+        merchants: Array.isArray(payload.merchants) ? payload.merchants : [],
+        sessionGrant: payload.session_grant
+      };
+    },
+    async createMerchant({ sessionGrant, displayName, legalName = "" }) {
+      const payload = await request("/v1/merchants", {
+        method: "POST",
+        body: {
+          session_grant: String(sessionGrant || "").trim(),
+          display_name: String(displayName || "").trim(),
+          ...(String(legalName || "").trim() ? { legal_name: String(legalName).trim() } : {})
+        }
+      });
+      return { merchant: payload.merchant, sessionGrant: payload.session_grant };
+    },
     async restoreSession() {
       const payload = await request("/v1/merchant-sessions/current");
       return { session: payload.session, csrfAvailable: false };

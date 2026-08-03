@@ -6,8 +6,9 @@ import { fileURLToPath } from "node:url";
 const appDirectory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(appDirectory, "public");
 const sourceDirectory = path.join(appDirectory, "src");
-const port = Number(process.env.PORT || 8092);
-const shellRoutes = new Set(["/", "/overview", "/organization", "/members", "/domains", "/agents", "/recipients", "/webhooks", "/audit"]);
+const port = Number(process.env.PORT || 8093);
+const host = process.env.HOST || "0.0.0.0";
+const shellRoutes = new Set(["/", "/verify-email", "/overview", "/organization", "/members", "/domains", "/agents", "/recipients", "/webhooks", "/audit"]);
 const mime = new Map([
   [".html", "text/html; charset=utf-8"],
   [".css", "text/css; charset=utf-8"],
@@ -78,7 +79,7 @@ function sendJson(response, status, payload) {
 function securityHeaders(headers) {
   return {
     ...headers,
-    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https://api.velarumai.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
@@ -88,7 +89,7 @@ function securityHeaders(headers) {
 
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun && process.env.VP_PORTAL_NO_AUTO_LISTEN !== "1") {
-  createPortalServer().listen(port, "127.0.0.1", () => {
-    console.log(`VelarumPay merchant portal listening on http://127.0.0.1:${port}`);
+  createPortalServer().listen(port, host, () => {
+    console.log(`VelarumPay merchant portal listening on http://${host}:${port}`);
   });
 }

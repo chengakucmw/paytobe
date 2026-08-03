@@ -1,8 +1,8 @@
 # VelarumPayCode
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-07-21 13:50:07 UTC
+> - **Taipei Time / 台北时间:** 2026-08-04 00:05:02 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-08-03 16:05:02 UTC
 
 
 VelarumPayCode is the clean development repository for VelarumPay.
@@ -100,4 +100,4 @@ Release gate:
 npm run release:gate
 ```
 
-The release gate runs workspace checks, unit tests, quickstart smoke, cross-component smoke, Android `testDebugUnitTest` + `assembleDebug`, and the iOS simulator build. For non-release local checks on a machine without mobile toolchains, run `npm run release:gate -- --node-only`.
+The release gate runs license and workspace checks, unit tests, quickstart and cross-component smoke tests, Android debug tests/builds, a mandatory signed `stellarTestnetRelease` APK build, and iOS simulator unit tests. Configure the controlled Android release key and Firebase testnet values before running the full gate. For non-release local checks on a machine without mobile toolchains, run `npm run release:gate -- --node-only`.

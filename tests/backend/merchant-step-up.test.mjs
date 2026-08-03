@@ -52,7 +52,7 @@ async function request(pathname, { method = "GET", payload, useSession = false }
   return { status: response.status, body: await response.json(), setCookie: response.headers.get("set-cookie") || "" };
 }
 
-test("setup creates a verified Owner session without any step-up proof", async () => {
+test("a fresh verified-email sign-in is immediately stepped up without a second email", async () => {
   await request("/v1/merchant-accounts/registrations", { method: "POST", payload: { email: "stepup@example.com" } });
   const verified = await request("/v1/merchant-accounts/email-verifications", {
     method: "POST", payload: { token: merchantEmail.latest("stepup@example.com").token }
@@ -68,10 +68,15 @@ test("setup creates a verified Owner session without any step-up proof", async (
   cookie = login.setCookie.split(";")[0];
   csrf = login.body.csrf_token;
   sessionId = login.body.session.session_id;
-  assert.equal(store.db.prepare("SELECT step_up_at FROM merchant_sessions WHERE session_id = ?").get(sessionId).step_up_at, null);
+  assert.match(login.body.session.step_up_at, /^2026-/);
+  assert.equal(login.body.session.step_up_fresh, true);
+  assert.equal(store.db.prepare("SELECT step_up_at FROM merchant_sessions WHERE session_id = ?").get(sessionId).step_up_at,
+    login.body.session.step_up_at);
+  assert.equal(merchantEmail.latestStepUp("stepup@example.com"), null);
 });
 
 test("CSRF alone only starts a generic challenge and wrong/different-session proof cannot refresh step_up_at", async () => {
+  store.db.prepare("UPDATE merchant_sessions SET step_up_at = NULL WHERE session_id = ?").run(sessionId);
   const started = await request("/v1/merchant-sessions/current/step-up", { method: "POST", payload: {}, useSession: true });
   assert.equal(started.status, 202);
   assert.deepEqual(started.body, { ok: true, accepted: true });
@@ -128,6 +133,9 @@ test("proof older than ten minutes is rejected and failed challenges never refre
   assert.equal(rejected.body.error.code, "step_up_required");
   const old = store.db.prepare("SELECT step_up_at FROM merchant_sessions WHERE session_id = ?").get(sessionId).step_up_at;
   assert.equal(Date.now() - Date.parse(old) >= 10 * 60 * 1000, true);
+  const current = await request("/v1/merchant-sessions/current", { useSession: true });
+  assert.equal(current.status, 200);
+  assert.equal(current.body.session.step_up_fresh, false);
 });
 
 test("step-up challenges have an independent per-session rate limit", async () => {

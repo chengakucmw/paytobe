@@ -280,6 +280,80 @@ form {
   margin-top: 1.5rem;
 }
 
+hr {
+  margin: 2rem 0;
+  border: 0;
+  border-top: var(--border);
+}
+
+details {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--shi-grey-200);
+}
+
+summary {
+  color: var(--shi-grey-700);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.merchant-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 0;
+  padding: 0.9rem;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--shi-white);
+  cursor: pointer;
+}
+
+.merchant-choice:has(input:checked) {
+  background: var(--shi-blue-100);
+  box-shadow: 3px 3px 0 var(--shi-black);
+}
+
+.merchant-choice input {
+  width: auto;
+  margin: 0;
+}
+
+.merchant-choice span {
+  display: grid;
+}
+
+.merchant-choice small {
+  color: var(--shi-grey-700);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.token-output {
+  display: block;
+  overflow-wrap: anywhere;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--shi-yellow-200);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.button-link {
+  display: inline-block;
+  padding: 0.75rem 1rem;
+  border: var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--shi-white);
+  background: var(--shi-blue);
+  box-shadow: var(--shadow-pop);
+  font-weight: 800;
+  text-decoration: none;
+}
+
 label {
   margin-top: 0.45rem;
   color: var(--shi-black);
@@ -388,6 +462,17 @@ button.danger:hover:not(:disabled) {
 
 .notice h3 {
   margin-top: 0;
+}
+
+.security-verification-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.security-verification-header h3 {
+  margin: 0;
 }
 
 .portal-shell {

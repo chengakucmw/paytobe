@@ -16,6 +16,10 @@
   "Amount": "金額",
   "Amount and asset": "金額と資産",
   "Android Preview distribution may be invitation-based. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Android Preview の配布は招待制の場合があります。iOS の提供は管理された TestFlight 経路を使用する場合があります。確認されていない提供元からパッケージをインストールしないでください。",
+  "Android Preview APK · Testnet only. This fixed link always downloads the current published build.": "Android Preview APK · Testnet 専用。この固定リンクから、現在公開中のビルドを常にダウンロードできます。",
+  "Download Android APK": "Android APK をダウンロード",
+  "Download the Android Preview APK only from the Personal page on this official site. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Android Preview APK は、この公式サイトの個人向けページからのみダウンロードしてください。iOS の提供には管理された TestFlight 経路を使用する場合があります。確認されていない提供元からパッケージをインストールしないでください。",
+  "The Android Preview APK is available from the Personal page. The same official download link is kept when the published build changes.": "Android Preview APK は個人向けページからダウンロードできます。公開ビルドが更新されても、同じ公式ダウンロードリンクを使用できます。",
   "App availability": "アプリの提供状況",
   "App version, operating system version, approximate time, test or sandbox environment, screen name, redacted request ID, expected behavior, and observed behavior.": "アプリのバージョン、OS のバージョン、おおよその時刻、テストまたはサンドボックス環境、画面名、マスキング済みのリクエスト ID、期待される動作、実際に観測された動作。",
   "Approval": "承認",
@@ -414,5 +418,11 @@
   "Your responsibilities": "あなたの責任",
   "Your system requests. The customer's wallet decides.": "あなたのシステムがリクエストし、顧客のウォレットが判断します。",
   "Your wallet presents the amount, asset, network, recipient, fee, and transaction context.": "あなたのウォレットには、金額、資産、ネットワーク、受取先、手数料、取引コンテキストが表示されます。",
+  "Effective August 3, 2026": "2026年8月3日発効",
+  "Effective terms now govern the official testnet.": "正式に発効した規約が公式テストネットに適用されます。",
+  "Legal documents": "法的文書",
+  "Open the Legal Center →": "リーガルセンターを開く →",
+  "The official environment remains testnet-only. Test assets have no monetary value, and the server does not hold recovery phrases, private keys, or signing material.": "公式環境は引き続きテストネット専用です。テスト資産に金銭的価値はなく、サーバーはリカバリーフレーズ、秘密鍵、署名材料を保持しません。",
+  "Vivbase LLC operates the live Stellar testnet service under the Terms, Privacy Policy, Risk Disclosure, Acceptable Use Policy, Cookie Notice, Business Terms, DPA, and Subprocessor List.": "Vivbase LLC は、利用規約、プライバシーポリシー、リスク開示、許容利用ポリシー、Cookie 通知、ビジネス規約、DPA、サブプロセッサー一覧に基づき、稼働中の Stellar テストネットサービスを運営します。",
   "© 2026 VelarumPay. Brand identifiers are separately protected.": "© 2026 VelarumPay。ブランド識別子は別途保護されています。"
 }

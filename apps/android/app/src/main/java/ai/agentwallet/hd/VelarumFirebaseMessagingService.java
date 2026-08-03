@@ -6,7 +6,6 @@ import com.google.firebase.messaging.RemoteMessage;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-import java.util.List;
 import java.util.Map;
 
 public final class VelarumFirebaseMessagingService extends FirebaseMessagingService {
@@ -38,14 +37,7 @@ public final class VelarumFirebaseMessagingService extends FirebaseMessagingServ
     }
 
     private void synchronizeAndNotify() {
-        try {
-            List<PaymentIntent> items = RelayClient.sync(getApplicationContext());
-            for (PaymentIntent intent : items) {
-                PaymentNotifications.notifyPaymentIntent(getApplicationContext(), intent);
-            }
-        } catch (Exception error) {
-            VpLog.w("VelarumFcm", "authenticated REST compensation sync failed", error);
-        }
+        PaymentSyncWorker.enqueue(getApplicationContext());
     }
 
     static PushHintDecision evaluateData(Map<String, String> data) {

@@ -17,6 +17,8 @@ const WEAK_SECRET_VALUES = new Set([
 ]);
 const REDACTED = "[redacted]";
 const SENSITIVE_KEY = /(authorization|token|secret|signature|password|seed|private|mnemonic)/i;
+export const OFFICIAL_API_ORIGIN = "https://api.velarumai.com";
+export const OFFICIAL_STELLAR_TESTNET_HORIZON = "https://horizon-testnet.stellar.org";
 
 export function loadRuntimeConfig(env = process.env) {
   const nodeEnv = String(env.NODE_ENV || "development").trim().toLowerCase();
@@ -30,6 +32,7 @@ export function loadRuntimeConfig(env = process.env) {
     runtime_env: runtimeEnv,
     production,
     public_base_url: String(env.PUBLIC_BASE_URL || "").trim(),
+    official_testnet_only: parseBool(env.OFFICIAL_TESTNET_ONLY, false),
     trust_proxy: parseBool(env.TRUST_PROXY, false),
     storage: {
       driver: String(env.RELAY_STORE_DRIVER || "sqlite").trim().toLowerCase(),
@@ -61,11 +64,24 @@ export function loadRuntimeConfig(env = process.env) {
     observability: {
       metrics_token: String(env.METRICS_TOKEN || env.OBSERVABILITY_TOKEN || "").trim()
     },
+    email: {
+      provider: String(env.TRANSACTIONAL_EMAIL_PROVIDER || (production ? "" : "memory")).trim().toLowerCase(),
+      account_id: String(env.CLOUDFLARE_EMAIL_ACCOUNT_ID || "").trim(),
+      api_token: String(env.CLOUDFLARE_EMAIL_API_TOKEN || "").trim(),
+      from: String(env.TRANSACTIONAL_EMAIL_FROM || "").trim().toLowerCase(),
+      from_name: String(env.TRANSACTIONAL_EMAIL_FROM_NAME || "VelarumPay").trim(),
+      reply_to: String(env.TRANSACTIONAL_EMAIL_REPLY_TO || "").trim().toLowerCase(),
+      portal_base_url: String(env.MERCHANT_PORTAL_PUBLIC_URL || "").trim().replace(/\/+$/, ""),
+      timeout_ms: positiveInt(env.TRANSACTIONAL_EMAIL_TIMEOUT_MS, 10_000)
+    },
     stellar_public: {
       enabled: parseBool(env.STELLAR_PUBLIC_ENABLED, false),
       single_payment_max_xlm: String(env.STELLAR_PUBLIC_SINGLE_PAYMENT_MAX_XLM || "1").trim(),
-      horizon_url: String(env.STELLAR_PUBLIC_HORIZON_URL || "https://horizon.stellar.org").trim(),
+      horizon_url: String(env.STELLAR_PUBLIC_HORIZON_URL || "").trim(),
       recipient_allowlist: parseList(env.ADDRESS_WHITELIST_STELLAR)
+    },
+    stellar_testnet: {
+      horizon_url: String(env.STELLAR_TESTNET_HORIZON_URL || OFFICIAL_STELLAR_TESTNET_HORIZON).trim()
     },
     push: {
       fcm: {
@@ -105,6 +121,16 @@ export function validateRuntimeConfig(config) {
       errors.push("FCM_TOKEN_ENCRYPTION_KEY must be a base64/base64url or hex value that decodes to exactly 32 bytes.");
     }
   }
+  if (config.email.provider && !["memory", "cloudflare"].includes(config.email.provider)) {
+    errors.push("TRANSACTIONAL_EMAIL_PROVIDER must be memory or cloudflare.");
+  }
+  if (config.email.provider === "cloudflare") {
+    if (!/^[a-f0-9]{32}$/i.test(config.email.account_id)) errors.push("CLOUDFLARE_EMAIL_ACCOUNT_ID must be a valid Cloudflare account ID.");
+    if (config.email.api_token.length < 20) errors.push("CLOUDFLARE_EMAIL_API_TOKEN must be configured for Cloudflare Email Sending.");
+    if (!isEmailAddress(config.email.from)) errors.push("TRANSACTIONAL_EMAIL_FROM must be a valid verified sender address.");
+    if (config.email.reply_to && !isEmailAddress(config.email.reply_to)) errors.push("TRANSACTIONAL_EMAIL_REPLY_TO must be a valid email address.");
+    if (!isHttpsOrigin(config.email.portal_base_url)) errors.push("MERCHANT_PORTAL_PUBLIC_URL must be an HTTPS origin.");
+  }
   if (config.stellar_public.enabled) {
     const maxXlm = normalizeDecimalString(config.stellar_public.single_payment_max_xlm);
     if (maxXlm === null || compareDecimalStrings(maxXlm, "0") <= 0) {
@@ -117,8 +143,24 @@ export function validateRuntimeConfig(config) {
       errors.push("ADDRESS_WHITELIST_STELLAR must contain at least one verified recipient when Stellar mainnet is enabled.");
     }
   }
+  if (config.official_testnet_only) {
+    if (config.stellar_public.enabled) errors.push("STELLAR_PUBLIC_ENABLED must be false when OFFICIAL_TESTNET_ONLY is true.");
+    if (config.stellar_public.horizon_url) errors.push("STELLAR_PUBLIC_HORIZON_URL must be absent in the official testnet environment.");
+    if (config.stellar_testnet.horizon_url !== OFFICIAL_STELLAR_TESTNET_HORIZON) {
+      errors.push(`STELLAR_TESTNET_HORIZON_URL must be ${OFFICIAL_STELLAR_TESTNET_HORIZON}.`);
+    }
+  }
 
   if (config.production) {
+    if (config.public_base_url !== OFFICIAL_API_ORIGIN) {
+      errors.push(`PUBLIC_BASE_URL must be the canonical ${OFFICIAL_API_ORIGIN} origin in production.`);
+    }
+    if (!config.official_testnet_only) {
+      errors.push("OFFICIAL_TESTNET_ONLY must be true in production.");
+    }
+    if (config.email.provider !== "cloudflare") {
+      errors.push("TRANSACTIONAL_EMAIL_PROVIDER must be cloudflare in production.");
+    }
     if (!config.push.fcm.enabled) {
       errors.push("FCM_ENABLED must be true in production so wallet push delivery cannot be silently disabled.");
     }
@@ -162,6 +204,8 @@ export function runtimeHealth(config, validation = validateRuntimeConfig(config)
   return {
     runtime_env: config.runtime_env,
     production: config.production,
+    public_base_url: config.public_base_url,
+    official_testnet_only: config.official_testnet_only,
     cors: {
       allowlist_count: config.cors.allowed_origins.length,
       allow_localhost: config.cors.allow_localhost,
@@ -184,11 +228,20 @@ export function runtimeHealth(config, validation = validateRuntimeConfig(config)
       fcm_credentials_configured: Boolean(config.push.fcm.service_account_json || config.push.fcm.service_account_file),
       fcm_token_encryption_configured: isAes256Key(config.push.fcm.token_encryption_key)
     },
+    email: {
+      provider: config.email.provider || "unconfigured",
+      provider_configured: config.email.provider === "cloudflare" && /^[a-f0-9]{32}$/i.test(config.email.account_id),
+      sender_configured: isEmailAddress(config.email.from),
+      portal_origin_configured: isHttpsOrigin(config.email.portal_base_url)
+    },
     stellar_public: {
       enabled: config.stellar_public.enabled,
       single_payment_limit_configured: Boolean(normalizeDecimalString(config.stellar_public.single_payment_max_xlm)),
       https_horizon_configured: isHttpsUrl(config.stellar_public.horizon_url),
       recipient_allowlist_count: config.stellar_public.recipient_allowlist.length
+    },
+    stellar_testnet: {
+      official_horizon: config.stellar_testnet.horizon_url === OFFICIAL_STELLAR_TESTNET_HORIZON
     },
     warnings: validation.warnings
   };
@@ -202,6 +255,19 @@ function isHttpsUrl(value) {
   }
 }
 
+function isHttpsOrigin(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && url.origin === url.href.replace(/\/$/, "");
+  } catch {
+    return false;
+  }
+}
+
+function isEmailAddress(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || ""));
+}
+
 export function createCorsOptions(config) {
   return {
     credentials: config.cors.allow_credentials,
@@ -211,6 +277,44 @@ export function createCorsOptions(config) {
       callback(null, decision.ok ? true : false);
     }
   };
+}
+
+export function createTestnetOnlyMiddleware(config, options = {}) {
+  return (req, res, next) => {
+    if (!config.official_testnet_only) return next();
+    const forbidden = findForbiddenNetwork(req.body);
+    if (!forbidden) return next();
+    if (typeof options.onViolation === "function") return options.onViolation(res, forbidden);
+    return res.status(400).json({
+      ok: false,
+      error: {
+        code: "validation_failed",
+        message: "The official VelarumPay environment accepts Stellar testnet only.",
+        severity: "blocker",
+        details: { reason: "mainnet_forbidden", field: forbidden }
+      }
+    });
+  };
+}
+
+function findForbiddenNetwork(value, pathPrefix = "body") {
+  if (!value || typeof value !== "object") return "";
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      const found = findForbiddenNetwork(value[index], `${pathPrefix}[${index}]`);
+      if (found) return found;
+    }
+    return "";
+  }
+  for (const [key, nested] of Object.entries(value)) {
+    const field = `${pathPrefix}.${key}`;
+    if (key === "network" && String(nested || "").trim() !== "stellar_testnet") return field;
+    if (/mainnet|public_network|stellar_public/i.test(key) && nested !== false && nested !== "false" && nested !== "") return field;
+    if (typeof nested === "string" && /horizon\.stellar\.org|\bstellar_public\b|\bbase_mainnet\b/i.test(nested)) return field;
+    const found = findForbiddenNetwork(nested, field);
+    if (found) return found;
+  }
+  return "";
 }
 
 export function isOriginAllowed(origin, config) {

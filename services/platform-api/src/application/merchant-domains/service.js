@@ -61,12 +61,21 @@ export class MerchantDomainService {
       if (before.join(",") !== after.join(",")) return failed("domain_dns_rebinding", "Domain addresses changed during verification");
       const verifiedAt = this.clock.nowIso();
       const evidenceDigest = this.hash(`${record.method}:${record.domain}:${before.join(",")}:${proofHash}`);
-      const updated = this.repository.markVerified(scope, domainId, record.version, {
+      const committed = this.repository.markVerified(scope, domainId, record.version, {
         verified_at: verifiedAt,
         evidence_digest: evidenceDigest,
         updated_at: verifiedAt
       });
-      return updated ? { ok: true, merchant_domain: updated } : conflict("domain_conflict", "Domain is already verified for another merchant");
+      if (!committed) return conflict("domain_conflict", "Domain is already verified for another merchant");
+      if (committed.reason === "merchant_not_activatable") {
+        return conflict("merchant_not_activatable", "Merchant cannot be activated from its current verification state");
+      }
+      return {
+        ok: true,
+        merchant_domain: committed.merchant_domain,
+        merchant: committed.merchant,
+        merchant_activated: committed.merchant_activated
+      };
     } catch (error) {
       if (error?.code === "response_too_large") return failed("domain_response_too_large", "Domain verification response is too large");
       return failed("domain_verification_failed", "Domain verification failed");
@@ -107,13 +116,42 @@ export class SqliteMerchantDomainRepository {
   }
   markVerified(scope, id, version, value) {
     assertScope(scope);
+    this.db.exec("BEGIN IMMEDIATE");
     try {
       const result = this.db.prepare(`UPDATE merchant_domains SET status = 'verified', verified_at = ?, evidence_digest = ?,
         version = version + 1, updated_at = ? WHERE merchant_id = ? AND domain_id = ? AND version = ?
         AND status IN ('pending', 'reverification_required')`)
         .run(value.verified_at, value.evidence_digest, value.updated_at, scope.merchant_id, id, version);
-      return Number(result.changes || 0) === 1 ? this.get(scope, id) : null;
+      if (Number(result.changes || 0) !== 1) return rollbackNull(this.db);
+      const merchantBefore = this.db.prepare(`SELECT merchant_id, display_name, legal_name, status, verification_state,
+        version, created_at, updated_at FROM merchants WHERE merchant_id = ?`).get(scope.merchant_id);
+      if (!merchantBefore) return rollbackNull(this.db);
+      let merchantActivated = false;
+      if (merchantBefore.status === "pending_verification") {
+        if (merchantBefore.verification_state !== "email_verified") {
+          this.db.exec("ROLLBACK");
+          return { reason: "merchant_not_activatable" };
+        }
+        const activated = this.db.prepare(`UPDATE merchants SET status = 'active', verification_state = 'verified',
+          version = version + 1, updated_at = ?
+          WHERE merchant_id = ? AND status = 'pending_verification' AND verification_state = 'email_verified'`)
+          .run(value.updated_at, scope.merchant_id);
+        if (Number(activated.changes || 0) !== 1) return rollbackNull(this.db);
+        merchantActivated = true;
+      } else if (merchantBefore.status !== "active") {
+        this.db.exec("ROLLBACK");
+        return { reason: "merchant_not_activatable" };
+      } else if (merchantBefore.verification_state !== "verified") {
+        this.db.prepare(`UPDATE merchants SET verification_state = 'verified', version = version + 1, updated_at = ?
+          WHERE merchant_id = ? AND status = 'active'`).run(value.updated_at, scope.merchant_id);
+      }
+      const merchantDomain = this.get(scope, id);
+      const merchant = this.db.prepare(`SELECT merchant_id, display_name, legal_name, status, verification_state,
+        version, created_at, updated_at FROM merchants WHERE merchant_id = ?`).get(scope.merchant_id);
+      this.db.exec("COMMIT");
+      return { merchant_domain: merchantDomain, merchant: { ...merchant }, merchant_activated: merchantActivated };
     } catch (error) {
+      try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
       if (String(error?.message || "").includes("UNIQUE constraint failed")) return null;
       throw error;
     }
@@ -199,6 +237,7 @@ function isIpAddress(value) { return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || 
 function normalizeMethod(value) { const method = String(value || "dns_txt"); if (!["dns_txt", "https_well_known"].includes(method)) throw new TypeError("Domain method is invalid"); return method; }
 function verificationUrl(domain) { return `https://${domain}/.well-known/velarumpay-domain-verification`; }
 function assertScope(scope) { if (!scope || !Object.isFrozen(scope) || !scope.merchant_id) throw new TypeError("Immutable TenantScope is required"); }
+function rollbackNull(db) { db.exec("ROLLBACK"); return null; }
 function failed(code, message) { return { ok: false, status: 422, code, message }; }
 function conflict(code, message) { return { ok: false, status: 409, code, message }; }
 function notFound() { return { ok: false, status: 404, code: "resource_not_found", message: "Resource not found" }; }

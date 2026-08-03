@@ -1,25 +1,25 @@
-# AgentFood Independent Production Connector
+# AgentFood Official Testnet Connector
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-02 03:04:51 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-01 19:04:51 UTC
+> - **Taipei Time:** 2026-08-03 18:06:25 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-08-03 10:06:25 UTC
 
-This dependency-free Node.js service is the independently deployable AgentFood backend. It creates real Stellar public-network Payment Requests through the VelarumPay Platform API, but never holds a seed phrase or private key, never signs, and never broadcasts. VelarumPay still requires local user review and signing.
+This dependency-free Node.js service is the independently deployable AgentFood backend for the official VelarumPay testnet. It creates real Recipient-bound Payment Requests through the production-like Platform API, while every chain transaction is restricted to Stellar testnet. It never holds a wallet seed phrase or wallet private key, never signs a wallet transaction, and never broadcasts one. VelarumPay still requires local user review and signing.
 
-The commerce boundary remains intentionally limited: merchants, menu items, catalog prices, orders, and fulfillment are mock data. The real XLM amount is a fixed small demonstration settlement configured by the operator and is explicitly separated from the mock catalog total in every API response and Payment Request.
+The commerce boundary remains intentionally limited: merchants, menu items, catalog prices, orders, and fulfillment are mock data. The test XLM amount is a fixed demonstration amount configured by the operator and is explicitly separated from the mock catalog total in every API response and Payment Request.
 
-This service is separate from `examples/agentfood-platform-demo`. The OpenAI Sites project remains a public mock/Stellar-testnet reference demo and must not receive this service's mainnet configuration or secrets.
+This service is separate from `examples/agentfood-platform-demo`. Mainnet settings are forbidden in both the service and the official cloud orchestration.
 
 ## Required production controls
 
-- `AGENTFOOD_STELLAR_MAINNET_ENABLED=true`
-- a fixed `AGENTFOOD_STELLAR_PAYMENT_AMOUNT_XLM` no greater than `AGENTFOOD_STELLAR_MAINNET_MAX_XLM`
-- the official `https://horizon.stellar.org` endpoint
+- `AGENTFOOD_STELLAR_TESTNET_ENABLED=true`
+- a fixed `AGENTFOOD_STELLAR_PAYMENT_AMOUNT_XLM` no greater than `AGENTFOOD_STELLAR_TESTNET_MAX_XLM`
+- the official `https://horizon-testnet.stellar.org` endpoint
 - one active standard Recipient selected by `AGENTFOOD_RECIPIENT_ID` and `AGENTFOOD_RECIPIENT_VERSION_ID`
 - an HTTPS `PLATFORM_API_URL`, registered Agent credential, local Ed25519 Agent Assertion signer, and standard Webhook secret
 - a 32-character-or-longer API key and an absolute durable store path
 
-The Platform API must independently enable the same mainnet boundary with `STELLAR_PUBLIC_ENABLED=true`, a compatible single-payment cap, the same Horizon endpoint, and the AgentFood recipient in `ADDRESS_WHITELIST_STELLAR`.
+No `AGENTFOOD_STELLAR_MAINNET_*`, `STELLAR_PUBLIC_ENABLED`, or public-network Horizon variables may be present. The Platform API keeps its mainnet gate hard-disabled and rejects mainnet requests.
 
 ## Run and verify
 

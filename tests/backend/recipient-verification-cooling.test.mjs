@@ -20,14 +20,14 @@ const addressA = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 const addressB = "GAAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQCAIBAEAQDZ7H";
 const start = Date.parse("2026-08-01T16:50:00.000Z");
 
-test("evidence, mandatory cooling, owner notification, activation, suspension, and revoke use the controlled Clock", async (t) => {
+test("non-testnet evidence, cooling, owner notification, activation, suspension, and revoke use the controlled Clock", async (t) => {
   const runtime = sqliteRuntime(t);
   const clock = controlledClock(start);
   const service = recipientService(runtime, clock);
   const tenant = scope("merchant_a");
   runtime.seedTenant("merchant_a", "owner_a", "owner");
 
-  const created = await service.create(tenant, recipientInput(addressA));
+  const created = await service.create(tenant, recipientInput(addressA, "", "stellar_public"));
   assert.equal(Date.parse(created.recipient_version.cooling_until) - Date.parse(created.recipient_version.cooling_started_at), RECIPIENT_COOLING_MS);
   assert.equal(created.recipient_version.verification_state, "unverified");
   const notification = runtime.db.prepare("SELECT * FROM recipient_owner_notifications WHERE merchant_id = ?").get("merchant_a");
@@ -84,6 +84,36 @@ test("evidence, mandatory cooling, owner notification, activation, suspension, a
     "recipient.created", "recipient.verified", "recipient.activated", "recipient.status_changed", "recipient.status_changed"
   ]);
   assert.equal(audit.every((event) => !event.details_json.includes(source.evidence_digest) && !event.details_json.includes(addressA)), true);
+});
+
+test("Stellar testnet Recipient activates immediately after trusted evidence", async (t) => {
+  const runtime = sqliteRuntime(t);
+  const clock = controlledClock(start);
+  const service = recipientService(runtime, clock);
+  const tenant = scope("merchant_testnet");
+  runtime.seedTenant("merchant_testnet", "owner_testnet", "owner");
+
+  const created = await service.create(tenant, recipientInput(addressA));
+  assert.equal(created.recipient_version.network, "stellar_testnet");
+  assert.equal(created.recipient_version.cooling_until, created.recipient_version.cooling_started_at);
+
+  const source = runtime.seedEvidenceSource({
+    merchantId: "merchant_testnet",
+    type: "reviewed_operational",
+    facts: created.recipient_version,
+    verifiedAt: clock.nowIso()
+  });
+  const verified = await service.verify(tenant, created.recipient.recipient_id, {
+    recipient_version_id: created.recipient_version.recipient_version_id,
+    type: "reviewed_operational",
+    source_id: source.source_id,
+    evidence_digest: source.evidence_digest,
+    version: 1
+  });
+  const activated = await service.activate(tenant, created.recipient.recipient_id, activation(verified, 2));
+  assert.equal(activated.ok, true);
+  assert.equal(activated.recipient.status, "active");
+  assert.equal(activated.recipient_version.verification_state, "active");
 });
 
 test("all evidence types are extensible trusted sources and tenant/facts/digest mismatches fail closed", async (t) => {
@@ -258,11 +288,11 @@ function scope(merchantId) {
   return createTenantScope(Object.freeze({ merchant_id: merchantId, actor_id: `owner_${merchantId}`, request_id: `request_${merchantId}` }));
 }
 
-function recipientInput(address, suffix = "") {
+function recipientInput(address, suffix = "", network = "stellar_testnet") {
   return {
     name: `Treasury ${suffix}`.trim(),
     rail: "stellar_xlm",
-    network: "stellar_testnet",
+    network,
     asset: "XLM",
     address,
     ...(suffix ? { memo: suffix } : {})

@@ -10,14 +10,14 @@ export {
   normalizeTransactionContextV1
 };
 
-export const DEFAULT_BASE_URL = "http://127.0.0.1:8787";
-export const DEFAULT_AGENT_TOKEN_AUDIENCE = "https://api-testnet.velarumpay.com/v1/agent-auth/token";
+export const DEFAULT_BASE_URL = "https://api.velarumai.com";
+export const DEFAULT_AGENT_TOKEN_AUDIENCE = "https://api.velarumai.com/v1/agent-auth/token";
 export const validatePaymentRequest = normalizePaymentRequestV1;
 export const validateTransactionContext = normalizeTransactionContextV1;
 
 /**
  * @typedef {Object} VelarumPayClientOptions
- * @property {string=} baseUrl Platform API base URL. Defaults to http://127.0.0.1:8787.
+ * @property {string=} baseUrl Platform API base URL. Defaults to https://api.velarumai.com.
  * @property {string=} connectionToken Connection-scoped token returned by pairing approval.
  * @property {typeof fetch=} fetch Fetch implementation for Node, browsers, or tests.
  * @property {Record<string, string>=} headers Extra headers sent with every request.

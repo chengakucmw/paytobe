@@ -7,7 +7,7 @@ import java.util.Locale;
 
 /** Resolves the fail-closed Platform API boundary for the selected build variant. */
 final class PlatformServiceConfig {
-    static final String OFFICIAL_TESTNET_ORIGIN = "https://api-testnet.velarumpay.com";
+    static final String OFFICIAL_TESTNET_ORIGIN = "https://api.velarumai.com";
     private static final String LOG_TAG = "VelarumPayEnvironment";
 
     private PlatformServiceConfig() {

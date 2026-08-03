@@ -434,10 +434,16 @@ final class SecureWalletStore {
         private EnvelopeCodec() {}
 
         static String encrypt(SecretKey key, String plaintext, String aad) throws Exception {
-            byte[] iv = new byte[12];
-            RANDOM.nextBytes(iv);
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(128, iv));
+            // AndroidKeyStore keys created with randomized encryption reject a
+            // caller-provided IV. Let the provider generate it for encryption and
+            // persist that IV in the envelope; decryption continues to use the
+            // stored IV and remains compatible with existing envelopes.
+            cipher.init(Cipher.ENCRYPT_MODE, key);
+            byte[] iv = cipher.getIV();
+            if (iv == null || iv.length != 12) {
+                throw new IllegalStateException("Invalid generated credential IV");
+            }
             cipher.updateAAD(aad.getBytes(StandardCharsets.UTF_8));
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
             return new JSONObject()

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { createVelarumPayClient } from "../../packages/sdk-js/src/index.js";
 
-const OFFICIAL_TESTNET_ORIGIN = "https://api-testnet.velarumpay.com";
+const OFFICIAL_TESTNET_ORIGIN = "https://api.velarumai.com";
 const TEST_PUBLIC_KEY = `ed25519:${"A".repeat(43)}`;
 
 export async function runOfflineMerchantQuickstart() {

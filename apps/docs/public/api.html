@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumpay.com/preview">View program boundaries</a></div>
+  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumai.com/preview">View program boundaries</a></div>
   <header class="topbar">
     <div class="inner">
       <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
@@ -19,7 +19,7 @@
         <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
-        <a href="https://velarumpay.com/business">Business</a>
+        <a href="https://velarumai.com/business">Business</a>
       </nav>
     </div>
   </header>
@@ -27,7 +27,7 @@
   <main>
     <span class="pill">REST API v1</span>
     <h1>REST API reference</h1>
-    <p class="lead">The official testnet origin is <code>https://api-testnet.velarumpay.com</code>; local contract tests may use <code>http://127.0.0.1:8787</code>. All API paths below are prefixed with <code>/v1</code>.</p>
+    <p class="lead">The official testnet origin is <code>https://api.velarumai.com</code>; local contract tests may use <code>http://127.0.0.1:8787</code>. All API paths below are prefixed with <code>/v1</code>.</p>
     <div class="note">Download the canonical <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1 document</a>. Legacy <code>/v1/payment-intents</code> and OpenClaw-specific routes are migration-only and are not part of this public contract.</div>
 
     <h2>Authentication</h2>
@@ -59,7 +59,8 @@
     <h2>Merchant control plane</h2>
     <table>
       <tr><th>Method</th><th>Path</th><th>Purpose</th></tr>
-      <tr><td>POST</td><td><code>/v1/merchant-accounts/registrations</code></td><td>Start enumeration-safe email registration.</td></tr>
+      <tr><td>POST</td><td><code>/v1/merchant-accounts/registrations</code></td><td>Request an enumeration-safe one-time link for registration, setup recovery, or returning access.</td></tr>
+      <tr><td>POST</td><td><code>/v1/merchant-accounts/email-verifications</code></td><td>Exchange the one-time email link for eligible workspaces and a single-use session grant.</td></tr>
       <tr><td>POST</td><td><code>/v1/merchants</code></td><td>Consume the email-verification session grant and create an organization.</td></tr>
       <tr><td>POST</td><td><code>/v1/merchant-sessions</code></td><td>Consume the next one-time grant and issue an HttpOnly session plus CSRF proof.</td></tr>
       <tr><td>POST</td><td><code>/v1/merchant-domains</code></td><td>Register an exact DNS/HTTPS verification challenge.</td></tr>
@@ -98,7 +99,7 @@
     </table>
 
     <h2>Example: create a payment request</h2>
-    <pre><code>curl -X POST https://api-testnet.velarumpay.com/v1/payment-requests \
+    <pre><code>curl -X POST https://api.velarumai.com/v1/payment-requests \
   -H "Authorization: Bearer $VELARUMPAY_CONNECTION_TOKEN" \
   -H "X-Idempotency-Key: demo-payment-1" \
   -H "Content-Type: application/json" \

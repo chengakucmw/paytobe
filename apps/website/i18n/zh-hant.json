@@ -16,6 +16,10 @@
   "Amount": "金額",
   "Amount and asset": "金額與資產",
   "Android Preview distribution may be invitation-based. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "Android Preview 發佈可能採邀請制。iOS 的可用性可能透過受控的 TestFlight 管道提供。請勿從未經驗證的來源安裝套件。",
+  "Android Preview APK · Testnet only. This fixed link always downloads the current published build.": "Android Preview APK · 僅限測試網。此固定連結一律下載目前已發佈的版本。",
+  "Download Android APK": "下載 Android APK",
+  "Download the Android Preview APK only from the Personal page on this official site. iOS availability may use a controlled TestFlight path. Do not install packages from an unverified source.": "請僅從本官方網站的個人頁面下載 Android Preview APK。iOS 可用性可能透過受控的 TestFlight 管道提供。請勿從未經驗證的來源安裝套件。",
+  "The Android Preview APK is available from the Personal page. The same official download link is kept when the published build changes.": "Android Preview APK 可從個人頁面下載。發佈版本更新時，官方固定下載連結維持不變。",
   "App availability": "App 可用性",
   "App version, operating system version, approximate time, test or sandbox environment, screen name, redacted request ID, expected behavior, and observed behavior.": "App 版本、作業系統版本、約略時間、測試或 sandbox 環境、畫面名稱、已遮蔽的請求 ID、預期行為與實際觀察到的行為。",
   "Approval": "核准",
@@ -414,5 +418,11 @@
   "Your responsibilities": "您的責任",
   "Your system requests. The customer's wallet decides.": "由您的系統提出請求，由客戶的錢包做決定。",
   "Your wallet presents the amount, asset, network, recipient, fee, and transaction context.": "您的錢包會呈現金額、資產、網路、收款方、手續費與交易情境。",
+  "Effective August 3, 2026": "2026 年 8 月 3 日生效",
+  "Effective terms now govern the official testnet.": "官方測試網現已適用正式生效的條款。",
+  "Legal documents": "法律文件",
+  "Open the Legal Center →": "開啟法律中心 →",
+  "The official environment remains testnet-only. Test assets have no monetary value, and the server does not hold recovery phrases, private keys, or signing material.": "官方環境仍僅限測試網。測試資產沒有貨幣價值，伺服器不持有助記詞、私鑰或簽名材料。",
+  "Vivbase LLC operates the live Stellar testnet service under the Terms, Privacy Policy, Risk Disclosure, Acceptable Use Policy, Cookie Notice, Business Terms, DPA, and Subprocessor List.": "Vivbase LLC 依據服務條款、隱私權政策、風險揭露、可接受使用政策、Cookie 聲明、商業條款、DPA 與子處理方清單營運已上線的 Stellar 測試網服務。",
   "© 2026 VelarumPay. Brand identifiers are separately protected.": "© 2026 VelarumPay。品牌識別另受保護。"
 }

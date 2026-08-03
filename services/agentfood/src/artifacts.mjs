@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-export function buildMainnetArtifacts(order, config, now = new Date()) {
+export function buildTestnetArtifacts(order, config, now = new Date()) {
   const createdAt = now.toISOString();
   const transactionId = `txn_${order.order_id}`;
   const amount = order.settlement.amount;
@@ -16,10 +16,10 @@ export function buildMainnetArtifacts(order, config, now = new Date()) {
     created_at: createdAt,
     type: "generic",
     status: "awaiting_payment",
-    title: "AgentFood small mainnet demonstration",
-    summary: `A real ${amount} XLM mainnet transfer was requested for a mock AgentFood order. No food will be fulfilled.`,
+    title: "AgentFood official testnet demonstration",
+    summary: `A real transaction flow for ${amount} test XLM was requested for a mock AgentFood order. No food will be fulfilled.`,
     source,
-    user_intent: { prompt_summary: "Create a small mainnet demonstration payment for a mock AgentFood order." },
+    user_intent: { prompt_summary: "Create an official testnet payment for a mock AgentFood order." },
     agent_activity: [
       {
         at: createdAt,
@@ -31,8 +31,8 @@ export function buildMainnetArtifacts(order, config, now = new Date()) {
       {
         at: createdAt,
         action: "payment_requested",
-        label: "Requested a real mainnet transfer",
-        summary: `Requested ${amount} XLM on Stellar public network for local wallet approval and signing.`,
+        label: "Requested a testnet transaction",
+        summary: `Requested ${amount} test XLM on Stellar testnet for local wallet approval and signing.`,
         source_type: "payment_request_fact"
       }
     ],
@@ -85,19 +85,20 @@ export function buildMainnetArtifacts(order, config, now = new Date()) {
     recipient_version_id: config.stellar.recipientVersionId,
     transaction_context_ref: { transaction_id: transactionId },
     expires_at: new Date(now.getTime() + 5 * 60 * 1000).toISOString(),
-    idempotency_key: `agentfood:${order.order_id}:mainnet:v1`,
+    idempotency_key: `agentfood:${order.order_id}:testnet:v1`,
     payment: {
       amount
     },
     display: {
-      title: "AgentFood real XLM demonstration",
-      summary: `Real ${amount} XLM mainnet transfer; the associated food order and fulfillment are mock only.`,
-      primary_action: "Review real transfer"
+      title: "AgentFood testnet payment",
+      summary: `${amount} test XLM on Stellar testnet; the associated food order and fulfillment are mock only.`,
+      primary_action: "Review testnet transaction"
     },
     metadata: {
-      environment: "independent_production_connector",
+      environment: "official_testnet",
       data_mode: order.data_mode,
-      real_value_transfer: true,
+      real_transaction_process: true,
+      real_value_transfer: false,
       fulfillment: "none",
       order_reference: crypto.createHash("sha256").update(order.order_id).digest("hex").slice(0, 24)
     }

@@ -5,9 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { buildMainnetArtifacts } from "../src/artifacts.mjs";
+import { buildTestnetArtifacts } from "../src/artifacts.mjs";
 import { buildMockOrder } from "../src/catalog.mjs";
-import { loadConfig, validateConfig } from "../src/config.mjs";
+import { configHealth, loadConfig, validateConfig } from "../src/config.mjs";
 import { signWebhookPayload } from "../../platform-api/src/crypto.js";
 import { createAgentCredentialSigner, PlatformClient } from "../src/platform-client.mjs";
 import { createAgentFoodServer } from "../src/server.mjs";
@@ -29,10 +29,10 @@ function validConfig(overrides = {}) {
     AGENTFOOD_AGENT_CREDENTIAL_KID: "agentfood-test-key",
     AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_PKCS8_B64: PRIVATE_KEY,
     AGENTFOOD_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    AGENTFOOD_STELLAR_MAINNET_ENABLED: "true",
-    AGENTFOOD_STELLAR_MAINNET_MAX_XLM: "1",
+    AGENTFOOD_STELLAR_TESTNET_ENABLED: "true",
+    AGENTFOOD_STELLAR_TESTNET_MAX_XLM: "1",
     AGENTFOOD_STELLAR_PAYMENT_AMOUNT_XLM: "0.1",
-    AGENTFOOD_STELLAR_HORIZON_URL: "https://horizon.stellar.org",
+    AGENTFOOD_STELLAR_HORIZON_URL: "https://horizon-testnet.stellar.org",
     AGENTFOOD_RECIPIENT_ID: "agentfood-recipient",
     AGENTFOOD_RECIPIENT_VERSION_ID: "agentfood-recipient-v1",
     AGENTFOOD_PAYEE_NAME: "AgentFood test recipient",
@@ -50,12 +50,28 @@ function sampleOrder(config = validConfig()) {
   }, config.stellar.paymentAmountXlm, new Date("2026-07-24T00:00:00.000Z"));
 }
 
-test("production connector fails closed until real mainnet controls are configured", () => {
+test("production connector fails closed until official testnet controls are configured", () => {
   const result = validateConfig(loadConfig({ AGENTFOOD_RUNTIME_ENV: "production" }));
   assert.equal(result.ok, false);
-  assert(result.errors.some((error) => error.includes("MAINNET_ENABLED")));
+  assert(result.errors.some((error) => error.includes("TESTNET_ENABLED")));
   assert(result.errors.some((error) => error.includes("AGENTFOOD_RECIPIENT_ID")));
   assert(result.errors.some((error) => error.includes("AGENTFOOD_AGENT_CREDENTIAL")));
+});
+
+test("production site-only mode starts without pretending payments are ready", () => {
+  const config = loadConfig({
+    AGENTFOOD_RUNTIME_ENV: "production",
+    AGENTFOOD_SITE_ONLY: "true",
+    AGENTFOOD_PUBLIC_BASE_URL: "https://agentfood.velarumai.com",
+    AGENTFOOD_API_KEY: API_KEY,
+    AGENTFOOD_STORE_PATH: "/var/lib/agentfood/agentfood-store.json",
+    PLATFORM_API_URL: "https://api.velarumai.com"
+  });
+  assert.deepEqual(validateConfig(config), { ok: true, errors: [] });
+  const health = configHealth(config);
+  assert.equal(health.site_ready, true);
+  assert.equal(health.payment_ready, false);
+  assert.equal(health.site_only, true);
 });
 
 test("AgentFood refuses any server-side Stellar signing material", () => {
@@ -64,27 +80,28 @@ test("AgentFood refuses any server-side Stellar signing material", () => {
   assert(result.errors.some((error) => error.includes("Private signing material is forbidden")));
 });
 
-test("valid small-mainnet config passes while an amount over the cap fails", () => {
+test("valid testnet config passes while an amount over the cap fails", () => {
   assert.deepEqual(validateConfig(validConfig()), { ok: true, errors: [] });
   const over = validateConfig(validConfig({ AGENTFOOD_STELLAR_PAYMENT_AMOUNT_XLM: "1.0000001" }));
   assert.equal(over.ok, false);
   assert(over.errors.some((error) => error.includes("exceeds")));
 });
 
-test("mock catalog total is explicitly separate from the fixed real XLM settlement", () => {
+test("mock catalog total is explicitly separate from the fixed test XLM settlement", () => {
   const order = sampleOrder();
   assert.equal(order.mock_quote.total, "14.3");
   assert.equal(order.mock_quote.currency, "MOCK_CREDITS");
   assert.equal(order.settlement.amount, "0.1");
-  assert.equal(order.settlement.real_value_transfer, true);
+  assert.equal(order.settlement.real_transaction_process, true);
+  assert.equal(order.settlement.real_value_transfer, false);
   assert.equal(order.settlement.purchases_food, false);
   assert.equal(order.fulfillment, "none");
 });
 
-test("mainnet artifacts keep chain facts real and commerce claims visibly mock", () => {
+test("testnet artifacts keep chain facts real and commerce claims visibly mock", () => {
   const config = validConfig();
   const order = sampleOrder(config);
-  const artifacts = buildMainnetArtifacts(order, config, new Date("2026-07-24T00:00:00.000Z"));
+  const artifacts = buildTestnetArtifacts(order, config, new Date("2026-07-24T00:00:00.000Z"));
   assert.equal(artifacts.paymentRequest.payment.amount, "0.1");
   assert.equal(artifacts.paymentRequest.recipient_id, "agentfood-recipient");
   assert.equal(artifacts.paymentRequest.recipient_version_id, "agentfood-recipient-v1");
@@ -92,7 +109,7 @@ test("mainnet artifacts keep chain facts real and commerce claims visibly mock",
   assert.equal(Object.hasOwn(artifacts.paymentRequest.metadata, "food_order"), false);
   assert.equal(artifacts.context.type, "generic");
   assert.equal(artifacts.context.metadata.food_order.mock, true);
-  assert.match(artifacts.paymentRequest.display.summary, /Real 0\.1 XLM/);
+  assert.match(artifacts.paymentRequest.display.summary, /0\.1 test XLM/);
   assert.match(artifacts.paymentRequest.display.summary, /mock only/);
   assert.equal(artifacts.context.metadata.food_order.settlement_summary.total, artifacts.paymentRequest.payment.amount);
 });
@@ -100,7 +117,7 @@ test("mainnet artifacts keep chain facts real and commerce claims visibly mock",
 test("Platform client uses the SDK signer and a runtime Connection token with stable idempotency", async () => {
   const config = validConfig();
   const order = sampleOrder(config);
-  const artifacts = buildMainnetArtifacts(order, config);
+  const artifacts = buildTestnetArtifacts(order, config);
   const calls = [];
   const client = new PlatformClient(config.platform, { signer: createAgentCredentialSigner({
     AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_PKCS8_B64: PRIVATE_KEY
@@ -124,7 +141,7 @@ test("OpenAI Sites reference demo remains Stellar testnet-only", () => {
   assert.doesNotMatch(hostedApi, /network:\s*["']stellar_public["']/);
 });
 
-test("HTTP flow creates a mock order then a real mainnet Payment Request", {
+test("HTTP flow creates a mock order then a real testnet Payment Request", {
   skip: process.env.VP_ALLOW_LISTEN_TESTS !== "1"
 }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentfood-http-"));
@@ -158,7 +175,7 @@ test("HTTP flow creates a mock order then a real mainnet Payment Request", {
       return { ok: true, payment_request: {
         ...paymentRequest,
         request_id: "prq_test",
-        payment: { amount: paymentRequest.payment.amount, network: "stellar_public", asset: "XLM", to: RECIPIENT },
+        payment: { amount: paymentRequest.payment.amount, network: "stellar_testnet", asset: "XLM", to: RECIPIENT },
         risk: { signing_allowed: true }
       } };
     },
@@ -205,9 +222,46 @@ test("HTTP flow creates a mock order then a real mainnet Payment Request", {
   });
   assert.equal(response.status, 201);
   const payment = await response.json();
-  assert.equal(payment.payment_request.payment.network, "stellar_public");
+  assert.equal(payment.payment_request.payment.network, "stellar_testnet");
   assert.equal(payment.payment_request.payment.amount, "0.1");
   assert.equal(Object.hasOwn(payment.payment_request.metadata, "food_order"), false);
+
+  response = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: `velarumpay-connect:ck_${"C".repeat(43)}` })
+  });
+  assert.equal(response.status, 201);
+  const publicConnect = await response.json();
+  assert.equal(publicConnect.type, "connect_started");
+  assert.equal(Object.hasOwn(publicConnect.connection, "connection_token"), false);
+
+  response = await fetch(`${base}/api/connect/${publicConnect.session_id}`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).connection.connected, true);
+
+  response = await fetch(`${base}/api/orders`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      session_id: publicConnect.session_id,
+      client_request_id: "browserrequest0001",
+      merchant_id: "green-bowl",
+      items: [{ item_id: "garden-bowl", quantity: 1 }]
+    })
+  });
+  assert.equal(response.status, 201);
+  const publicOrder = await response.json();
+
+  response = await fetch(`${base}/api/orders/${publicOrder.order.order_id}/payment-request`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ session_id: publicConnect.session_id })
+  });
+  assert.equal(response.status, 201);
+  const publicPayment = await response.json();
+  assert.equal(publicPayment.payment_request.payment.network, "stellar_testnet");
+  assert.equal(publicPayment.payment_request.payment.amount, "0.1");
 
   const rawEvent = Buffer.from(JSON.stringify({ event_id: "event_agentfood_1", type: "payment_request.status_updated", data: {} }));
   const signature = signWebhookPayload(WEBHOOK_SECRET, String(Math.floor(Date.now() / 1000)), rawEvent);
@@ -218,4 +272,55 @@ test("HTTP flow creates a mock order then a real mainnet Payment Request", {
   });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).duplicate, false);
+});
+
+test("site-only HTTP surface serves the production UI and mock recommendations", {
+  skip: process.env.VP_ALLOW_LISTEN_TESTS !== "1"
+}, async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentfood-site-"));
+  const config = validConfig({
+    AGENTFOOD_SITE_ONLY: "true",
+    AGENTFOOD_STELLAR_TESTNET_ENABLED: "false",
+    AGENTFOOD_AGENT_CREDENTIAL_KID: "",
+    AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_PKCS8_B64: "",
+    AGENTFOOD_WEBHOOK_SECRET: "",
+    AGENTFOOD_RECIPIENT_ID: "",
+    AGENTFOOD_RECIPIENT_VERSION_ID: "",
+    AGENTFOOD_STORE_PATH: path.join(dir, "store.json")
+  });
+  const server = createAgentFoodServer({ config, store: new AgentFoodStore(config.storePath), platformClient: null });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  let response = await fetch(`${base}/`);
+  assert.equal(response.status, 200);
+  assert.match(await response.text(), /Real testnet payment flow/);
+
+  response = await fetch(`${base}/api/catalog`);
+  const catalog = await response.json();
+  assert.equal(catalog.payment_ready, false);
+  assert.equal(catalog.hosting_mode, "production_site_only");
+  assert.equal(catalog.merchants.length, 3);
+
+  response = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: "spicy vegetarian under 20 credits" })
+  });
+  const chat = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(chat.type, "mock_recommendation");
+  assert.equal(chat.order.currency, "MOCK_CREDITS");
+
+  response = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ message: `velarumpay-connect:ck_${"B".repeat(43)}` })
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "wallet_connection_unavailable");
 });

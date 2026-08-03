@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumpay.com/preview">View program boundaries</a></div>
+  <div class="preview-bar">Developer Preview · Test and pilot use only · <a href="https://velarumai.com/preview">View program boundaries</a></div>
   <header class="topbar"><div class="inner">
     <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
     <nav class="nav">
@@ -19,7 +19,7 @@
   <main>
     <span class="pill">Merchant Quickstart · Testnet</span>
     <h1>From merchant registration to a user-approved test request</h1>
-    <p class="lead">This is the canonical onboarding order for the official testnet origin <code>https://api-testnet.velarumpay.com</code>. A local offline mock exercises the same order without network access or credentials.</p>
+    <p class="lead">This is the canonical onboarding order for the official testnet origin <code>https://api.velarumai.com</code>. A local offline mock exercises the same order without network access or credentials.</p>
     <div class="note">This flow never asks for a wallet private key and never grants payment-signing authority to an Agent. Recipient facts come from an active verified Recipient version; the wallet still reviews and approves every payment.</div>
 
     <h2>0. Run the offline contract first</h2>
@@ -27,10 +27,10 @@
     <p>The zero-dependency mock completes registration, domain verification, Recipient and Agent setup, Agent token exchange, Connect, and a pending Payment Request. It uses reserved <code>.invalid</code> domains and labeled test values.</p>
 
     <h2>1. Register and verify the merchant account</h2>
-    <p>Submit the operator email to <code>POST /v1/merchant-accounts/registrations</code>, then follow the email link through <code>POST /v1/merchant-accounts/email-verifications</code>. Registration returns a generic response to prevent account enumeration. Verification returns a one-time session grant.</p>
+    <p>Submit the operator email to <code>POST /v1/merchant-accounts/registrations</code>, then follow the email link through <code>POST /v1/merchant-accounts/email-verifications</code>. The same enumeration-safe request works for first-time verification and returning access. Verification returns eligible merchant choices plus a one-time session grant; an account with no workspace continues to organization creation.</p>
 
     <h2>2. Create the organization and verify its domain</h2>
-    <p>Create the organization with <code>POST /v1/merchants</code> using the one-time grant, then exchange the returned next grant at <code>POST /v1/merchant-sessions</code>. The browser receives an HttpOnly session cookie and an in-memory CSRF proof. Register an exact domain using <code>POST /v1/merchant-domains</code>, publish only the returned DNS or HTTPS challenge, then call <code>POST /v1/merchant-domains/{id}/verify</code>. Do not fetch or probe a user-entered domain from browser code.</p>
+    <p>Create the organization with <code>POST /v1/merchants</code> using the one-time grant, then exchange the returned next grant at <code>POST /v1/merchant-sessions</code>. The browser receives an HttpOnly session cookie and an in-memory CSRF proof. Register an exact domain using <code>POST /v1/merchant-domains</code>, publish only the returned DNS or HTTPS challenge, then call <code>POST /v1/merchant-domains/{id}/verify</code>. The first successful proof atomically activates an email-verified pending Merchant; proof failure leaves both records unchanged. Do not fetch or probe a user-entered domain from browser code.</p>
     <div class="note">Domain proof is a gate, not a client-side activation command. Stop here until the Platform API reports the merchant as <code>active</code>; do not use an operator credential or an undocumented route to bypass verification.</div>
 
     <h2>3. Register, verify, and activate a Recipient</h2>
@@ -48,7 +48,7 @@ const verification = await merchant.verifyRecipient(recipient.recipient.recipien
   version: recipient.recipient.version
 });
 
-// Activate only after evidence succeeds and the cooling period completes.
+// Stellar testnet versions may activate immediately after trusted evidence succeeds.
 await merchant.activateRecipientVersion(
   recipient.recipient.recipient_id,
   recipient.recipient_version.recipient_version_id,
@@ -88,7 +88,7 @@ await merchant.updateAgent(agent.agent.agent_id, { status: "active", version: 1 
     <pre><code>import { createVelarumPayClient } from "@velarumpay/sdk-js";
 
 const agentClient = createVelarumPayClient({
-  baseUrl: "https://api-testnet.velarumpay.com",
+  baseUrl: "https://api.velarumai.com",
   agentAuth: {
     agentId,
     clientId,

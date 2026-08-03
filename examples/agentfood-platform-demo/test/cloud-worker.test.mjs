@@ -12,26 +12,33 @@ function jsonBody(value) {
   return { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(value) };
 }
 
-test("the hosted page exposes the two-pane real Connect Key experience", async () => {
+test("the hosted page exposes the conversation-first real Connect Key experience", async () => {
   const home = await call("/");
   assert.equal(home.response.status, 200);
   assert.match(home.result, /class="product-workspace"/);
-  assert.match(home.result, /AgentFood AI/);
+  assert.match(home.result, /What are you in the mood for\?/);
   assert.match(home.result, /Continue with Google/);
   assert.match(home.result, /\/signin-with-chatgpt\?return_to=%2F/);
-  assert.match(home.result, /REAL CONNECT KEY/);
-  assert.match(home.result, /https:\/\/agentfood\.example\/assets\/agentfood-social-v2\.jpg/);
+  assert.match(home.result, /Real Connect Key/);
+  assert.match(home.result, /https:\/\/agentfood\.example\/assets\/agentfood-social-v3\.png/);
 
   const app = await call("/app.js");
   assert.equal(app.response.status, 200);
   assert.doesNotMatch(app.result, /\/v1\/integrations\/agentfood|velarumpay-connect-testnet/);
   assert.match(app.result, /fetch\(path,/);
 
-  for (const path of ["/assets/agentfood-dishes-v2.jpg", "/assets/agentfood-social-v2.jpg"]) {
+  for (const path of ["/assets/agentfood-dishes-v2.jpg", "/assets/agentfood-social-v3.png"]) {
     const image = await worker.fetch(new Request(`https://agentfood.example${path}`));
     assert.equal(image.status, 200);
-    assert.equal(image.headers.get("content-type"), "image/jpeg");
+    assert.match(image.headers.get("content-type"), /^image\/(jpeg|png)$/);
     assert.ok((await image.arrayBuffer()).byteLength > 100_000);
+  }
+
+  for (const path of ["/fonts/Poppins-Regular.ttf", "/fonts/DMSans-Variable.ttf", "/fonts/JetBrainsMono-Variable.ttf"]) {
+    const font = await worker.fetch(new Request(`https://agentfood.example${path}`));
+    assert.equal(font.status, 200);
+    assert.equal(font.headers.get("content-type"), "font/ttf");
+    assert.ok((await font.arrayBuffer()).byteLength > 100_000);
   }
 
   const catalog = await call("/api/catalog");

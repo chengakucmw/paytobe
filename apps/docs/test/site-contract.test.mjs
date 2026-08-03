@@ -39,7 +39,7 @@ test("merchant quickstart keeps the canonical order and testnet safety boundary"
     assert.ok(next > cursor, `${marker} must appear in canonical quickstart order`);
     cursor = next;
   }
-  assert.match(quickstart, /https:\/\/api-testnet\.velarumpay\.com/);
+  assert.match(quickstart, /https:\/\/api\.velarumai\.com/);
   assert.match(quickstart, /requires_user_approval: true/);
   assert.match(quickstart, /recipient_version_id/);
   assert.doesNotMatch(quickstart, /AgentFood|\/claim\/legacy|BEGIN [A-Z ]*PRIVATE KEY|conn_tok_|whsec_|mainnet/i);
@@ -47,7 +47,7 @@ test("merchant quickstart keeps the canonical order and testnet safety boundary"
 
 test("OpenAPI covers merchant onboarding and resolves errors, schemas, and official origin", () => {
   const openapi = json("services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json");
-  assert.equal(openapi.servers[0].url, "https://api-testnet.velarumpay.com");
+  assert.equal(openapi.servers[0].url, "https://api.velarumai.com");
   const paths = [
     "/v1/merchant-accounts/registrations", "/v1/merchant-accounts/email-verifications",
     "/v1/merchants", "/v1/merchant-sessions", "/v1/merchant-domains", "/v1/merchant-domains/{id}/verify",

@@ -5,6 +5,7 @@ import { recipientAuditEvent, recipientOwnerNotificationEvent } from "../audit/r
 import { assertTenantScope } from "../../ports/tenant-repository.js";
 
 const RECIPIENT_COOLING_MS = 24 * 60 * 60 * 1000;
+const STELLAR_TESTNET_RECIPIENT_COOLING_MS = 0;
 
 const RECIPIENT_TRANSITIONS = Object.freeze({
   draft: new Set(["pending_verification", "revoked"]),
@@ -537,7 +538,7 @@ export function normalizeRecipientFacts(input) {
 }
 
 function versionRecord(scope, recipientId, versionId, facts, now, hash) {
-  const coolingUntil = new Date(Date.parse(now) + RECIPIENT_COOLING_MS).toISOString();
+  const coolingUntil = new Date(Date.parse(now) + recipientCoolingMs(facts)).toISOString();
   return {
     recipient_version_id: versionId,
     merchant_id: scope.merchant_id,
@@ -551,6 +552,10 @@ function versionRecord(scope, recipientId, versionId, facts, now, hash) {
     cooling_until: coolingUntil,
     last_evaluated_at: now
   };
+}
+
+function recipientCoolingMs(facts) {
+  return facts.network === "stellar_testnet" ? STELLAR_TESTNET_RECIPIENT_COOLING_MS : RECIPIENT_COOLING_MS;
 }
 
 function immutablePaymentFacts(value) {

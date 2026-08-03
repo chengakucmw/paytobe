@@ -28,6 +28,16 @@ export function reduceAuthState(state, event) {
         message: event.csrfAvailable === true ? "" : "Reauthenticate before making changes."
       });
     }
+    case "STEP_UP_COMPLETED": {
+      if (state.status !== AUTH_STATUS.AUTHENTICATED || !state.session) return state;
+      const stepUpAt = String(event.stepUpAt || "");
+      if (!Number.isFinite(Date.parse(stepUpAt))) return state;
+      return Object.freeze({
+        ...state,
+        session: Object.freeze({ ...state.session, stepUpAt, stepUpFresh: true }),
+        message: ""
+      });
+    }
     case "SESSION_EXPIRED":
       return signedOut(AUTH_STATUS.EXPIRED, "Your session expired. Sign in again to continue.");
     case "REAUTH_REQUIRED":
@@ -59,7 +69,9 @@ function sanitizeSession(value) {
     accountId,
     role,
     expiresAt,
-    idleExpiresAt: String(value.idle_expires_at || "")
+    idleExpiresAt: String(value.idle_expires_at || ""),
+    stepUpAt: Number.isFinite(Date.parse(String(value.step_up_at || ""))) ? String(value.step_up_at) : "",
+    stepUpFresh: value.step_up_fresh === true
   });
 }
 

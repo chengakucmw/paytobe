@@ -8,6 +8,12 @@ licensed for trademark use by the Apache License, Version 2.0.
 
 Reviewed third-party dependency notices
 
+AndroidX WorkManager 2.11.2
+Upstream: https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-work-release/work/
+Declared license: Apache-2.0
+Used by the Android wallet for reliable, constrained background synchronization
+after an FCM wake-up hint.
+
 unicode-ident 1.0.24
 Upstream: https://github.com/dtolnay/unicode-ident
 Declared license: (MIT OR Apache-2.0) AND Unicode-3.0
@@ -26,7 +32,14 @@ Fonts repository:
 - Schibsted Grotesk, Copyright 2023 The Schibsted-Grotesk Project Authors.
 - Hanken Grotesk, Copyright 2021 The Hanken Grotesk Project Authors.
 - Space Mono, Copyright 2016 The Space Mono Project Authors.
+- DM Sans, Copyright 2014 The DM Sans Project Authors.
+- JetBrains Mono, Copyright 2020 The JetBrains Mono Project Authors.
+- Poppins, Copyright 2020 The Poppins Project Authors.
 
 Each font is licensed under the SIL Open Font License, Version 1.1. The full
 copyright notices and license texts are distributed beside the font files in
 each application's public/fonts directory.
+
+The AgentFood social preview image `agentfood-social-v3.png` is first-party
+project artwork generated for VelarumPay. It is distributed as part of this
+Apache-2.0 source tree and does not include a third-party stock image license.

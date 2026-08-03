@@ -23,7 +23,7 @@ function factPanel(version, now) {
   const remaining = Math.max(0, Date.parse(version.cooling_until) - now);
   return `<section class="fact-panel" aria-labelledby="facts-title"><div class="section-heading"><h4 id="facts-title">Immutable payment facts</h4><span class="status-badge">${escapeHtml(version.verification_state)}</span></div><dl>
     ${fact("Network", version.network)}${fact("Asset", version.asset)}${fact("Address", version.address, true)}${fact("Contract", version.contract)}${fact("Issuer", version.issuer)}${fact("Memo or tag", version.memo)}
-  </dl><p class="cooling-time" data-cooling-ms="${remaining}">${remaining ? `Cooling period: ${formatDuration(remaining)} remaining` : "Cooling period complete"}</p></section>`;
+  </dl><p class="cooling-time" data-cooling-ms="${remaining}">${remaining ? `Cooling period: ${formatDuration(remaining)} remaining` : version.network === "stellar_testnet" ? "Testnet cooling: not required" : "Cooling period complete"}</p></section>`;
 }
 
 function verificationPanel(state, version, recipient, canManage, now) {
@@ -62,7 +62,7 @@ function factsForm(id, title, version, busy, includeName) {
     <label for="recipient-contract">Contract (when required)</label><input id="recipient-contract" name="contract" value="${escapeHtml(version?.contract || "")}" autocomplete="off">
     <label for="recipient-issuer">Issuer (when required)</label><input id="recipient-issuer" name="issuer" value="${escapeHtml(version?.issuer || "")}" autocomplete="off">
     <label for="recipient-memo">Memo or tag</label><input id="recipient-memo" name="memo" value="${escapeHtml(version?.memo || "")}" autocomplete="off">
-    <button type="submit" ${busy ? "disabled" : ""}>${includeName ? "Create Recipient" : "Create version and start 24-hour cooling"}</button>
+    <button type="submit" ${busy ? "disabled" : ""}>${includeName ? "Create Recipient" : "Create immutable facts version"}</button>
   </form>`;
 }
 

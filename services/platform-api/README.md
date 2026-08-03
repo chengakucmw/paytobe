@@ -1,8 +1,8 @@
 # VelarumPay Platform API
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-07-24 15:40:49 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-07-24 07:40:49 UTC
+> - **Taipei Time / 台北时间:** 2026-08-03 19:42:23 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-08-03 11:42:23 UTC
 
 Local development API for VelarumPay payment requests, Transaction Context Lite, and legacy AgentWallet relay compatibility.
 
@@ -97,16 +97,20 @@ tokens are returned only when created or rotated.
 
 FCM registration tokens are encrypted with AES-256-GCM at rest and bound to the wallet device identifier. Push payloads contain no amount, address, memo, payment status, or business context. The device receives only a sync signal, opaque request id, and event cursor, then retrieves authoritative data over authenticated REST. Production requires FCM so delivery cannot be silently omitted, while REST remains the source of truth.
 
-Stellar public-network payments are disabled by default. To enable a controlled small-mainnet deployment, configure all of the following:
+The official VelarumPay environment is testnet-only. Production startup and the
+request middleware reject `stellar_public`, `base_mainnet`, a mainnet Horizon
+endpoint, and any attempt to enable a mainnet route. The only supported Stellar
+endpoint in the official environment is:
 
 ```bash
-STELLAR_PUBLIC_ENABLED=true
-STELLAR_PUBLIC_SINGLE_PAYMENT_MAX_XLM=1
-STELLAR_PUBLIC_HORIZON_URL=https://horizon.stellar.org
-ADDRESS_WHITELIST_STELLAR=G...verified-recipient
+OFFICIAL_TESTNET_ONLY=true
+STELLAR_PUBLIC_ENABLED=false
+STELLAR_TESTNET_HORIZON_URL=https://horizon-testnet.stellar.org
 ```
 
-Every `stellar_public` Payment Request is blocked unless the feature is enabled, the amount is positive and no greater than the single-payment cap, the Horizon endpoint matches the configured HTTPS endpoint, and the recipient is allowlisted. This check runs independently of the Android build gate and independently of the daily XLM limit.
+Do not add a mainnet Horizon URL, allowlist, feature flag, or deployment override
+to the official compose environment. Mainnet support requires a separate future
+security review and is not an operator-configurable path in this deployment.
 
 ## Deployment
 

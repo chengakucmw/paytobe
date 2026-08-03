@@ -145,7 +145,9 @@ async function handle(request, env) {
   if (request.method === "GET" && url.pathname === "/api/catalog") {
     return json(200, { ok: true, demo: true, hosting_mode: "cloud_real_connect", persistence: env?.DB ? "d1" : "memory", merchants });
   }
-  if (request.method === "GET" && ["/", "/app.js", "/styles.css", "/assets/agentfood-dishes-v2.jpg", "/assets/agentfood-social-v2.jpg"].includes(url.pathname)) return staticResponse(url.pathname, url.origin);
+  if (request.method === "GET" && Object.prototype.hasOwnProperty.call(STATIC_ASSETS, url.pathname)) {
+    return staticResponse(url.pathname, url.origin);
+  }
   if (request.method === "GET" && url.pathname.startsWith("/merchants/")) {
     const merchantId = url.pathname.slice("/merchants/".length);
     if (!merchants.some((merchant) => merchant.id === merchantId)) return json(404, { ok: false, error: { code: "merchant_not_found", message: "Demo merchant not found" } });

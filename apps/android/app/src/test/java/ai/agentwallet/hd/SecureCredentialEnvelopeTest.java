@@ -25,6 +25,7 @@ public final class SecureCredentialEnvelopeTest {
         JSONObject json = new JSONObject(envelope);
         assertEquals(1, json.getInt("v"));
         assertEquals("A256GCM", json.getString("alg"));
+        assertEquals(12, java.util.Base64.getDecoder().decode(json.getString("iv")).length);
         assertFalse(envelope.contains(plaintext));
         assertEquals(plaintext, SecureWalletStore.EnvelopeCodec.decrypt(KEY, envelope, "slot-a"));
 

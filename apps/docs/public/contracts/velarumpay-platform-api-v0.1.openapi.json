@@ -9,7 +9,7 @@
   "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
   "servers": [
     {
-      "url": "https://api-testnet.velarumpay.com",
+      "url": "https://api.velarumai.com",
       "description": "Official VelarumPay testnet"
     },
     {
@@ -74,7 +74,7 @@
         "operationId": "registerMerchantAccount",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantAccountRegistration"}}}},
         "responses": {
-          "202": {"description": "Enumeration-safe registration response", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "202": {"description": "Enumeration-safe response for a new verification or returning-account access link", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
           "400": {"$ref": "#/components/responses/ApiError"},
           "429": {"$ref": "#/components/responses/ApiError"}
         }
@@ -86,7 +86,7 @@
         "operationId": "verifyMerchantAccountEmail",
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/EmailVerification"}}}},
         "responses": {
-          "200": {"description": "Email verified and one-time session grant returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "200": {"description": "One-time email link verified; eligible merchant choices and a one-time session grant returned", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/MerchantEmailVerificationResult"}}}},
           "400": {"$ref": "#/components/responses/ApiError"}
         }
       }
@@ -131,7 +131,7 @@
         "tags": ["Merchant Domains"], "operationId": "verifyMerchantDomain", "security": [{"merchantSession": []}],
         "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
         "responses": {
-          "200": {"description": "Domain verification result", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
+          "200": {"description": "Domain verified; the first valid domain atomically activates an email-verified pending Merchant", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}},
           "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"},
           "403": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"},
           "422": {"$ref": "#/components/responses/ApiError"}
@@ -203,7 +203,7 @@
         "tags": ["Recipients"], "operationId": "verifyRecipient", "security": [{"merchantSession": []}],
         "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/CsrfToken"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecipientVerify"}}}},
-        "responses": {"200": {"description": "Evidence accepted and cooling period started", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+        "responses": {"200": {"description": "Evidence accepted; activation follows the network-specific cooling policy", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "400": {"$ref": "#/components/responses/ApiError"}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
       }
     },
     "/v1/recipients/{id}/versions/{versionId}/activate": {
@@ -211,7 +211,7 @@
         "tags": ["Recipients"], "operationId": "activateRecipientVersion", "security": [{"merchantSession": []}],
         "parameters": [{"$ref": "#/components/parameters/ResourceId"}, {"$ref": "#/components/parameters/VersionId"}, {"$ref": "#/components/parameters/CsrfToken"}],
         "requestBody": {"required": true, "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RecipientActivate"}}}},
-        "responses": {"200": {"description": "Verified version activated after cooling", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
+        "responses": {"200": {"description": "Verified version activated after the applicable network policy", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuccessEnvelope"}}}}, "401": {"$ref": "#/components/responses/ApiError"}, "403": {"$ref": "#/components/responses/ApiError"}, "404": {"$ref": "#/components/responses/ApiError"}, "409": {"$ref": "#/components/responses/ApiError"}}
       }
     },
     "/v1/connect-invitations/claim": {
@@ -597,6 +597,29 @@
       "EmailVerification": {
         "type": "object", "required": ["token"],
         "properties": {"token": {"type": "string", "minLength": 1, "maxLength": 512}},
+        "additionalProperties": false
+      },
+      "MerchantEmailVerificationResult": {
+        "type": "object",
+        "required": ["ok", "account", "merchants", "session_grant"],
+        "properties": {
+          "ok": {"const": true},
+          "account": {"type": "object", "additionalProperties": true},
+          "merchants": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["merchant_id", "display_name", "role"],
+              "properties": {
+                "merchant_id": {"type": "string"},
+                "display_name": {"type": "string"},
+                "role": {"type": "string"}
+              },
+              "additionalProperties": false
+            }
+          },
+          "session_grant": {"type": "string", "writeOnly": true}
+        },
         "additionalProperties": false
       },
       "MerchantCreate": {

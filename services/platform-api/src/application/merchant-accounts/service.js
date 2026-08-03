@@ -27,7 +27,12 @@ export class MerchantAccountService {
       expires_at: expiresAt
     });
     if (result.deliver) {
-      await this.email.sendVerification({ to: emailNormalized, token, expires_at: expiresAt });
+      await this.email.sendVerification({
+        to: emailNormalized,
+        token,
+        expires_at: expiresAt,
+        purpose: result.purpose
+      });
     }
     return Object.freeze({ accepted: true });
   }
@@ -96,7 +101,8 @@ export class SqliteMerchantAccountRepository {
           .run(value.account_id, value.email_normalized, value.created_at, value.created_at);
         account = { account_id: value.account_id, status: "pending_verification" };
       }
-      const deliver = account.status === "pending_verification";
+      const deliver = ["pending_verification", "active"].includes(account.status);
+      const purpose = account.status === "active" ? "access" : "verification";
       if (deliver) {
         this.db.prepare(`UPDATE merchant_email_verifications SET status = 'superseded', superseded_at = ?
           WHERE account_id = ? AND status = 'active'`).run(value.created_at, account.account_id);
@@ -106,7 +112,7 @@ export class SqliteMerchantAccountRepository {
           .run(value.verification_id, account.account_id, value.token_hash, value.created_at, value.expires_at);
       }
       this.db.exec("COMMIT");
-      return { deliver };
+      return { deliver, purpose };
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
       throw error;
@@ -116,9 +122,13 @@ export class SqliteMerchantAccountRepository {
   verify({ token_hash, now }) {
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      const verification = this.db.prepare(`SELECT verification_id, account_id, status, expires_at
-        FROM merchant_email_verifications WHERE token_hash = ?`).get(token_hash);
-      if (!verification || verification.status !== "active") {
+      const verification = this.db.prepare(`SELECT v.verification_id, v.account_id, v.status, v.expires_at,
+          a.status AS account_status
+        FROM merchant_email_verifications v
+        JOIN merchant_accounts a ON a.account_id = v.account_id
+        WHERE v.token_hash = ?`).get(token_hash);
+      if (!verification || verification.status !== "active"
+          || !["pending_verification", "active"].includes(verification.account_status)) {
         this.db.exec("ROLLBACK");
         return invalidToken();
       }
@@ -138,8 +148,13 @@ export class SqliteMerchantAccountRepository {
         WHERE account_id = ? AND status = 'pending_verification'`).run(now, verification.account_id);
       const account = this.db.prepare(`SELECT account_id, email_normalized, status, version, created_at, updated_at
         FROM merchant_accounts WHERE account_id = ?`).get(verification.account_id);
+      const merchants = this.db.prepare(`SELECT m.merchant_id, m.display_name, mm.role
+        FROM merchant_memberships mm
+        JOIN merchants m ON m.merchant_id = mm.merchant_id
+        WHERE mm.account_id = ? AND mm.status = 'active' AND m.status IN ('pending_verification', 'active')
+        ORDER BY m.created_at, m.merchant_id`).all(verification.account_id).map((merchant) => ({ ...merchant }));
       this.db.exec("COMMIT");
-      return { ok: true, account: { ...account } };
+      return { ok: true, account: { ...account }, merchants };
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
       throw error;
@@ -165,24 +180,28 @@ export class MemoryMerchantAccountRepository {
       account = { account_id: value.account_id, email_normalized: value.email_normalized, status: "pending_verification", version: 1, created_at: value.created_at, updated_at: value.created_at };
       this.accounts.set(account.account_id, account);
     }
-    const deliver = account.status === "pending_verification";
+    const deliver = ["pending_verification", "active"].includes(account.status);
+    const purpose = account.status === "active" ? "access" : "verification";
     if (deliver) {
       for (const verification of this.verifications.values()) {
         if (verification.account_id === account.account_id && verification.status === "active") verification.status = "superseded";
       }
       this.verifications.set(value.token_hash, { ...value, account_id: account.account_id, status: "active" });
     }
-    return { deliver };
+    return { deliver, purpose };
   }
   verify({ token_hash, now }) {
     const verification = this.verifications.get(token_hash);
     if (!verification || verification.status !== "active" || verification.expires_at <= now) return invalidToken();
     verification.status = "used";
     const account = this.accounts.get(verification.account_id);
-    account.status = "active";
-    account.version += 1;
-    account.updated_at = now;
-    return { ok: true, account: { ...account } };
+    if (!account || !["pending_verification", "active"].includes(account.status)) return invalidToken();
+    if (account.status === "pending_verification") {
+      account.status = "active";
+      account.version += 1;
+      account.updated_at = now;
+    }
+    return { ok: true, account: { ...account }, merchants: [] };
   }
   issueSessionGrant(value) {
     this.sessionGrants ||= new Map();

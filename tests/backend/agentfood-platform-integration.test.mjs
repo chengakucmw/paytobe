@@ -33,7 +33,7 @@ test("AgentFood D1 migration is additive, rerunnable, and preserves auditable ID
   db.close();
 });
 
-test("independent AgentFood creates an allowlisted small-mainnet request through Platform API", {
+test("independent AgentFood creates a Recipient-bound testnet request through Platform API", {
   skip: process.env.VP_ALLOW_LISTEN_TESTS !== "1"
 }, async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "agentfood-platform-e2e-"));
@@ -43,15 +43,12 @@ test("independent AgentFood creates an allowlisted small-mainnet request through
   process.env.RELAY_STORE_DRIVER = "sqlite";
   process.env.RELAY_STORE_PATH = path.join(dir, "platform-store.sqlite");
   process.env.FCM_ENABLED = "false";
-  process.env.STELLAR_PUBLIC_ENABLED = "true";
-  process.env.STELLAR_PUBLIC_SINGLE_PAYMENT_MAX_XLM = "1";
-  process.env.STELLAR_PUBLIC_HORIZON_URL = "https://horizon.stellar.org";
-  process.env.ADDRESS_WHITELIST_STELLAR = RECIPIENT;
+  process.env.STELLAR_PUBLIC_ENABLED = "false";
   process.env.DAILY_LIMIT_XLM = "1";
 
   const platformModule = await import(`../../services/platform-api/src/server.js?agentfood-e2e=${Date.now()}`);
   const keyPair = crypto.generateKeyPairSync("ed25519");
-  seedStandardAgentFood(platformModule.store, keyPair.publicKey, "stellar_public");
+  seedStandardAgentFood(platformModule.store, keyPair.publicKey, "stellar_testnet");
   const platformServer = platformModule.server;
   await new Promise((resolve) => platformServer.listen(0, "127.0.0.1", resolve));
   const platformBase = `http://127.0.0.1:${platformServer.address().port}`;
@@ -76,10 +73,10 @@ test("independent AgentFood creates an allowlisted small-mainnet request through
     AGENTFOOD_AGENT_CREDENTIAL_KID: "agentfood-reference-key",
     AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_PKCS8_B64: privateKey,
     AGENTFOOD_WEBHOOK_SECRET: WEBHOOK_SECRET,
-    AGENTFOOD_STELLAR_MAINNET_ENABLED: "true",
-    AGENTFOOD_STELLAR_MAINNET_MAX_XLM: "1",
+    AGENTFOOD_STELLAR_TESTNET_ENABLED: "true",
+    AGENTFOOD_STELLAR_TESTNET_MAX_XLM: "1",
     AGENTFOOD_STELLAR_PAYMENT_AMOUNT_XLM: "0.1",
-    AGENTFOOD_STELLAR_HORIZON_URL: "https://horizon.stellar.org",
+    AGENTFOOD_STELLAR_HORIZON_URL: "https://horizon-testnet.stellar.org",
     AGENTFOOD_RECIPIENT_ID: "agentfood-reference-recipient",
     AGENTFOOD_RECIPIENT_VERSION_ID: "agentfood-reference-recipient-v1",
     AGENTFOOD_PAYEE_NAME: "AgentFood integration recipient"
@@ -156,7 +153,7 @@ test("independent AgentFood creates an allowlisted small-mainnet request through
   });
   assert.equal(response.status, 201);
   const created = await response.json();
-  assert.equal(created.payment_request.payment.network, "stellar_public");
+  assert.equal(created.payment_request.payment.network, "stellar_testnet");
   assert.equal(created.payment_request.payment.amount, "0.1");
   assert.equal(created.payment_request.payment.to, RECIPIENT);
   assert.equal(created.payment_request.recipient_id, "agentfood-reference-recipient");

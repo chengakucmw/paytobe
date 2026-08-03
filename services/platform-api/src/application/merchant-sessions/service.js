@@ -39,6 +39,7 @@ export class MerchantSessionService {
       token_hash: this.hash(sessionToken),
       csrf_hash: this.hash(csrfToken),
       created_at: now.toISOString(),
+      step_up_at: now.toISOString(),
       expires_at: new Date(now.getTime() + ABSOLUTE_TTL_MS).toISOString(),
       idle_expires_at: new Date(now.getTime() + IDLE_TTL_MS).toISOString()
     });
@@ -159,13 +160,13 @@ export class SqliteMerchantSessionRepository {
         .run(value.created_at, value.created_at, value.merchant_id, grant.account_id);
       this.db.prepare(`INSERT INTO merchant_sessions
         (session_id, merchant_id, account_id, token_hash, csrf_hash, status, expires_at, idle_expires_at,
-         last_seen_at, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`)
+         last_seen_at, step_up_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?)`)
         .run(value.session_id, value.merchant_id, grant.account_id, value.token_hash, value.csrf_hash,
-          value.expires_at, value.idle_expires_at, value.created_at, value.created_at, value.created_at);
+          value.expires_at, value.idle_expires_at, value.created_at, value.step_up_at, value.created_at, value.created_at);
       this.db.exec("COMMIT");
       return { session_id: value.session_id, merchant_id: value.merchant_id, account_id: grant.account_id, role: identity.role,
-        status: "active", expires_at: value.expires_at, idle_expires_at: value.idle_expires_at };
+        status: "active", expires_at: value.expires_at, idle_expires_at: value.idle_expires_at, step_up_at: value.step_up_at };
     } catch (error) {
       try { this.db.exec("ROLLBACK"); } catch { /* no active transaction */ }
       throw error;

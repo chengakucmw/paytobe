@@ -15,7 +15,7 @@ export function createMerchantSessionsRouter(deps) {
         actor: { type: "merchant_account", id: result.session.account_id },
         resource: { type: "merchant_session", id: result.session.session_id }
       });
-      return res.status(201).json({ ok: true, session: publicSession(result.session), csrf_token: result.csrf_token });
+      return res.status(201).json({ ok: true, session: publicSession(result.session, merchantSessionService), csrf_token: result.csrf_token });
     } catch (error) {
       return next(error);
     }
@@ -24,7 +24,7 @@ export function createMerchantSessionsRouter(deps) {
   router.get("/current", (req, res) => {
     const auth = verifyMerchantSession(req);
     if (!auth.ok) return sendApiError(res, auth.status, auth.code, auth.message);
-    return res.json({ ok: true, session: publicSession(auth.session), auth_context: auth.auth_context });
+    return res.json({ ok: true, session: publicSession(auth.session, merchantSessionService), auth_context: auth.auth_context });
   });
 
   router.delete("/current", (req, res) => {
@@ -67,7 +67,7 @@ function cookieOptions(expiresAt) {
   return { secure: true, httpOnly: true, sameSite: "strict", path: "/", expires: new Date(expiresAt) };
 }
 
-function publicSession(session) {
+function publicSession(session, merchantSessionService) {
   return {
     session_id: session.session_id,
     merchant_id: session.merchant_id,
@@ -75,6 +75,8 @@ function publicSession(session) {
     role: session.role,
     status: session.status,
     expires_at: session.expires_at,
-    idle_expires_at: session.idle_expires_at
+    idle_expires_at: session.idle_expires_at,
+    step_up_at: session.step_up_at || null,
+    step_up_fresh: merchantSessionService.isStepUpFresh(session)
   };
 }

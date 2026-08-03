@@ -1,8 +1,8 @@
 # JavaScript SDK
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-08-02 02:05:41 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-08-01 18:05:41 UTC
+> - **Taipei Time / 台北时间:** 2026-08-03 18:06:25 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-08-03 10:06:25 UTC
 
 
 Minimal JavaScript SDK for local agents and app developers using VelarumPay Platform API v0.1.
@@ -21,7 +21,7 @@ The SDK creates Agent Assertions locally and exchanges them for short-lived Agen
 import { createVelarumPayClient } from "@velarumpay/sdk-js";
 
 const client = createVelarumPayClient({
-  baseUrl: "http://127.0.0.1:8787",
+  baseUrl: "https://api.velarumai.com",
   agentAuth: {
     agentId: "agt_local_123",
     clientId: "client_local_123",
@@ -48,7 +48,7 @@ Payment Request methods use a connection token, which is intentionally separate 
 import { createVelarumPayClient, validatePaymentRequest } from "@velarumpay/sdk-js";
 
 const client = createVelarumPayClient({
-  baseUrl: "http://127.0.0.1:8787",
+  baseUrl: "https://api.velarumai.com",
   connectionToken
 });
 

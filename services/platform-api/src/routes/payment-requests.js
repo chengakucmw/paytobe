@@ -137,7 +137,10 @@ export function createPaymentRequestsRouter(deps) {
     }
 
     const payload = buildPaymentRequestPayload(acceptedBody, auth.connection, idempotencyKey, platformCore);
-    const normalized = normalizePaymentRequestV1(payload);
+    // Use the injected platform clock for both payload creation and validation.
+    // Mixing the controlled clock with Date.now() makes otherwise valid requests
+    // become expired when deterministic tests or migrations replay older fixtures.
+    const normalized = normalizePaymentRequestV1(payload, { now: platformCore.clock.now() });
     if (!normalized.ok) {
       return res.status(400).json({
         ok: false,
