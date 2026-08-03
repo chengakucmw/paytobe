@@ -13,6 +13,10 @@ const PAYMENT_TRANSITIONS = Object.freeze({
   broadcasted: new Set(["confirmed", "failed"]),
   confirmed: new Set(), failed: new Set(), expired: new Set(), rejected: new Set()
 });
+const CONTROLLED_WEBHOOK_RECEIVERS = Object.freeze({
+  "/testing/webhooks/merchant-a": Object.freeze({ label: "merchant-a", challenge: "WEBHOOK_A_OWNERSHIP_CHALLENGE", secret: "WEBHOOK_A_SECRET" }),
+  "/testing/webhooks/merchant-b": Object.freeze({ label: "merchant-b", challenge: "WEBHOOK_B_OWNERSHIP_CHALLENGE", secret: "WEBHOOK_B_SECRET" })
+});
 
 function edgePaymentTransition(request, nextStatus, nowMs = Date.now()) {
   const currentStatus = String(request?.status || "pending").toLowerCase();
@@ -617,6 +621,60 @@ function recordLegacyAgentFoodAttempt(env, {
   }
 }
 
+async function controlledWebhookReceiver(request, env, route) {
+  const config = CONTROLLED_WEBHOOK_RECEIVERS[route];
+  if (!config) return null;
+  const url = new URL(request.url);
+  const method = request.method.toUpperCase();
+  if (method === "GET" && url.searchParams.get("velarumpay_challenge") === "1") {
+    const challenge = String(env?.[config.challenge] || "").trim();
+    return challenge ? json(200, { challenge }) : apiError(503, "webhook_receiver_unconfigured", "Webhook receiver ownership challenge is not configured");
+  }
+  if (method !== "POST") return apiError(405, "method_not_allowed", "Webhook receiver accepts POST deliveries only");
+  const secret = String(env?.[config.secret] || "").trim();
+  if (!secret) return apiError(503, "webhook_receiver_unconfigured", "Webhook receiver signing secret is not configured");
+  const declaredLength = Number(request.headers.get("content-length") || 0);
+  if (declaredLength > 256 * 1024) return apiError(413, "payload_too_large", "Webhook payload is too large");
+  const rawBody = new Uint8Array(await request.arrayBuffer());
+  if (rawBody.byteLength > 256 * 1024) return apiError(413, "payload_too_large", "Webhook payload is too large");
+  const signature = String(request.headers.get("x-velarumpay-signature") || "");
+  const valid = await verifyControlledWebhookSignature(secret, rawBody, signature);
+  let eventType = "";
+  try { eventType = String(JSON.parse(new TextDecoder().decode(rawBody))?.type || "").slice(0, 120); } catch { /* signature result remains authoritative */ }
+  console.info(JSON.stringify({
+    level: valid ? "info" : "warn",
+    event: "controlled_webhook.delivery",
+    receiver: config.label,
+    signature_valid: valid,
+    event_id: String(request.headers.get("x-velarumpay-event-id") || "").slice(0, 160),
+    delivery_id: String(request.headers.get("x-velarumpay-delivery-id") || "").slice(0, 160),
+    event_type: eventType,
+    payload_digest: await hash(rawBody),
+    occurred_at: new Date().toISOString()
+  }));
+  return valid ? new Response(null, { status: 204, headers: { "cache-control": "no-store" } })
+    : apiError(401, "webhook_signature_invalid", "Webhook signature is invalid");
+}
+
+async function verifyControlledWebhookSignature(secret, rawBody, signatureHeader) {
+  const parts = Object.fromEntries(String(signatureHeader || "").split(",").map((part) => {
+    const [key, ...value] = part.trim().split("=");
+    return [key, value.join("=")];
+  }));
+  if (!/^\d{10,16}$/.test(parts.t || "") || !/^[0-9a-f]{64}$/i.test(parts.v1 || "")) return false;
+  if (Math.abs(Date.now() - Number(parts.t) * 1000) > 5 * 60_000) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const timestamp = new TextEncoder().encode(`${parts.t}.`);
+  const payload = new Uint8Array(timestamp.byteLength + rawBody.byteLength);
+  payload.set(timestamp);
+  payload.set(rawBody, timestamp.byteLength);
+  const expected = new Uint8Array(await crypto.subtle.sign("HMAC", key, payload));
+  const received = Uint8Array.from(parts.v1.match(/../g).map((value) => Number.parseInt(value, 16)));
+  let difference = expected.byteLength ^ received.byteLength;
+  for (let index = 0; index < Math.min(expected.byteLength, received.byteLength); index += 1) difference |= expected[index] ^ received[index];
+  return difference === 0;
+}
+
 async function authenticateAgent(request, env, store) {
   const token = bearer(request, "x-agent-client-token");
   if (!TOKEN_PATTERN.test(token)) return null;
@@ -751,6 +809,9 @@ async function handle(request, env, store) {
 
   if (method === "GET" && path === "/") return json(200, { ok: true, service: "VelarumPay Connect Platform", environment: "testnet", api: "/v1" });
   if (method === "GET" && path === "/health") return json(200, { ok: true, service: "velarumpay-connect-platform", environment: "testnet", persistence: env.DB ? "d1" : "memory", multi_tenant: true, agent_identity: "registered" });
+
+  const controlledReceiver = await controlledWebhookReceiver(request, env, path);
+  if (controlledReceiver) return controlledReceiver;
 
   if (method === "POST" && path === "/v1/integrations/agentfood/chat") {
     const origin = agentFoodOrigin(request, env);

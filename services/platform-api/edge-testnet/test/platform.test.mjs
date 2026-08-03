@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
@@ -72,6 +73,46 @@ test("the live smoke exercises AgentFood's standard hosted API instead of dedica
   assert.doesNotMatch(source, /\/v1\/integrations\/agentfood/);
   assert.match(source, /request\(agentFood, "\/api\/chat"/);
   assert.match(source, /request\(agentFood, "\/api\/connect"/);
+});
+
+test("controlled public webhook receivers verify ownership and HMAC without logging secrets or payloads", async (t) => {
+  const challenge = "whv_test_receiver_a_ownership";
+  const secret = "whsec_test_receiver_a_signing_secret";
+  const payload = JSON.stringify({ version: "velarum.webhook_event.v1", type: "payment_request.status_updated", private_note: "never log this" });
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = `t=${timestamp},v1=${crypto.createHmac("sha256", secret).update(`${timestamp}.`).update(payload).digest("hex")}`;
+  const logs = [];
+  const originalInfo = console.info;
+  console.info = (message) => logs.push(String(message));
+  t.after(() => { console.info = originalInfo; });
+  const worker = createTestWorker({ WEBHOOK_A_OWNERSHIP_CHALLENGE: challenge, WEBHOOK_A_SECRET: secret });
+
+  const ownership = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a?velarumpay_challenge=1"));
+  assert.equal(ownership.status, 200);
+  assert.deepEqual(await ownership.json(), { challenge });
+
+  const delivered = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-velarumpay-event-id": "event_receiver_a",
+      "x-velarumpay-delivery-id": "delivery_receiver_a",
+      "x-velarumpay-signature": signature
+    },
+    body: payload
+  }));
+  assert.equal(delivered.status, 204);
+  assert.equal(logs.length, 1);
+  assert.equal(JSON.parse(logs[0]).signature_valid, true);
+  assert.equal(logs[0].includes(secret), false);
+  assert.equal(logs[0].includes("never log this"), false);
+
+  const rejected = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-velarumpay-signature": `t=${timestamp},v1=${"0".repeat(64)}` },
+    body: payload
+  }));
+  assert.equal(rejected.status, 401);
 });
 
 test("registered tenants claim opaque Connect Keys without self-declared identity", async () => {
