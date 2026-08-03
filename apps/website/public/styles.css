@@ -298,17 +298,36 @@ pre,
 .language-picker {
   position: relative;
   display: inline-flex;
-  width: 64px;
-  min-height: 42px;
+  width: 104px;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  gap: 9px;
   overflow: hidden;
+  padding: 0 13px 0 12px;
   border: 2px solid var(--shi-black);
   border-radius: var(--radius-pill);
   color: var(--shi-black);
-  background: var(--shi-cream);
+  background: var(--shi-white);
   box-shadow: 3px 3px 0 var(--shi-black);
+  cursor: pointer;
   order: 3;
+  transition:
+    background-color 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    transform 160ms var(--ease-out);
+}
+
+.language-picker:hover {
+  background: var(--shi-blue-100);
+  box-shadow: 4px 4px 0 var(--shi-black);
+  transform: translate(-1px, -1px);
+}
+
+.language-picker:active {
+  box-shadow: 1px 1px 0 var(--shi-black);
+  transform: translate(2px, 2px);
 }
 
 .language-picker select {
@@ -327,10 +346,52 @@ pre,
 }
 
 .language-picker-code {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  min-width: 2.2em;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  text-align: center;
+}
+
+.language-picker-globe {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  border: 2px solid var(--shi-blue);
+  border-radius: 50%;
+}
+
+.language-picker-globe::before {
+  position: absolute;
+  top: 1px;
+  right: 4px;
+  bottom: 1px;
+  left: 4px;
+  border-right: 1px solid var(--shi-blue);
+  border-left: 1px solid var(--shi-blue);
+  border-radius: 50%;
+  content: "";
+}
+
+.language-picker-globe::after {
+  position: absolute;
+  top: 6px;
+  right: 0;
+  left: 0;
+  border-top: 1px solid var(--shi-blue);
+  content: "";
+}
+
+.language-picker-chevron {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  margin-top: -4px;
+  border-right: 2px solid var(--shi-black);
+  border-bottom: 2px solid var(--shi-black);
+  transform: rotate(45deg);
 }
 
 .site-nav a:not(.button) {
@@ -1449,7 +1510,13 @@ pre,
   }
 
   .language-picker {
-    width: 58px;
+    width: 62px;
+    gap: 8px;
+    padding-inline: 10px;
+  }
+
+  .language-picker-code {
+    display: none;
   }
 
   .site-nav {

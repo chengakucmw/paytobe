@@ -26,6 +26,8 @@ test("all public pages render as a clearly labelled Preview", async () => {
     assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|<script[^>]+src="https?:/i, route);
     assert.match(html, /https:\/\/velarumpay\.example\/og\.png/, route);
     assert.match(html, /\/site\.js\?v=i18n-20260803-2/, route);
+    assert.match(html, /\/styles\.css\?v=language-20260803-1/, route);
+    assert.match(html, /class="language-picker-globe"/, route);
   }
 });
 

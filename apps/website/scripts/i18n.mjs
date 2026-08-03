@@ -141,7 +141,7 @@ function languagePicker(route, selectedLocale, ariaLabel) {
     const selected = locale.code === selectedLocale.code ? " selected" : "";
     return `<option value="${routePath(route, locale.path)}"${selected}>${locale.label}</option>`;
   }).join("");
-  return `      <label class="language-picker"><span class="language-picker-code" aria-hidden="true">${escapeHtml(selectedLocale.shortLabel)}</span><select aria-label="${escapeAttribute(ariaLabel)}" data-language-picker>${options}</select></label>`;
+  return `      <label class="language-picker"><span class="language-picker-globe" aria-hidden="true"></span><span class="language-picker-code" aria-hidden="true">${escapeHtml(selectedLocale.shortLabel)}</span><span class="language-picker-chevron" aria-hidden="true"></span><select aria-label="${escapeAttribute(ariaLabel)}" data-language-picker>${options}</select></label>`;
 }
 
 function routePath(route, localePath) {
