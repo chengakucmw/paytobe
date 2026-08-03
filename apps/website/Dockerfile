@@ -1,3 +1,14 @@
+FROM node:24-bookworm-slim AS build
+
+WORKDIR /app
+COPY package.json ./package.json
+COPY cloud ./cloud
+COPY i18n ./i18n
+COPY public ./public
+COPY scripts ./scripts
+
+RUN node scripts/build-site.mjs
+
 FROM node:24-bookworm-slim
 
 ENV NODE_ENV=production \
@@ -5,7 +16,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY server.mjs ./server.mjs
-COPY public ./public
+COPY --from=build /app/dist ./dist
 
 USER node
 EXPOSE 8091
