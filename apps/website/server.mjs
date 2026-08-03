@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const publicDir = path.join(__dirname, "public");
+const builtPublicDir = path.join(__dirname, "dist", "public");
+const publicDir = existsSync(builtPublicDir) ? builtPublicDir : path.join(__dirname, "public");
 // Configurable APK source. Defaults to a repo-local downloads dir; the /download/android
 // route already 404s gracefully when the file is absent. (Previously hardcoded to an
 // external workspace path that does not exist in this repo.)
@@ -37,6 +38,7 @@ const pageRoutes = new Map([
   ["/support", "/support.html"],
   ["/preview", "/preview.html"]
 ]);
+const localePaths = new Set(["zh-hans", "zh-hant", "ja", "ko", "es", "pt-br", "fr"]);
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host || `localhost:${port}`}`);
@@ -80,7 +82,11 @@ server.listen(port, () => {
 
 function serveStatic(pathname, origin, headOnly, res) {
   const clean = decodeURIComponent(pathname).replace(/\\/g, "/");
-  const requested = pageRoutes.get(clean) || clean;
+  const segments = clean.split("/").filter(Boolean);
+  const localePath = localePaths.has(segments[0]) ? segments.shift() : "";
+  const localizedRoute = `/${segments.join("/")}`;
+  const page = pageRoutes.get(localizedRoute) || localizedRoute;
+  const requested = localePath && page.endsWith(".html") ? `/${localePath}${page}` : pageRoutes.get(clean) || clean;
   const filePath = path.normalize(path.join(publicDir, requested));
 
   if (!filePath.startsWith(publicDir)) {

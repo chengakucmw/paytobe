@@ -12,7 +12,7 @@
   <meta property="og:url" content="__SITE_ORIGIN__/business" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#2727E6" />
-  <link rel="canonical" href="https://velarumpay.com/business" />
+  <link rel="canonical" href="https://velarumai.com/business" />
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802" />
   <script src="/site.js" defer></script>
 </head>
@@ -24,7 +24,7 @@
       <a class="brand" href="/" aria-label="VelarumPay home"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a>
       <button class="menu-button" type="button" aria-label="Open navigation" aria-expanded="false" aria-controls="site-navigation" data-menu-button></button>
       <nav class="site-nav" id="site-navigation" aria-label="Primary navigation" data-site-nav>
-        <a href="/personal">Personal</a><a href="/business" aria-current="page">Business</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://docs.velarumpay.com">Developers</a><a class="button compact" href="#pilot">Request a pilot</a>
+        <a href="/personal">Personal</a><a href="/business" aria-current="page">Business</a><a href="/security">Security</a><a href="/support">Support</a><a href="https://docs.velarumai.com">Developers</a><a class="button compact" href="#pilot">Request a pilot</a>
       </nav>
     </div>
   </header>
@@ -34,7 +34,7 @@
       <span class="eyebrow">For businesses and builders</span>
       <h1>Request payment without taking control of the wallet.</h1>
       <p class="lead">Create a standard Payment Request, attach business context, let the customer review and sign locally, then follow the result through a consistent status model.</p>
-      <div class="actions"><a class="button" href="#pilot">Request a Preview pilot</a><a class="button secondary" href="https://docs.velarumpay.com/quickstart.html">Read the Quickstart</a></div>
+      <div class="actions"><a class="button" href="#pilot">Request a Preview pilot</a><a class="button secondary" href="https://docs.velarumai.com/quickstart.html">Read the Quickstart</a></div>
       <p class="microcopy">Preview pilots begin with sandbox and test flows. Live merchant onboarding, pricing, settlement claims, and regional availability are not yet open.</p>
     </section>
 
@@ -59,13 +59,13 @@
           <button class="tab-button" type="button" role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="false" tabindex="-1">MCP and connectors</button>
         </div>
         <section class="integration-panel tab-panel" id="panel-rest" role="tabpanel" aria-labelledby="tab-rest">
-          <span class="pill">Contract first</span><h3>Integrate directly with the Platform API.</h3><p>Use the published OpenAPI contract for pairing, connections, transaction contexts, Payment Requests, status, and events. Server-side services validate scopes, expiry, exact amounts, and idempotency.</p><p><a href="https://docs.velarumpay.com/api.html">Open the REST API reference →</a></p>
+          <span class="pill">Contract first</span><h3>Integrate directly with the Platform API.</h3><p>Use the published OpenAPI contract for pairing, connections, transaction contexts, Payment Requests, status, and events. Server-side services validate scopes, expiry, exact amounts, and idempotency.</p><p><a href="https://docs.velarumai.com/api.html">Open the REST API reference →</a></p>
         </section>
         <section class="integration-panel tab-panel" id="panel-sdk" role="tabpanel" aria-labelledby="tab-sdk" hidden>
-          <span class="pill">JavaScript</span><h3>Use typed helpers around the same contracts.</h3><p>The JavaScript SDK packages pairing, validation, context creation, Payment Request creation, and status polling into a smaller client surface. The API and JSON Schema remain the source of truth.</p><p><a href="https://docs.velarumpay.com/quickstart.html">Follow the JavaScript Quickstart →</a></p>
+          <span class="pill">JavaScript</span><h3>Use typed helpers around the same contracts.</h3><p>The JavaScript SDK packages pairing, validation, context creation, Payment Request creation, and status polling into a smaller client surface. The API and JSON Schema remain the source of truth.</p><p><a href="https://docs.velarumai.com/quickstart.html">Follow the JavaScript Quickstart →</a></p>
         </section>
         <section class="integration-panel tab-panel" id="panel-mcp" role="tabpanel" aria-labelledby="tab-mcp" hidden>
-          <span class="pill">Agent ready</span><h3>Give agents request tools, never wallet keys.</h3><p>The MCP server and connectors expose a deliberately small tool set for pairing, creating context, requesting payment, and reading status. They cannot approve, sign, export keys, or bypass wallet review.</p><p><a href="https://docs.velarumpay.com/mcp.html">Review the MCP tools →</a></p>
+          <span class="pill">Agent ready</span><h3>Give agents request tools, never wallet keys.</h3><p>The MCP server and connectors expose a deliberately small tool set for pairing, creating context, requesting payment, and reading status. They cannot approve, sign, export keys, or bypass wallet review.</p><p><a href="https://docs.velarumai.com/mcp.html">Review the MCP tools →</a></p>
         </section>
       </div>
     </section>
@@ -101,7 +101,7 @@
           <p class="lead">The first conversation should establish your use case, integration surface, intended user approval flow, and test environment. A pilot request does not approve production access.</p>
           <div class="notice"><strong>No sensitive data</strong>Do not include API keys, wallet addresses, seed phrases, private keys, production customer data, or signing material.</div>
         </div>
-        <form class="pilot-form" data-pilot-form>
+        <form class="pilot-form" data-pilot-form data-i18n-subject="VelarumPay Preview pilot request" data-i18n-organization="Organization" data-i18n-contact="Contact" data-i18n-use-case="Use case" data-i18n-integration="Preferred integration" data-i18n-notes="Notes" data-i18n-no-notes="No additional notes." data-i18n-disclaimer="I understand that this is a Preview and pilot request, not live merchant approval." data-i18n-status="Opening your email app. This website has not stored your answers.">
           <div class="field-grid">
             <div class="field"><label for="organization">Organization</label><input id="organization" name="organization" autocomplete="organization" required /></div>
             <div class="field"><label for="email">Work email</label><input id="email" name="email" type="email" autocomplete="email" required /></div>
@@ -116,13 +116,13 @@
       </div>
     </section>
 
-    <section class="shell section compact"><div class="cta-band"><div><h2>Prefer to inspect the contracts first?</h2><p>The developer subdomain contains the Quickstart, REST surface, protocol schemas, and MCP guide.</p></div><div class="actions"><a class="button" href="https://docs.velarumpay.com">Open developer docs</a><a class="button secondary" href="/security">Review security</a></div></div></section>
+    <section class="shell section compact"><div class="cta-band"><div><h2>Prefer to inspect the contracts first?</h2><p>The developer subdomain contains the Quickstart, REST surface, protocol schemas, and MCP guide.</p></div><div class="actions"><a class="button" href="https://docs.velarumai.com">Open developer docs</a><a class="button secondary" href="/security">Review security</a></div></div></section>
   </main>
 
   <footer class="site-footer"><div class="footer-inner">
     <div class="footer-brand"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true">V</span>VelarumPay</a><p>Non-custodial payment requests for people, trusted applications, merchants, and local AI agents.</p></div>
     <div class="footer-column"><strong>Use VelarumPay</strong><a href="/personal">Personal</a><a href="/preview">Preview</a><a href="/support">Support</a></div>
-    <div class="footer-column"><strong>Build</strong><a href="/business">Business</a><a href="https://docs.velarumpay.com">Developer docs</a><a href="#pilot">Request a pilot</a></div>
+    <div class="footer-column"><strong>Build</strong><a href="/business">Business</a><a href="https://docs.velarumai.com">Developer docs</a><a href="#pilot">Request a pilot</a></div>
     <div class="footer-column"><strong>Trust</strong><a href="/security">Security</a><a href="/support#availability">Availability</a><a href="/support#legal">Legal status</a></div>
     <div class="footer-bottom"><span>© 2026 VelarumPay. Brand identifiers are separately protected.</span><span>Developer Preview · Test and pilot use only</span></div>
   </div></footer>

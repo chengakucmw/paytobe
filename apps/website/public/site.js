@@ -61,6 +61,12 @@ document.querySelectorAll("[data-tabs]").forEach((tabSet) => {
   });
 });
 
+document.querySelectorAll("[data-language-picker]").forEach((picker) => {
+  picker.addEventListener("change", () => {
+    window.location.href = picker.value;
+  });
+});
+
 const pilotForm = document.querySelector("[data-pilot-form]");
 
 if (pilotForm) {
@@ -74,23 +80,24 @@ if (pilotForm) {
     const useCase = String(data.get("use_case") || "").trim();
     const integration = String(data.get("integration") || "").trim();
     const notes = String(data.get("notes") || "").trim();
-    const subject = `VelarumPay Preview pilot request — ${organization}`;
+    const copy = (key, fallback) => pilotForm.dataset[key] || fallback;
+    const subject = `${copy("i18nSubject", "VelarumPay Preview pilot request")} — ${organization}`;
     const body = [
-      "VelarumPay Preview pilot request",
+      copy("i18nSubject", "VelarumPay Preview pilot request"),
       "",
-      `Organization: ${organization}`,
-      `Contact: ${email}`,
-      `Use case: ${useCase}`,
-      `Preferred integration: ${integration}`,
+      `${copy("i18nOrganization", "Organization")}: ${organization}`,
+      `${copy("i18nContact", "Contact")}: ${email}`,
+      `${copy("i18nUseCase", "Use case")}: ${useCase}`,
+      `${copy("i18nIntegration", "Preferred integration")}: ${integration}`,
       "",
-      "Notes:",
-      notes || "No additional notes.",
+      `${copy("i18nNotes", "Notes")}:`,
+      notes || copy("i18nNoNotes", "No additional notes."),
       "",
-      "I understand that this is a Preview and pilot request, not live merchant approval."
+      copy("i18nDisclaimer", "I understand that this is a Preview and pilot request, not live merchant approval.")
     ].join("\n");
 
     const status = pilotForm.querySelector("[data-form-status]");
-    if (status) status.textContent = "Opening your email app. This website has not stored your answers.";
+    if (status) status.textContent = copy("i18nStatus", "Opening your email app. This website has not stored your answers.");
     window.location.href = `mailto:pilot@velarumpay.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   });
 }

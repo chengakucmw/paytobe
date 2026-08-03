@@ -30,7 +30,11 @@ function json(status, payload) {
 }
 
 function staticResponse(pathname, origin, headOnly) {
-  const requested = PAGE_ROUTES[pathname] || pathname;
+  const localizedMatch = pathname.match(new RegExp(`^/(${LOCALIZED_ROUTE_PREFIXES.join("|")})(/.*)?$`));
+  const localePrefix = localizedMatch?.[1] || "";
+  const routePath = localizedMatch ? localizedMatch[2] || "/" : pathname;
+  const page = PAGE_ROUTES[routePath] || routePath;
+  const requested = localePrefix && page.endsWith(".html") ? `/${localePrefix}${page}` : PAGE_ROUTES[pathname] || pathname;
   const asset = STATIC_ASSETS[requested];
   if (!asset) return json(404, { ok: false, error: "Not found" });
 
