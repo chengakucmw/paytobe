@@ -19,6 +19,15 @@ export class SqliteWebhookOutbox {
         ...payment,
         status,
         updated_at: event.occurred_at,
+        history: [
+          ...(Array.isArray(payment.history) ? payment.history : []),
+          {
+            status,
+            tx_hash: patch?.tx_hash || null,
+            error: patch?.error || null,
+            at: event.occurred_at
+          }
+        ],
         ...(patch?.tx_hash ? { tx_hash: patch.tx_hash } : {}),
         ...(patch?.error ? { error: patch.error } : {})
       };

@@ -15,6 +15,7 @@ import {
   StorePaymentTenantRepository
 } from "../application/payment-requests/tenant-state.js";
 import { paymentTenantEventProjection } from "../domain/projections.js";
+import { paymentStatusWebhookEvent } from "../application/webhooks/outbox.js";
 import {
   PAYMENT_REQUEST_STATUS_UPDATES,
   paymentRequestEventProjection,
@@ -67,10 +68,126 @@ export function createPaymentRequestsRouter(deps) {
     notifyOpenClaw,
     pushService,
     platformCore,
-    recipientService
+    recipientService,
+    webhookOutbox,
+    webhookDeliveryService,
+    confirmPaymentRequestLater,
+    scheduleWebhookDelivery
   } = deps;
   const router = express.Router();
   const tenantRepository = new StorePaymentTenantRepository(store);
+  const pendingConfirmations = new Set();
+
+  function applyStatusUpdate(request, status, patch, actor) {
+    const scope = request.merchant_id ? createTenantScope(Object.freeze({
+      merchant_id: request.merchant_id,
+      actor_id: actor.id,
+      request_id: actor.request_id
+    })) : null;
+    let updated;
+    if (scope && webhookOutbox) {
+      const occurredAt = platformCore.clock.nowIso();
+      const event = paymentStatusWebhookEvent(scope, request, status, patch, {
+        eventId: platformCore.random.id("event"),
+        occurredAt
+      });
+      const committed = webhookOutbox.commitPaymentStatus(scope, request.request_id, status, patch, event);
+      if (!committed) return null;
+      // The outbox transaction is authoritative for the status + immutable webhook
+      // event. Refresh the Store cache, then append the wallet REST event in a
+      // separate durable mutation so app synchronization observes the transition.
+      store.reloadSqliteState();
+      store.mutate(() => {
+        store.event("payment_request.status", request.request_id, {
+          request_id: request.request_id,
+          transaction_id: request.transaction_id || null,
+          connection_id: request.connection_id || null,
+          target_app_device_id: request.target_app_device_id || null,
+          status,
+          tx_hash: patch.tx_hash || null,
+          error: patch.error || null
+        });
+        return true;
+      });
+      updated = store.paymentRequest(request.request_id);
+      const deliveries = webhookDeliveryService?.enqueue(scope, event.event_id) || [];
+      if (deliveries.length > 0) scheduleWebhookDelivery?.();
+    } else {
+      updated = scope
+        ? tenantRepository.updateStatus(scope, request.request_id, status, patch)
+        : store.updatePaymentRequestStatus(request.request_id, status, patch);
+    }
+    if (!updated) return null;
+
+    if (shouldRecordSpent(status)) {
+      store.settleDailyReservation(request.request_id, updated.payment.asset, updated.payment.amount);
+    } else if (RELEASE_ON_STATUS.has(status)) {
+      store.releaseDailyReservation(request.request_id);
+    }
+
+    const message = paymentRequestStatusMessage(updated, patch);
+    notifyOpenClaw(updated.connection_id || updated.source?.device_id, message);
+    const eventSeq = store.eventWindow().latest_seq;
+    notifyApp(updated.target_app_device_id, {
+      type: "payment_request",
+      request_id: updated.request_id,
+      status: updated.status,
+      event_seq: eventSeq
+    });
+    pushService?.notifyPaymentRequest(updated.target_app_device_id, {
+      request_id: updated.request_id,
+      event_seq: eventSeq
+    });
+    observability.recordAuditEvent("payment_request.status_updated", "success", {
+      actor: actor.audit,
+      resource: { type: "payment_request", id: updated.request_id },
+      labels: paymentRequestMetricLabels(updated),
+      details: {
+        connection_id: updated.connection_id || null,
+        transaction_id: updated.transaction_id || null,
+        tx_hash: patch.tx_hash || null,
+        has_error: Boolean(patch.error)
+      }
+    });
+    observability.incrementCounter("velarumpay_payment_request_status_updates_total", paymentRequestMetricLabels(updated));
+    return updated;
+  }
+
+  function scheduleConfirmation(request) {
+    const txHash = request?.tx_hash;
+    if (request?.status !== "broadcasted" || !txHash || !confirmPaymentRequestLater) return null;
+    const key = `${request.request_id}:${txHash}`;
+    if (pendingConfirmations.has(key)) return null;
+    pendingConfirmations.add(key);
+    return confirmPaymentRequestLater(request, txHash, (nextStatus, confirmationPatch) => {
+      const current = store.paymentRequest(request.request_id);
+      if (!current) return null;
+      const next = decidePaymentStatusTransition(current, nextStatus);
+      if (!next.ok || next.duplicate) return current;
+      return applyStatusUpdate(current, nextStatus, confirmationPatch, {
+        id: "platform:confirmation",
+        request_id: platformCore.random.id("request"),
+        audit: { type: "platform_worker", id: "chain_confirmation" }
+      });
+    }).catch((error) => {
+      observability.recordAuditEvent("payment_request.confirmation_update_failed", "failure", {
+        actor: { type: "platform_worker", id: "chain_confirmation" },
+        resource: { type: "payment_request", id: request.request_id },
+        labels: { code: error?.code || "confirmation_update_failed" }
+      });
+      return null;
+    }).finally(() => {
+      pendingConfirmations.delete(key);
+    });
+  }
+
+  async function reconcileBroadcasted() {
+    const confirmations = Object.values(store.state.paymentRequests)
+      .filter((request) => request.status === "broadcasted" && request.tx_hash)
+      .map(scheduleConfirmation)
+      .filter(Boolean);
+    return Promise.allSettled(confirmations);
+  }
 
   router.post("/", async (req, res) => {
     const auth = authorizeConnection(req, "payment.requests.create", { allowLegacyOpenClaw: true });
@@ -347,62 +464,26 @@ export function createPaymentRequestsRouter(deps) {
     }
 
     if (transition.duplicate) {
+      scheduleConfirmation(request);
       return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(request) });
     }
 
-    const statusScope = request.merchant_id ? createTenantScope(Object.freeze({
-      merchant_id: request.merchant_id,
-      actor_id: `wallet:${req.body.device_id}`,
-      request_id: String(req.request_id || req.id || request.request_id)
-    })) : null;
-    const updated = statusScope ? tenantRepository.updateStatus(statusScope, request.request_id, status, {
+    const patch = {
       tx_hash: req.body.tx_hash || null,
       error: req.body.error || null
-    }) : store.updatePaymentRequestStatus(request.request_id, status, {
-      tx_hash: req.body.tx_hash || null,
-      error: req.body.error || null
+    };
+    const updated = applyStatusUpdate(request, status, patch, {
+      id: `wallet:${req.body.device_id}`,
+      request_id: String(req.request_id || req.id || request.request_id),
+      audit: { type: "wallet_device", id: req.body.device_id }
     });
-    // F1: settle the reservation into confirmed spend on success, release it back to
-    // the cap on a terminal non-confirmed status. The M5 transition guard above
-    // blocks re-reporting a terminal status, so this runs at most once.
-    if (shouldRecordSpent(status)) {
-      store.settleDailyReservation(request.request_id, updated.payment.asset, updated.payment.amount);
-    } else if (RELEASE_ON_STATUS.has(status)) {
-      store.releaseDailyReservation(request.request_id);
-    }
-
-    const message = paymentRequestStatusMessage(updated, {
-      tx_hash: req.body.tx_hash || null,
-      error: req.body.error || null
-    });
-    notifyOpenClaw(updated.connection_id || updated.source?.device_id, message);
-    const eventSeq = store.eventWindow().latest_seq;
-    notifyApp(updated.target_app_device_id, {
-      type: "payment_request",
-      request_id: updated.request_id,
-      status: updated.status,
-      event_seq: eventSeq
-    });
-    pushService?.notifyPaymentRequest(updated.target_app_device_id, {
-      request_id: updated.request_id,
-      event_seq: eventSeq
-    });
-    observability.recordAuditEvent("payment_request.status_updated", "success", {
-      actor: { type: "wallet_device", id: req.body.device_id },
-      resource: { type: "payment_request", id: updated.request_id },
-      labels: paymentRequestMetricLabels(updated),
-      details: {
-        connection_id: updated.connection_id || null,
-        transaction_id: updated.transaction_id || null,
-        tx_hash: req.body.tx_hash || null,
-        has_error: Boolean(req.body.error)
-      }
-    });
-    observability.incrementCounter("velarumpay_payment_request_status_updates_total", paymentRequestMetricLabels(updated));
+    if (!updated) return sendApiError(res, 404, "payment_request_not_found", "Payment Request not found");
 
     res.json({ ok: true, payment_request: paymentRequestProjection(updated) });
+    scheduleConfirmation(updated);
   });
 
+  router.reconcileBroadcasted = reconcileBroadcasted;
   return router;
 }
 

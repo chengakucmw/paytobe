@@ -1,8 +1,8 @@
-// On-chain confirmation polling for broadcasted payment intents.
+// On-chain confirmation polling for broadcasted Payment Intents and Payment Requests.
 //
 // Needs the store and the WS notify helpers, so it's produced by a factory
-// wired once at startup. Only confirmLater is returned; waitForConfirmation /
-// evmReceipt / stellarTransaction / sleep are internal. confirmLater closes
+// wired once at startup. waitForConfirmation / evmReceipt / stellarTransaction /
+// sleep remain internal. The returned confirmation functions close
 // over the SAME notify helpers the server uses, which the regression test
 // relies on (it seeds the openclaw socket map, then calls confirmLater).
 
@@ -66,6 +66,20 @@ export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
     }
   }
 
+  async function confirmPaymentRequestLater(request, txHash, onResult) {
+    if (typeof onResult !== "function") throw new TypeError("Payment Request confirmation callback is required");
+    let result;
+    try {
+      result = await waitForConfirmation(request, txHash);
+    } catch (error) {
+      result = { ok: false, error: error?.message || "Confirmation failed" };
+    }
+    return onResult(result.ok ? "confirmed" : "failed", {
+      tx_hash: txHash,
+      error: result.error || null
+    });
+  }
+
   async function waitForConfirmation(intent, txHash) {
     const payment = intent.payment || {};
     for (let attempt = 0; attempt < 30; attempt++) {
@@ -86,7 +100,7 @@ export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
     return { ok: false, error: "Confirmation timeout" };
   }
 
-  return { confirmLater };
+  return { confirmLater, confirmPaymentRequestLater };
 }
 
 async function evmReceipt(rpcUrl, txHash) {

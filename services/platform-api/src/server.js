@@ -114,6 +114,7 @@ import {
 } from "./application/webhooks/endpoint-service.js";
 import { WebhookDeliveryService } from "./application/webhooks/delivery-worker.js";
 import { MemoryWebhookDeliveryRepository, SqliteWebhookDeliveryRepository } from "./adapters/webhook/delivery-repository.js";
+import { SqliteWebhookOutbox } from "./adapters/sqlite/webhook-outbox.js";
 import { SafeWebhookTransport } from "./adapters/webhook/transport.js";
 import { createAes256GcmVault } from "./crypto.js";
 
@@ -262,6 +263,28 @@ const webhookDeliveryService = new WebhookDeliveryService({
   random: platformCore.random,
   observability
 });
+const webhookOutbox = store.db ? new SqliteWebhookOutbox(store.db) : null;
+let webhookDeliveryRunning = false;
+function scheduleWebhookDelivery() {
+  if (webhookDeliveryRunning) return;
+  webhookDeliveryRunning = true;
+  setImmediate(async () => {
+    try {
+      for (let processed = 0; processed < 100; processed += 1) {
+        const result = await webhookDeliveryService.runOnce("webhook-worker");
+        if (result.idle) break;
+      }
+    } catch (error) {
+      observability.recordAuditEvent("webhook.worker_failed", "failure", {
+        actor: { type: "platform_worker", id: "webhook_delivery" },
+        resource: { type: "webhook_worker", id: "webhook-worker" },
+        labels: { code: error?.code || "webhook_worker_failed" }
+      });
+    } finally {
+      webhookDeliveryRunning = false;
+    }
+  });
+}
 const {
   auditActorFromAuth,
   authorizeConnection,
@@ -282,7 +305,7 @@ const {
 const { refreshRuntimeMetrics, recordPairingExpired } = createMetrics({ store, observability, wsHub });
 const { uniquePairingCode, resolvePairingSession } = createPairing({ store });
 const { buildTransactionContextProjection } = createTransactionContext({ store });
-const { confirmLater } = createConfirmation({ store, notifyApp, notifyOpenClaw });
+const { confirmLater, confirmPaymentRequestLater } = createConfirmation({ store, notifyApp, notifyOpenClaw });
 const pushService = createFcmPushService({ config: runtimeConfig, store, observability });
 
 // Shared bag of dependencies handed to every router factory; each router
@@ -301,6 +324,7 @@ const routeDeps = {
   recipientService,
   webhookEndpointService,
   webhookDeliveryService,
+  webhookOutbox,
   observability,
   runtimeConfig,
   runtimeValidation,
@@ -322,7 +346,9 @@ const routeDeps = {
   uniquePairingCode,
   resolvePairingSession,
   buildTransactionContextProjection,
-  confirmLater
+  confirmLater,
+  confirmPaymentRequestLater,
+  scheduleWebhookDelivery
 };
 
 // ---------------------------------------------------------------------------
@@ -373,7 +399,8 @@ app.use("/v1/transaction-contexts", createTransactionContextsRouter(routeDeps));
 app.use("/v1/pairing", createPairingRouter(routeDeps));
 app.use("/v1/connect-invitations", createConnectInvitationsRouter(routeDeps));
 app.use("/v1/connections", createConnectionsRouter(routeDeps));
-app.use("/v1/payment-requests", createPaymentRequestsRouter(routeDeps));
+const paymentRequestsRouter = createPaymentRequestsRouter(routeDeps);
+app.use("/v1/payment-requests", paymentRequestsRouter);
 app.use("/v1/payment-intents", createPaymentIntentsRouter(routeDeps));
 app.use("/v1/openclaw", createOpenClawRouter(routeDeps));
 app.use("/v1/merchant-accounts", createMerchantAccountsRouter(routeDeps));
@@ -479,6 +506,7 @@ wss.on("connection", (ws, _req, url) => {
 if (process.env.VP_NO_AUTO_LISTEN !== "1") {
   server.listen(PORT, () => {
     console.log(`AgentWallet Relay listening on http://0.0.0.0:${PORT}`);
+    void paymentRequestsRouter.reconcileBroadcasted();
   });
 
   // Background maintenance: sweep due expiries and retention-prune terminal records
@@ -503,6 +531,13 @@ if (process.env.VP_NO_AUTO_LISTEN !== "1") {
       }
     }, maintenanceIntervalMs);
     maintenanceTimer.unref();
+  }
+
+  const webhookIntervalMs = Number(process.env.WEBHOOK_DELIVERY_INTERVAL_MS) || 5_000;
+  if (webhookIntervalMs > 0) {
+    const webhookTimer = setInterval(scheduleWebhookDelivery, webhookIntervalMs);
+    webhookTimer.unref();
+    scheduleWebhookDelivery();
   }
 }
 
