@@ -20,7 +20,6 @@ const [
   poppinsLicense,
   dmSansLicense,
   jetBrainsMonoLicense,
-  connectStore,
   connectApi,
   workerTemplate
 ] = await Promise.all([
@@ -37,7 +36,6 @@ const [
   fs.readFile(path.join(root, "public/fonts/OFL-Poppins.txt"), "utf8"),
   fs.readFile(path.join(root, "public/fonts/OFL-DM-Sans.txt"), "utf8"),
   fs.readFile(path.join(root, "public/fonts/OFL-JetBrains-Mono.txt"), "utf8"),
-  fs.readFile(path.join(root, "cloud/real-connect-store.mjs"), "utf8"),
   fs.readFile(path.join(root, "cloud/real-connect-api.mjs"), "utf8"),
   fs.readFile(path.join(root, "cloud/worker-template.mjs"), "utf8")
 ]);
@@ -62,7 +60,7 @@ await fs.rm(outputDirectory, { recursive: true, force: true });
 await fs.mkdir(serverDirectory, { recursive: true });
 await fs.writeFile(
   path.join(serverDirectory, "index.js"),
-  `const STATIC_ASSETS = Object.freeze(${JSON.stringify(assets)});\n${connectStore}\n${connectApi}\n${workerTemplate}`
+  `const STATIC_ASSETS = Object.freeze(${JSON.stringify(assets)});\n${connectApi}\n${workerTemplate}`
 );
 
 console.log("Built AgentFood Sites Worker in dist/server/index.js");

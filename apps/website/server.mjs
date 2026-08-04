@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const builtPublicDir = path.join(__dirname, "dist", "public");
 const publicDir = existsSync(builtPublicDir) ? builtPublicDir : path.join(__dirname, "public");
-const apkDownloadName = "VelarumPay-Android-Preview.apk";
+const apkDownloadName = "VelarumPay-Android-Official-Testnet.apk";
 // APKs stay outside the public code repository. Operators replace the stable file in
 // releases/android, while the public /download/android URL remains unchanged.
 const apkPath = process.env.VELARUMPAY_APK_PATH

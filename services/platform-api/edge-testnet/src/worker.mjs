@@ -589,44 +589,6 @@ async function verifyDevice(store, deviceId, token) {
   return Boolean(deviceId && token && await store.verifyDevice(String(deviceId), await hash(String(token))));
 }
 
-function recordLegacyAgentFoodAttempt(env, {
-  classification,
-  method,
-  route,
-  disposition = "compatibility_observation",
-  responseStatus = null
-}) {
-  const event = {
-    level: "warn",
-    event: "agentfood.legacy_path_attempt",
-    schema_version: 1,
-    surface: "connect_platform_edge_testnet",
-    classification,
-    disposition,
-    method,
-    route,
-    ...(Number.isInteger(responseStatus) ? { response_status: responseStatus } : {}),
-    occurred_at: new Date().toISOString()
-  };
-  console.warn(JSON.stringify(event));
-  try {
-    env?.AGENTFOOD_LEGACY_METRICS?.writeDataPoint?.({
-      indexes: [event.surface],
-      blobs: [event.event, classification, disposition, method, route, responseStatus === null ? "" : String(responseStatus)],
-      doubles: [1]
-    });
-  } catch {
-    console.error(JSON.stringify({
-      level: "error",
-      event: "agentfood.legacy_metric_write_failed",
-      surface: event.surface,
-      classification,
-      route,
-      occurred_at: new Date().toISOString()
-    }));
-  }
-}
-
 async function controlledWebhookReceiver(request, env, route) {
   const config = CONTROLLED_WEBHOOK_RECEIVERS[route];
   if (!config) return null;
@@ -684,15 +646,6 @@ async function verifyControlledWebhookSignature(secret, rawBody, signatureHeader
 async function authenticateAgent(request, env, store) {
   const token = bearer(request, "x-agent-client-token");
   if (!TOKEN_PATTERN.test(token)) return null;
-  if (env.AGENTFOOD_CLIENT_TOKEN && await sameSecret(token, env.AGENTFOOD_CLIENT_TOKEN)) {
-    const path = new URL(request.url).pathname;
-    recordLegacyAgentFoodAttempt(env, {
-      classification: "authenticated_shared_token",
-      method: request.method.toUpperCase(),
-      route: path === "/v1/connect-invitations/claim" ? path : "/v1/*"
-    });
-    return { client_id: "agentfood-testnet", tenant_id: "agentfood", display_name: "AgentFood", runtime: "cloudflare-worker", source_domain: env.AGENTFOOD_SOURCE_DOMAIN || "agentfood-testnet.velarumpay", status: "active" };
-  }
   return store.clientByTokenHash(await hash(token));
 }
 
@@ -733,81 +686,6 @@ async function connectionAuth(store, request, requiredScope, fallback = "") {
   return { connection };
 }
 
-const AGENTFOOD_MERCHANTS = Object.freeze([
-  { id: "green-bowl", name: "Green Bowl Kitchen", tags: ["vegetarian", "healthy", "salad", "protein"], menu: [
-    { id: "garden-bowl", name: "Garden tahini bowl", price: "9.50", tags: ["vegetarian", "healthy", "main"] },
-    { id: "chili-tofu", name: "Chili tofu bowl", price: "11.20", tags: ["vegetarian", "spicy", "protein", "main"] },
-    { id: "citrus-tea", name: "Citrus iced tea", price: "2.40", tags: ["drink"] }
-  ] },
-  { id: "noodle-atelier", name: "Noodle Atelier", tags: ["noodles", "spicy", "comfort"], menu: [
-    { id: "red-chili-noodles", name: "Red chili noodles", price: "12.80", tags: ["spicy", "noodles", "main"] },
-    { id: "sesame-noodles", name: "Sesame noodles", price: "10.60", tags: ["vegetarian", "noodles", "main"] },
-    { id: "cucumber-side", name: "Smashed cucumber", price: "3.10", tags: ["vegetarian", "side"] }
-  ] },
-  { id: "bento-harbor", name: "Bento Harbor", tags: ["japanese", "bento", "rice"], menu: [
-    { id: "miso-salmon-bento", name: "Miso salmon bento", price: "14.40", tags: ["fish", "bento", "main"] },
-    { id: "ginger-tofu-bento", name: "Ginger tofu bento", price: "11.90", tags: ["vegetarian", "bento", "main"] },
-    { id: "miso-soup", name: "Miso soup", price: "2.20", tags: ["soup", "side"] }
-  ] }
-]);
-
-function agentFoodWords(value) { return String(value || "").toLowerCase().match(/[a-z0-9]+/g) || []; }
-
-function agentFoodOrder(message, preferredMerchantId) {
-  const requested = new Set(agentFoodWords(message));
-  const budgetMatch = String(message).match(/(?:under|below|budget(?:\s+of)?|max(?:imum)?)\s*(\d+(?:\.\d{1,2})?)/i)
-    || String(message).match(/(\d+(?:\.\d{1,2})?)\s*(?:xlm|units?)/i);
-  const budget = budgetMatch ? Number(budgetMatch[1]) : 30;
-  const merchant = AGENTFOOD_MERCHANTS.map((candidate) => {
-    let score = candidate.id === preferredMerchantId ? 10 : 0;
-    for (const tag of candidate.tags) if (requested.has(tag)) score += 3;
-    return { candidate, score };
-  }).sort((left, right) => right.score - left.score)[0].candidate;
-  const ranked = merchant.menu.map((item) => ({ item, score: item.tags.reduce((total, tag) => total + (requested.has(tag) ? 4 : 0), item.tags.includes("main") ? 2 : 0) }))
-    .sort((left, right) => right.score - left.score || Number(left.item.price) - Number(right.item.price));
-  const items = [];
-  let total = 0;
-  for (const { item } of ranked) {
-    const price = Number(item.price);
-    if (items.length < 3 && total + price <= budget) { items.push({ ...item, quantity: 1 }); total += price; }
-  }
-  if (!items.length) return null;
-  return { order_id: `agentfood_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`, merchant, items, currency: "XLM", total: total.toFixed(2), budget: budget.toFixed(2), prompt_summary: String(message).trim(), demo: true };
-}
-
-async function agentFoodArtifacts(order, connection, origin) {
-  const at = new Date().toISOString();
-  const transactionId = `txn_${order.order_id}`;
-  const requestId = `prq_${order.order_id}`;
-  const source = { agent_id: "agentfood-testnet", agent_name: "AgentFood", runtime: "velarumpay-platform", channel: "agentfood_web" };
-  const context = {
-    protocol: "velarum.transaction_context.v1", transaction_id: transactionId, connection_id: connection.connection_id,
-    created_at: at, type: "food_order", status: "awaiting_payment", title: `Demo order from ${order.merchant.name}`,
-    summary: `AgentFood prepared a testnet request totaling ${order.total} XLM.`, source,
-    user_intent: { prompt_summary: order.prompt_summary },
-    agent_activity: [{ at, action: "payment_requested", label: "Created a Payment Request", summary: "Sent a Stellar testnet Payment Request to VelarumPay for user review.", source_type: "payment_request_fact" }],
-    items: order.items.map((item) => ({ item_id: item.id, name: item.name, quantity: item.quantity, unit_amount: item.price, currency: "XLM" })),
-    costs: { total: order.total, currency: "XLM" }, media: [], evidence: [], truth_fields: [], missing_context: ["merchant_recipient_verification"], risk_findings: []
-  };
-  const payment = {
-    protocol: "velarum.payment_request.v1", request_id: requestId, connection_id: connection.connection_id, transaction_id: transactionId,
-    created_at: at, expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), idempotency_key: `${order.order_id}-payment-1`, status: "pending", source,
-    payee: { name: `${order.merchant.name} (Testnet demo)`, domain: new URL(origin).hostname, verified: false },
-    payment: { rail: "stellar_xlm", network: "stellar_testnet", asset: "XLM", amount: order.total, to: "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF", memo: `agentfood-${order.order_id.slice(-10)}`, estimated_fee: "0.00001", stellar_testnet: true },
-    display: { title: `Demo order from ${order.merchant.name}`, summary: "AgentFood sent this testnet request through the VelarumPay Connect Platform.", primary_action: "Review" },
-    policy: { requires_user_approval: true },
-    metadata: { type: "food_order", environment: "platform_testnet", food_order: { order_id: order.order_id, restaurant: { name: order.merchant.name }, items: order.items.map((item) => ({ item_id: item.id, quantity: item.quantity })) } },
-    transaction_context_snapshot: context,
-    risk: { level: "caution", label: "Testnet demo · unverified merchant recipient", review_status: "needs_review", signing_allowed: true, errors: [], warnings: [{ code: "testnet_demo", message: "This request uses Stellar testnet and representative merchant data" }, { code: "recipient_unverified", message: "The demo merchant recipient is not verified" }] }
-  };
-  return { context, payment };
-}
-
-function agentFoodOrigin(request, env) {
-  const expected = env.AGENTFOOD_WEB_ORIGIN || "https://agentfood-velarumpay-demo.chengakucmw.chatgpt.site";
-  return request.headers.get("origin") === expected ? expected : "";
-}
-
 async function handle(request, env, store) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -818,62 +696,6 @@ async function handle(request, env, store) {
 
   const controlledReceiver = await controlledWebhookReceiver(request, env, path);
   if (controlledReceiver) return controlledReceiver;
-
-  if (method === "POST" && path === "/v1/integrations/agentfood/chat") {
-    const origin = agentFoodOrigin(request, env);
-    recordLegacyAgentFoodAttempt(env, {
-      classification: origin ? "allowed_origin_dedicated_route" : "untrusted_origin_dedicated_route",
-      method,
-      route: path,
-      ...(origin ? {} : { responseStatus: 403 })
-    });
-    if (!origin) return apiError(403, "integration_origin_denied", "AgentFood integration origin is not allowed");
-    const payload = await body(request);
-    const message = String(payload.message || "").trim().slice(0, 2_000);
-    if (!message) return apiError(400, "message_required", "A message is required");
-    const key = message.match(/velarumpay-connect:ck_[A-Za-z0-9_-]{43}/)?.[0];
-    if (key) {
-      const requestedScopes = ["payment.requests.create", "payment.requests.read", "transaction_contexts.create", "transaction_contexts.read"];
-      const claimToken = randomToken("claim");
-      const client = { client_id: "agentfood-testnet", tenant_id: "agentfood", display_name: "AgentFood", runtime: "velarumpay-platform", source_domain: new URL(origin).hostname };
-      const at = new Date().toISOString();
-      const invitation = await store.claimInvitation(await hash(key), await hash(claimToken), client, requestedScopes, id("pair"), at);
-      if (!invitation) return apiError(409, "connect_key_unavailable", "Connect Key is invalid, expired, or already used");
-      return json(201, { ok: true, type: "connect_invitation_claimed", message: "Connect Key recognized. Review AgentFood's registered identity and scopes in VelarumPay.", connect_invitation_id: invitation.connect_invitation_id, claim_token: claimToken, connect_invitation: invitationView(invitation), pairing_session: pairingView(invitation), identity: { assurance: "registered", tenant_id: "agentfood", client_id: "agentfood-testnet" } });
-    }
-    const auth = await connectionAuth(store, request, "payment.requests.create", String(payload.connection_token || ""));
-    if (auth.error) return apiError(409, "connection_required", "Approve the Connect Invitation in VelarumPay before requesting an order");
-    if (!auth.connection.scopes.includes("transaction_contexts.create")) return apiError(403, "scope_denied", "Missing required scope: transaction_contexts.create");
-    const order = agentFoodOrder(message, String(payload.preferred_merchant_id || ""));
-    if (!order) return apiError(409, "budget_too_low", "No menu item fits the requested demo budget");
-    const artifacts = await agentFoodArtifacts(order, auth.connection, origin);
-    await store.upsertContext(auth.connection, artifacts.context, new Date().toISOString());
-    const payment = await store.createPayment(auth.connection, artifacts.payment, new Date().toISOString());
-    return json(201, { ok: true, type: "payment_request_created", message: `I prepared a ${order.total} XLM testnet order from ${order.merchant.name} and sent a Payment Request to your VelarumPay inbox.`, order, transaction_context: artifacts.context, payment_request: payment, warnings: payment.risk.warnings });
-  }
-
-  if (method === "POST" && path === "/v1/integrations/agentfood/connect") {
-    const origin = agentFoodOrigin(request, env);
-    recordLegacyAgentFoodAttempt(env, {
-      classification: origin ? "allowed_origin_dedicated_route" : "untrusted_origin_dedicated_route",
-      method,
-      route: path,
-      ...(origin ? {} : { responseStatus: 403 })
-    });
-    if (!origin) return apiError(403, "integration_origin_denied", "AgentFood integration origin is not allowed");
-    const payload = await body(request);
-    const invitationId = String(payload.connect_invitation_id || "");
-    const claimToken = String(payload.claim_token || "");
-    let invitation = claimToken ? await store.invitationByClaimHash(await hash(claimToken)) : null;
-    if (!invitation || invitation.connect_invitation_id !== invitationId) return apiError(401, "invalid_connect_claim_token", "Connect claim token is invalid");
-    invitation = await store.expireInvitation(invitation, new Date().toISOString());
-    if (invitation.status === "claimed") return json(200, { ok: true, connection: { status: "claimed", connected: false, connect_invitation_id: invitationId } });
-    if (["expired", "rejected", "cancelled"].includes(invitation.status)) return json(200, { ok: true, connection: { status: invitation.status, connected: false, connect_invitation_id: invitationId } });
-    const connectionToken = randomToken("conn");
-    const exchanged = await store.exchangeInvitation(invitation, await hash(connectionToken), new Date().toISOString());
-    if (!exchanged) return apiError(409, "connect_invitation_not_exchangeable", "Connect Invitation cannot be exchanged");
-    return json(200, { ok: true, connection: { ...connectionView(exchanged.connection, connectionToken), connected: true, connect_invitation_id: invitationId } });
-  }
 
   if (method === "POST" && path === "/v1/admin/agent-clients") {
     if (!env.PLATFORM_ADMIN_TOKEN || !await sameSecret(bearer(request), env.PLATFORM_ADMIN_TOKEN)) return apiError(401, "admin_auth_required", "Platform administrator authentication is required");
@@ -1125,15 +947,8 @@ export { D1Store, MemoryStore, edgePaymentTransition, edgeWebhookDeliveryDecisio
 export default {
   async fetch(request, env = {}) {
     if (!env.DB) return apiError(503, "database_unavailable", "Connect Platform database is unavailable");
-    const origin = agentFoodOrigin(request, env);
-    if (request.method === "OPTIONS" && origin) return new Response(null, { status: 204, headers: { "access-control-allow-origin": origin, "access-control-allow-methods": "POST,OPTIONS", "access-control-allow-headers": "content-type,authorization", "access-control-max-age": "600", vary: "Origin" } });
     try {
-      const response = await handle(request, env, new D1Store(env.DB));
-      if (!origin) return response;
-      const headers = new Headers(response.headers);
-      headers.set("access-control-allow-origin", origin);
-      headers.append("vary", "Origin");
-      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      return await handle(request, env, new D1Store(env.DB));
     }
     catch (error) {
       console.error(JSON.stringify({ level: "error", event: "connect_platform_request_failed", code: error.code || "internal_error", path: new URL(request.url).pathname }));

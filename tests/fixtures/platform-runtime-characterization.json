@@ -54,8 +54,6 @@
       "routes": [
         "GET /",
         "GET /health",
-        "POST /v1/integrations/agentfood/chat",
-        "POST /v1/integrations/agentfood/connect",
         "POST /v1/admin/agent-clients",
         "POST /v1/devices/app",
         "PUT /v1/devices/app/:id/push-token",

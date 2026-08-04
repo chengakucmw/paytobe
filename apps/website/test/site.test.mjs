@@ -17,18 +17,19 @@ async function call(pathname, options = {}, env = {}) {
   return worker.fetch(new Request(`https://velarumpay.example${pathname}`, options), env);
 }
 
-test("all public pages render as a clearly labelled Preview", async () => {
+test("all public pages render as a clearly labelled Official Testnet", async () => {
   for (const route of pageRoutes) {
     const response = await call(route);
     const html = await response.text();
     assert.equal(response.status, 200, route);
     assert.match(response.headers.get("content-type") || "", /text\/html/, route);
     assert.match(html, /<h1[ >]/, route);
-    assert.match(html, /Developer Preview/, route);
+    assert.match(html, /Official Testnet/, route);
+    assert.doesNotMatch(html, /Developer Preview/, route);
     assert.match(html, /https:\/\/docs\.velarumai\.com/, route);
     assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|<script[^>]+src="https?:/i, route);
     assert.match(html, /https:\/\/velarumpay\.example\/og\.png/, route);
-    assert.match(html, /\/site\.js\?v=i18n-20260803-2/, route);
+    assert.match(html, /\/site\.js\?v=i18n-20260804-1/, route);
     assert.match(html, /\/styles\.css\?v=language-20260803-1/, route);
     assert.match(html, /class="language-picker-globe"/, route);
   }
@@ -142,7 +143,7 @@ test("the self-hosted download route serves the current APK with download header
   const response = await fetch(`http://127.0.0.1:${port}/download/android`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/vnd.android.package-archive");
-  assert.equal(response.headers.get("content-disposition"), 'attachment; filename="VelarumPay-Android-Preview.apk"');
+  assert.equal(response.headers.get("content-disposition"), 'attachment; filename="VelarumPay-Android-Official-Testnet.apk"');
   assert.equal(response.headers.get("cache-control"), "no-cache, must-revalidate");
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), apkBytes);
 

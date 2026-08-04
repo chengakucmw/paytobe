@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 const DEVICE_TOKEN_SUFFIX = "123456789012345678901234567890";
 const STELLAR_TEST_ADDRESS = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF";
 
-export function createAdapterContractHarness({ name, call, registeredAgentToken = "" }) {
+export function createAdapterContractHarness({ name, call, registeredAgentToken = "", recipientBound = false }) {
   let generation = 0;
 
   return Object.freeze({
@@ -26,8 +26,8 @@ export function createAdapterContractHarness({ name, call, registeredAgentToken 
       const connection = await establishConnection({ call, suffix, registeredAgentToken });
       const key = `contract-order-${suffix}`;
       const firstRequestId = `contract-request-${suffix}-a`;
-      const firstPayload = paymentPayload(firstRequestId, key, "1.25");
-      const secondPayload = paymentPayload(`contract-request-${suffix}-b`, key, "9.75");
+      const firstPayload = paymentPayload(firstRequestId, key, "1.25", recipientBound);
+      const secondPayload = paymentPayload(`contract-request-${suffix}-b`, key, "9.75", recipientBound);
       const headers = { authorization: `Bearer ${connection.connection_token}`, "x-idempotency-key": key };
       const first = await parse(await call("/v1/payment-requests", { method: "POST", headers, payload: firstPayload }));
       const second = await parse(await call("/v1/payment-requests", { method: "POST", headers, payload: secondPayload }));
@@ -65,12 +65,6 @@ async function establishConnection({ call, suffix, registeredAgentToken }) {
     headers: claimHeaders,
     payload: {
       connect_key: created.body.connect_key,
-      agent_identity: {
-        agent_id: `agent-${suffix}`,
-        agent_name: `Contract Agent ${suffix}`,
-        runtime: "node-test",
-        source: "contract-fixture"
-      },
       requested_scopes: ["payment.requests.create", "payment.requests.read"]
     }
   }));
@@ -91,8 +85,18 @@ async function establishConnection({ call, suffix, registeredAgentToken }) {
   return exchanged.body.connection;
 }
 
-function paymentPayload(requestId, idempotencyKey, amount) {
+function paymentPayload(requestId, idempotencyKey, amount, recipientBound) {
   const createdAt = new Date().toISOString();
+  if (recipientBound) {
+    return {
+      recipient_id: "recipient-contract-fixture",
+      recipient_version_id: "recipient-version-contract-fixture",
+      idempotency_key: idempotencyKey,
+      expires_at: new Date(Date.parse(createdAt) + 5 * 60 * 1000).toISOString(),
+      payment: { amount },
+      policy: { requires_user_approval: true }
+    };
+  }
   return {
     protocol: "velarum.payment_request.v1",
     request_id: requestId,

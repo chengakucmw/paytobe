@@ -131,25 +131,19 @@ test("hosted AgentFood uses an Ed25519 Agent Assertion and standard Platform con
   assert.equal(calls.length, 4);
 });
 
-test("legacy hosted writes are retired, fully metered, redacted, and never become an anonymous fallback", async (t) => {
-  const metrics = [];
-  const logs = [];
-  const originalWarn = console.warn;
-  console.warn = (message) => logs.push(JSON.parse(String(message)));
-  t.after(() => { console.warn = originalWarn; });
-  const env = { AGENTFOOD_LEGACY_METRICS: { writeDataPoint: (value) => metrics.push(value) } };
-  const write = await call("/v1/devices/app", jsonBody({ device_id: "legacy", token: "legacy-token-123456" }), env);
-  assert.equal(write.response.status, 410);
-  assert.equal(write.result.error.code, "legacy_agentfood_path_retired");
-  const claim = await call("/api/chat", jsonBody({ message: `Use velarumpay-connect:ck_${"E".repeat(43)}` }), env);
-  assert.equal(claim.response.status, 410);
-  assert.equal(metrics.length, 2);
-  assert.equal(logs.length, 2);
-  assert.deepEqual(logs.map((entry) => entry.route), ["/v1/*", "/api/chat"]);
-  assert.deepEqual(logs.map((entry) => entry.classification), [
-    "retired_direct_platform_write",
-    "standard_agent_config_missing_connect_claim"
-  ]);
-  assert.ok(logs.every((entry) => entry.event === "agentfood.legacy_path_attempt" && entry.response_status === 410));
-  assert.doesNotMatch(JSON.stringify(logs), /legacy-token-123456|velarumpay-connect:ck_/);
+test("legacy hosted APIs are absent and standard routes fail closed without Agent configuration", async () => {
+  const legacy = await call("/v1/devices/app", jsonBody({ device_id: "legacy", token: "legacy-token-123456" }));
+  assert.equal(legacy.response.status, 404);
+  assert.equal(legacy.result.error.code, "not_found");
+
+  const claim = await call("/api/chat", jsonBody({ message: `Use velarumpay-connect:ck_${"E".repeat(43)}` }));
+  assert.equal(claim.response.status, 503);
+  assert.equal(claim.result.error.code, "agent_platform_unavailable");
+
+  const exchange = await call("/api/connect", jsonBody({
+    connect_invitation_id: "cinv_retired",
+    claim_token: `claim_${"F".repeat(43)}`
+  }));
+  assert.equal(exchange.response.status, 503);
+  assert.equal(exchange.result.error.code, "agent_platform_unavailable");
 });

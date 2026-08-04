@@ -12,7 +12,8 @@ const migrationNames = [
   "0000_multitenant_connect_platform.sql",
   "0001_agentfood_registered_integration.sql",
   "0002_merchant_tenant_control_plane.sql",
-  "0003_agentfood_standard_merchant.sql"
+  "0003_agentfood_standard_merchant.sql",
+  "0004_remove_agentfood_legacy_auth.sql"
 ];
 
 function database(t) {
@@ -59,7 +60,7 @@ test("the new sequential migration creates the complete D1 tenant schema and mer
   }
 });
 
-test("AgentFood compatibility data maps one-to-one without plaintext secrets", (t) => {
+test("AgentFood standard data remains while retired shared-token state is revoked", (t) => {
   const db = database(t);
   apply(db, migrationNames);
   assert.deepEqual({ ...db.prepare("SELECT merchant_id, display_name, status, verification_state FROM merchants WHERE merchant_id = 'agentfood'").get() }, {
@@ -70,8 +71,11 @@ test("AgentFood compatibility data maps one-to-one without plaintext secrets", (
   });
   const agent = db.prepare("SELECT agent_id, merchant_id, status FROM agents WHERE agent_id = 'agentfood-testnet'").get();
   assert.deepEqual({ ...agent }, { agent_id: "agentfood-testnet", merchant_id: "agentfood", status: "active" });
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM legacy_resource_mappings WHERE source_system = 'agentfood_legacy'").get().count, 5);
-  const migrationSource = fs.readFileSync(path.join(migrationDirectory, migrationNames[3]), "utf8");
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM legacy_resource_mappings WHERE source_system = 'agentfood_legacy'").get().count, 4);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM legacy_resource_mappings WHERE source_resource_type = 'shared_token_auth'").get().count, 0);
+  const retired = db.prepare("SELECT status, token_hash FROM agent_clients WHERE client_id = 'agentfood-testnet'").get();
+  assert.deepEqual({ ...retired }, { status: "revoked", token_hash: "removed:agentfood-shared-token-auth" });
+  const migrationSource = migrationNames.map((name) => fs.readFileSync(path.join(migrationDirectory, name), "utf8")).join("\n");
   assert.doesNotMatch(migrationSource, /secret_(?:plaintext|value)|BEGIN (?:PRIVATE|OPENSSH) KEY|seed phrase/i);
 });
 

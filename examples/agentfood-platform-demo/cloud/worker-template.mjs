@@ -143,7 +143,7 @@ async function handle(request, env) {
     return json(200, { ok: true, authenticated: Boolean(user), user });
   }
   if (request.method === "GET" && url.pathname === "/api/catalog") {
-    return json(200, { ok: true, demo: true, hosting_mode: "cloud_real_connect", persistence: env?.DB ? "d1" : "memory", merchants });
+    return json(200, { ok: true, demo: true, hosting_mode: "cloud_real_connect", persistence: "platform_api", merchants });
   }
   if (request.method === "GET" && Object.prototype.hasOwnProperty.call(STATIC_ASSETS, url.pathname)) {
     return staticResponse(url.pathname, url.origin);

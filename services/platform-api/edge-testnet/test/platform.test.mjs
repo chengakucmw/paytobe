@@ -7,7 +7,6 @@ import { fileURLToPath } from "node:url";
 import { createTestWorker } from "../src/worker.mjs";
 
 const adminToken = "admin_test_token_1234567890";
-const agentFoodToken = "agentfood_test_token_1234567890";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function api(worker, path, { method = "GET", token = "", headers = {}, payload } = {}) {
@@ -232,82 +231,26 @@ test("testnet platform rejects mainnet and supports wallet revocation", async ()
   assert.equal(afterRevoke.status, 401);
 });
 
-test("the legacy AgentFood web integration stays functional and fully metered during observation", async (t) => {
-  const origin = "https://agentfood-velarumpay-demo.chengakucmw.chatgpt.site";
-  const metrics = [];
-  const logs = [];
-  const originalWarn = console.warn;
-  console.warn = (message) => logs.push(JSON.parse(String(message)));
-  t.after(() => { console.warn = originalWarn; });
-  const worker = createTestWorker({
-    AGENTFOOD_WEB_ORIGIN: origin,
-    AGENTFOOD_LEGACY_METRICS: { writeDataPoint: (value) => metrics.push(value) }
-  });
-  const denied = await api(worker, "/v1/integrations/agentfood/chat", {
-    method: "POST", headers: { origin: "https://untrusted.example" }, payload: { message: "probe" }
-  });
-  assert.equal(denied.status, 403);
-  const device = await registerDevice(worker, "agentfood-web");
-  const created = await createKey(worker, device);
-  const claimed = await api(worker, "/v1/integrations/agentfood/chat", {
-    method: "POST", headers: { origin }, payload: { message: created.connect_key }
-  });
-  assert.equal(claimed.status, 201);
-  assert.equal(claimed.body.connect_invitation.identity_assurance, "registered");
-  assert.equal(claimed.body.connect_invitation.agent_identity.agent_name, "AgentFood");
-  await approve(worker, device, claimed.body);
-  const exchanged = await api(worker, "/v1/integrations/agentfood/connect", {
-    method: "POST", headers: { origin }, payload: { connect_invitation_id: claimed.body.connect_invitation_id, claim_token: claimed.body.claim_token }
-  });
-  assert.equal(exchanged.status, 200);
-  const ordered = await api(worker, "/v1/integrations/agentfood/chat", {
-    method: "POST", headers: { origin }, payload: { message: "vegetarian dinner under 15", connection_token: exchanged.body.connection.connection_token }
-  });
-  assert.equal(ordered.status, 201);
-  assert.equal(ordered.body.payment_request.payment.network, "stellar_testnet");
-  const inbox = await api(worker, `/v1/payment-requests?device_id=${encodeURIComponent(device.device_id)}&token=${encodeURIComponent(device.token)}`);
-  assert.deepEqual(inbox.body.items.map((item) => item.request_id), [ordered.body.payment_request.request_id]);
-  assert.equal(metrics.length, 4);
-  assert.equal(logs.length, 4);
-  assert.deepEqual(new Set(logs.map((entry) => entry.route)), new Set([
-    "/v1/integrations/agentfood/chat",
-    "/v1/integrations/agentfood/connect"
-  ]));
-  assert.ok(logs.some((entry) => entry.classification === "untrusted_origin_dedicated_route" && entry.response_status === 403));
-  assert.ok(logs.filter((entry) => entry.classification === "allowed_origin_dedicated_route").length === 3);
-  assert.ok(logs.every((entry) => entry.event === "agentfood.legacy_path_attempt" && entry.schema_version === 1));
-});
+test("legacy AgentFood routes and shared-token authentication are removed", async () => {
+  const retiredToken = "agentfood_test_token_1234567890";
+  const worker = createTestWorker({ AGENTFOOD_CLIENT_TOKEN: retiredToken });
+  for (const path of ["/v1/integrations/agentfood/chat", "/v1/integrations/agentfood/connect"]) {
+    const response = await api(worker, path, { method: "POST", payload: {} });
+    assert.equal(response.status, 404, path);
+    assert.equal(response.body.error.code, "not_found", path);
+  }
 
-test("the legacy AgentFood shared client token is isolated to a metered compatibility path", async (t) => {
-  const metrics = [];
-  const logs = [];
-  const originalWarn = console.warn;
-  console.warn = (message) => logs.push(JSON.parse(String(message)));
-  t.after(() => { console.warn = originalWarn; });
-  const worker = createTestWorker({
-    AGENTFOOD_CLIENT_TOKEN: agentFoodToken,
-    AGENTFOOD_LEGACY_METRICS: { writeDataPoint: (value) => metrics.push(value) }
-  });
-  const device = await registerDevice(worker, "legacy-token");
+  const device = await registerDevice(worker, "retired-token");
   const created = await createKey(worker, device);
-  const claimed = await api(worker, "/v1/connect-invitations/claim", {
+  const claim = await api(worker, "/v1/connect-invitations/claim", {
     method: "POST",
-    token: agentFoodToken,
+    token: retiredToken,
     payload: { connect_key: created.connect_key, requested_scopes: ["payment.requests.read"] }
   });
-  assert.equal(claimed.status, 201);
-  assert.equal(metrics.length, 1);
-  assert.equal(logs.length, 1);
-  assert.deepEqual({
-    event: logs[0].event,
-    surface: logs[0].surface,
-    classification: logs[0].classification,
-    route: logs[0].route
-  }, {
-    event: "agentfood.legacy_path_attempt",
-    surface: "connect_platform_edge_testnet",
-    classification: "authenticated_shared_token",
-    route: "/v1/connect-invitations/claim"
-  });
-  assert.doesNotMatch(JSON.stringify(logs[0]), new RegExp(agentFoodToken));
+  assert.equal(claim.status, 401);
+  assert.equal(claim.body.error.code, "agent_client_auth_required");
+
+  const source = fs.readFileSync(path.join(root, "src", "worker.mjs"), "utf8");
+  assert.doesNotMatch(source, /AGENTFOOD_CLIENT_TOKEN|AGENTFOOD_WEB_ORIGIN|AGENTFOOD_LEGACY_METRICS/);
+  assert.doesNotMatch(source, /\/v1\/integrations\/agentfood/);
 });
