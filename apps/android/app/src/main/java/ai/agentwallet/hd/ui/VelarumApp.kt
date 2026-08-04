@@ -123,6 +123,16 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // ActivityViewModel is app-scoped, so its init-time snapshot becomes stale after a
+    // transfer made in the same process. Reload whenever the history route becomes visible;
+    // TransactionHistoryStore is local and inexpensive, and chain-success records then appear
+    // immediately without requiring an app restart.
+    LaunchedEffect(currentRoute) {
+        if (currentRoute == Routes.ACTIVITY || currentRoute.startsWith(Routes.ASSET_HISTORY)) {
+            activityVm.reload()
+        }
+    }
+
     // Refresh immediately whenever a balance-bearing screen becomes visible, again whenever
     // the app returns to the foreground, and periodically while that screen stays resumed.
     // This closes the stale-zero path where the first lookup happened before an account was

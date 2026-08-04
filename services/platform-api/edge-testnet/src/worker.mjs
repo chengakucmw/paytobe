@@ -13,6 +13,7 @@ const PAYMENT_TRANSITIONS = Object.freeze({
   broadcasted: new Set(["confirmed", "failed"]),
   confirmed: new Set(), failed: new Set(), expired: new Set(), rejected: new Set()
 });
+const SIGNED_BROADCAST_REPORT_GRACE_MS = 2 * 60 * 1000;
 const CONTROLLED_WEBHOOK_RECEIVERS = Object.freeze({
   "/testing/webhooks/merchant-a": Object.freeze({ label: "merchant-a", challenge: "WEBHOOK_A_OWNERSHIP_CHALLENGE", secret: "WEBHOOK_A_SECRET" }),
   "/testing/webhooks/merchant-b": Object.freeze({ label: "merchant-b", challenge: "WEBHOOK_B_OWNERSHIP_CHALLENGE", secret: "WEBHOOK_B_SECRET" })
@@ -20,8 +21,13 @@ const CONTROLLED_WEBHOOK_RECEIVERS = Object.freeze({
 
 function edgePaymentTransition(request, nextStatus, nowMs = Date.now()) {
   const currentStatus = String(request?.status || "pending").toLowerCase();
+  const expiresAtMs = Date.parse(request?.expires_at || 0);
+  const expired = expiresAtMs <= nowMs;
+  const signedBroadcastWithinGrace = nextStatus === "broadcasted"
+    && currentStatus === "signed"
+    && nowMs <= expiresAtMs + SIGNED_BROADCAST_REPORT_GRACE_MS;
   if (["signed", "broadcasted"].includes(nextStatus) && currentStatus !== nextStatus
-      && Date.parse(request?.expires_at || 0) <= nowMs) {
+      && expired && !signedBroadcastWithinGrace) {
     return { ok: false, status: 409, code: "payment_request_expired", message: "Expired Payment Request cannot be signed or broadcasted" };
   }
   if (currentStatus === nextStatus && ["signed", "broadcasted"].includes(currentStatus)) return { ok: true, duplicate: true };

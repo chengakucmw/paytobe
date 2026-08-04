@@ -91,9 +91,14 @@ for (const [runtime, factory] of Object.entries({ worker_memory: memoryRuntime, 
 }
 
 test("Express and Edge transition decisions align on rollback, duplicate broadcast, terminal, and expiry", () => {
+  const justExpired = "2026-08-01T18:19:30.000Z";
+  const longExpired = "2026-08-01T18:10:00.000Z";
   const cases = [
     [{ status: "pending", expires_at: future }, "signed", Date.parse(at)],
     [{ status: "pending", expires_at: at }, "signed", Date.parse(future)],
+    [{ status: "pending", expires_at: justExpired }, "broadcasted", Date.parse(at)],
+    [{ status: "signed", expires_at: justExpired }, "broadcasted", Date.parse(at)],
+    [{ status: "signed", expires_at: longExpired }, "broadcasted", Date.parse(at)],
     [{ status: "signed", expires_at: future }, "signed", Date.parse(at)],
     [{ status: "signed", expires_at: future }, "pending", Date.parse(at)],
     [{ status: "broadcasted", expires_at: future }, "broadcasted", Date.parse(at)],
@@ -106,6 +111,10 @@ test("Express and Edge transition decisions align on rollback, duplicate broadca
     assert.equal(Boolean(edgeDecision.duplicate), Boolean(expressDecision.duplicate), `${request.status}->${next}`);
     assert.equal(edgeDecision.code || "", expressDecision.code || "", `${request.status}->${next}`);
   }
+
+  assert.equal(decidePaymentStatusTransition({ status: "pending", expires_at: justExpired }, "broadcasted", Date.parse(at)).ok, false);
+  assert.equal(decidePaymentStatusTransition({ status: "signed", expires_at: justExpired }, "broadcasted", Date.parse(at)).ok, true);
+  assert.equal(decidePaymentStatusTransition({ status: "signed", expires_at: longExpired }, "broadcasted", Date.parse(at)).ok, false);
 });
 
 function payment(requestId, merchantId, actorId, connectionId, key, requestHash) {

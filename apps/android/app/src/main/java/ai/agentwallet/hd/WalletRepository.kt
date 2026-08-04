@@ -337,7 +337,19 @@ object WalletRepository {
     fun confirmInboxPay(context: Context, prep: SendPreparation): String {
         val intent = PaymentIntent.parse(prep.intentJson)
         val wallet = loadWallet(context) ?: throw IllegalStateException("No wallet loaded.")
-        val tx = PaymentExecutor.execute(context, wallet, intent)
+        // Close the expiry race before touching signing material. The Platform must accept
+        // the authenticated `signed` transition while the request is still valid; otherwise
+        // fail closed and never broadcast a transaction that the Platform has already expired.
+        // A later signed -> broadcasted report gets a short server-side delivery grace so a
+        // Stellar ledger close at the expiry boundary cannot create split-brain state.
+        RelayClient.updateStatus(context, intent, "signed", null, null)
+        val tx = try {
+            PaymentExecutor.execute(context, wallet, intent)
+        } catch (error: Exception) {
+            try { PaymentInboxStore.updateStatus(context, intent.id, "failed", null, error.message) } catch (ignored: Exception) { VpLog.w("WalletRepository", "inbox status write failed after payment error", ignored) }
+            try { RelayClient.updateStatus(context, intent, "failed", null, error.message) } catch (ignored: Exception) { VpLog.w("WalletRepository", "relay status sync failed after payment error", ignored) }
+            throw error
+        }
         RiskPolicy.recordSuccessfulPayment(context, intent)
         try { PaymentInboxStore.updateStatus(context, intent.id, "broadcasted", tx, null) } catch (ignored: Exception) { VpLog.w("WalletRepository", "inbox status write failed after broadcast", ignored) }
         try {

@@ -19,6 +19,7 @@ Pods/
 build/
 .gradle/
 apps/android/.gradle-cache/
+apps/android/.kotlin/
 out/
 dist/
 coverage/

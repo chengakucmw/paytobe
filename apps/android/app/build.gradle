@@ -58,7 +58,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 22
-        versionName "0.2.1-velarumpay"
+        versionName "0.2.2-velarumpay"
         resourceConfigurations += ["en"]
         buildConfigField "String", "FIREBASE_APPLICATION_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.applicationId", "VELARUMPAY_FIREBASE_APPLICATION_ID"))
         buildConfigField "String", "FIREBASE_API_KEY", buildConfigString(firebaseConfigValue("velarumpay.firebase.apiKey", "VELARUMPAY_FIREBASE_API_KEY"))
@@ -85,7 +85,7 @@ android {
         stellarTestnet {
             dimension "network"
             applicationIdSuffix ".testnet"
-            versionCode 25
+            versionCode 26
             versionNameSuffix "-testnet"
             buildConfigField "boolean", "TESTNET_ONLY", "true"
             manifestPlaceholders = [appLabel: "VelarumPay Testnet"]

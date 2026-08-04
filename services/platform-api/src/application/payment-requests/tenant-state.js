@@ -4,6 +4,7 @@ import { assertTenantScope, createTenantScope } from "../../ports/tenant-reposit
 import { validatePaymentRequestStatusUpdate } from "../../domain/payment-request.js";
 
 export const PAYMENT_REQUEST_ROUTE = "POST /v1/payment-requests";
+export const SIGNED_BROADCAST_REPORT_GRACE_MS = 2 * 60 * 1000;
 
 export class StorePaymentTenantRepository {
   constructor(store) {
@@ -115,8 +116,13 @@ export function stablePaymentEventId(scope, event, request, hash = defaultHash) 
 }
 
 export function decidePaymentStatusTransition(request, nextStatus, nowMs = Date.now()) {
+  const expiresAtMs = Date.parse(request.expires_at || 0);
+  const expired = expiresAtMs <= nowMs;
+  const signedBroadcastWithinGrace = nextStatus === "broadcasted"
+    && request.status === "signed"
+    && nowMs <= expiresAtMs + SIGNED_BROADCAST_REPORT_GRACE_MS;
   if (["signed", "broadcasted"].includes(nextStatus) && request.status !== nextStatus
-      && Date.parse(request.expires_at || 0) <= nowMs) {
+      && expired && !signedBroadcastWithinGrace) {
     return { ok: false, status: 409, code: "payment_request_expired", message: "Expired Payment Request cannot be signed or broadcasted" };
   }
   const transition = validatePaymentRequestStatusUpdate(request, nextStatus);
