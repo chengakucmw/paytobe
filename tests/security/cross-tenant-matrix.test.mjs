@@ -81,6 +81,14 @@ test("the release gate isolates Android signing and Firebase values from every n
   assert.doesNotMatch(gate, /env:\s*\{\s*\.\.\.process\.env/);
 });
 
+test("the release gate rebuilds and fully lints the signed Android artifact without cached task results", () => {
+  const gate = fs.readFileSync(path.join(codeRoot, "scripts/release-gate.mjs"), "utf8");
+  assert.match(gate, /"--rerun-tasks"/);
+  assert.match(gate, /"--no-build-cache"/);
+  assert.match(gate, /"lintStellarTestnetRelease"/);
+  assert.match(gate, /"assembleStellarTestnetRelease"/);
+});
+
 async function seed(adapter, tenantScope, suffix) {
   const merchantId = tenantScope.merchant_id;
   await adapter.repository.create(tenantScope, "merchant", merchant(merchantId, `Merchant ${suffix.toUpperCase()}`));

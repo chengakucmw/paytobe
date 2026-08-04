@@ -47,6 +47,10 @@ public final class PaymentSyncWorker extends Worker {
             for (PaymentIntent intent : items) {
                 PaymentNotifications.notifyPaymentIntent(getApplicationContext(), intent);
             }
+            List<ConnectInvitation> invitations = RelayClient.syncConnectInvitations(getApplicationContext());
+            for (ConnectInvitation invitation : invitations) {
+                PaymentNotifications.notifyConnectInvitation(getApplicationContext(), invitation);
+            }
             return Result.success();
         } catch (Exception error) {
             VpLog.w("VelarumFcm", "authenticated REST compensation sync failed", error);

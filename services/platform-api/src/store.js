@@ -549,6 +549,13 @@ export class Store {
     return this.state.connectInvitations[invitationId] || null;
   }
 
+  listConnectInvitationsForDevice(deviceId) {
+    return Object.values(this.state.connectInvitations)
+      .filter((invitation) => invitation.target_app_device_id === deviceId)
+      .sort((left, right) => String(right.updated_at || "").localeCompare(String(left.updated_at || "")))
+      .map((invitation) => ({ ...invitation }));
+  }
+
   connectInvitationByKey(connectKey) {
     if (!connectKey) return null;
     const invitationId = this.state.connectKeys[tokenHash(connectKey)];

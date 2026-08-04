@@ -17,4 +17,13 @@ public final class PaymentSyncWorkerTest {
         assertFalse(PaymentSyncWorker.shouldRetry(PaymentSyncWorker.MAX_ATTEMPTS - 1));
         assertFalse(PaymentSyncWorker.shouldRetry(PaymentSyncWorker.MAX_ATTEMPTS));
     }
+
+    @Test
+    public void onlyClaimedConnectInvitationsAreActionableNotifications() {
+        assertTrue(PaymentNotifications.isActionableConnectStatus("claimed"));
+        assertFalse(PaymentNotifications.isActionableConnectStatus("waiting"));
+        assertFalse(PaymentNotifications.isActionableConnectStatus("approved"));
+        assertFalse(PaymentNotifications.isActionableConnectStatus("connected"));
+        assertFalse(PaymentNotifications.isActionableConnectStatus("expired"));
+    }
 }

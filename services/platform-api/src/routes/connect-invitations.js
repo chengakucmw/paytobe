@@ -44,9 +44,22 @@ export function createConnectInvitationsRouter(deps) {
     verifyAgentAccessToken,
     agentService,
     notifyApp,
+    pushService,
     platformCore
   } = deps;
   const router = express.Router();
+
+  router.get("/", (req, res) => {
+    store.expireConnectInvitations();
+    const deviceId = String(req.get("x-app-device-id") || "").trim();
+    const deviceToken = String(req.get("x-app-device-token") || "").trim();
+    const auth = verifyAppBody({ body: { device_id: deviceId, token: deviceToken } });
+    if (!auth.ok) return sendApiError(res, auth.status, "invalid_app_device_token", auth.error);
+    const items = store.listConnectInvitationsForDevice(deviceId)
+      .slice(0, 20)
+      .map((invitation) => connectInvitationResponse(invitation, connectIdentityReview(store, invitation)));
+    return res.json({ ok: true, items });
+  });
 
   router.post("/", (req, res) => {
     const auth = verifyAppBody(req);
@@ -131,6 +144,9 @@ export function createConnectInvitationsRouter(deps) {
       connect_invitation_id: claimed.connect_invitation.connect_invitation_id,
       pairing_session_id: claimed.pairing_session.pairing_session_id,
       status: claimed.connect_invitation.status
+    });
+    pushService?.notifyConnectInvitation(claimed.connect_invitation.target_app_device_id, {
+      event_id: claimed.connect_invitation.connect_invitation_id
     });
     observability.recordAuditEvent("connect_invitation.claimed", "success", {
       actor: { type: "agent", id: agent.agent_id, name: agent.agent_name },

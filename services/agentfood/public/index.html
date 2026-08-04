@@ -12,7 +12,7 @@
     <meta property="og:image" content="__SITE_ORIGIN__/assets/agentfood-social-v3.png">
     <meta name="twitter:card" content="summary_large_image">
     <title>agentfood — order by saying it</title>
-    <link rel="stylesheet" href="/styles.css?v=agentfood-ds-20260803b">
+    <link rel="stylesheet" href="/styles.css?v=agentfood-ds-20260804c">
   </head>
   <body>
     <a class="skip-link" href="#chat-input">Skip to the conversation</a>
@@ -30,11 +30,11 @@
           <a href="#safety">Wallet safety</a>
         </nav>
 
-        <a class="identity-button" id="identity-button" href="#safety" aria-label="Public AgentFood testnet">
-          <span class="identity-mark" aria-hidden="true">G</span>
+        <a class="identity-button" id="identity-button" href="#safety" aria-label="Open AgentFood testnet with no sign-in required">
+          <span class="identity-mark" aria-hidden="true">T</span>
           <span class="identity-copy">
-            <strong id="identity-label">Public testnet</strong>
-            <small id="identity-detail">No account required</small>
+            <strong id="identity-label">Open testnet</strong>
+            <small id="identity-detail">No sign-in required</small>
           </span>
         </a>
       </div>
@@ -167,18 +167,21 @@
         </div>
 
         <form class="composer" id="chat-form">
-          <label for="chat-input">Message your food agent</label>
+          <div class="composer-heading">
+            <label for="chat-input">Message your food agent</label>
+            <span>Enter to send · Shift+Enter for a new line</span>
+          </div>
           <div class="composer-field">
-            <textarea id="chat-input" rows="2" placeholder="something spicy under 20 credits" required></textarea>
+            <textarea id="chat-input" rows="1" maxlength="1200" placeholder="Try: something spicy under 20 credits" aria-describedby="composer-safety" required></textarea>
             <button type="submit" aria-label="Send message"><span aria-hidden="true">↑</span></button>
           </div>
-          <div class="composer-footer">
+          <div class="composer-footer" id="composer-safety">
             <span>0.1 XLM · Stellar testnet only</span>
             <span>Real wallet approval</span>
           </div>
         </form>
       </aside>
     </main>
-    <script type="module" src="/app.js?v=agentfood-ds-20260803d"></script>
+    <script type="module" src="/app.js?v=agentfood-ds-20260804a"></script>
   </body>
 </html>

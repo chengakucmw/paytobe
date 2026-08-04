@@ -46,11 +46,13 @@ export function buildFcmDataMessage(registrationToken, event = {}) {
   const token = String(registrationToken || "").trim();
   if (!token) throw new Error("FCM registration token is required");
   const requestId = String(event.request_id || "").trim();
+  const eventId = String(event.event_id || "").trim();
   const eventSeq = Number(event.event_seq || 0);
   const data = {
     type: "velarumpay.sync",
     sync_required: "true"
   };
+  if (eventId) data.event_id = eventId;
   if (requestId) data.request_id = requestId;
   if (Number.isSafeInteger(eventSeq) && eventSeq > 0) data.event_seq = String(eventSeq);
   return {
@@ -72,7 +74,8 @@ export function createFcmPushService({ config, store, observability, fetchImpl =
     return Object.freeze({
       enabled: false,
       tokenVault: null,
-      notifyPaymentRequest() {}
+      notifyPaymentRequest() {},
+      notifyConnectInvitation() {}
     });
   }
   if (typeof fetchImpl !== "function") throw new Error("Global fetch is required for FCM HTTP v1 delivery");
@@ -99,7 +102,11 @@ export function createFcmPushService({ config, store, observability, fetchImpl =
       observability?.recordAuditEvent("push.fcm_delivered", "success", {
         actor: { type: "platform_api" },
         resource: { type: "app_device", id: deviceId },
-        details: { request_id: event.request_id || null, event_seq: event.event_seq || null }
+        details: {
+          event_id: event.event_id || null,
+          request_id: event.request_id || null,
+          event_seq: event.event_seq || null
+        }
       });
       return { ok: true };
     } catch (error) {
@@ -110,7 +117,11 @@ export function createFcmPushService({ config, store, observability, fetchImpl =
         actor: { type: "platform_api" },
         resource: { type: "app_device", id: deviceId },
         labels: { code: error?.code || "fcm_delivery_failed" },
-        details: { request_id: event.request_id || null, event_seq: event.event_seq || null }
+        details: {
+          event_id: event.event_id || null,
+          request_id: event.request_id || null,
+          event_seq: event.event_seq || null
+        }
       });
       throw error;
     }
@@ -123,6 +134,12 @@ export function createFcmPushService({ config, store, observability, fetchImpl =
       void deliver(deviceId, event).catch(() => {
         // REST compensation synchronization is authoritative; a failed push is
         // recorded above and must never fail Payment Request creation itself.
+      });
+    },
+    notifyConnectInvitation(deviceId, event) {
+      void deliver(deviceId, event).catch(() => {
+        // Authenticated REST invitation synchronization is authoritative. Push is
+        // only a wake-up hint and must never make a successful claim fail.
       });
     }
   });

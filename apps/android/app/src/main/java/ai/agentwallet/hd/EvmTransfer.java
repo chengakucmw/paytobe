@@ -64,8 +64,8 @@ final class EvmTransfer {
         BigInteger value = Convert.toWei(new BigDecimal(amountNative), Convert.Unit.ETHER).toBigIntegerExact();
         String raw;
         if (USE_SHARED_CORE_SIGNING) {
-            raw = WalletCoreBridge.signEvm(privateKey, chainId, nonce.longValueExact(),
-                    gasPrice.toString(), gasLimit.longValueExact(), toAddress, value.toString(), "").rawTxHex;
+            raw = WalletCoreBridge.signEvm(privateKey, chainId, AmountUnits.longValueExact(nonce),
+                    gasPrice.toString(), AmountUnits.longValueExact(gasLimit), toAddress, value.toString(), "").rawTxHex;
         } else {
             RawTransaction tx = RawTransaction.createEtherTransaction(nonce, gasPrice, gasLimit, toAddress, value);
             byte[] signed = TransactionEncoder.signMessage(tx, chainId, credentials);
@@ -123,8 +123,8 @@ final class EvmTransfer {
             // ERC-20 is a legacy EVM transaction whose value is 0 and whose `data`
             // carries the transfer() call; the shared core signs the identical
             // EIP-155 RLP (byte-checked vs web3j in VelarumWalletCoreConformanceTest).
-            raw = WalletCoreBridge.signEvm(privateKey, chainId, nonce.longValueExact(),
-                    gasPrice.toString(), gasLimit.longValueExact(), contract, "0", data).rawTxHex;
+            raw = WalletCoreBridge.signEvm(privateKey, chainId, AmountUnits.longValueExact(nonce),
+                    gasPrice.toString(), AmountUnits.longValueExact(gasLimit), contract, "0", data).rawTxHex;
         } else {
             RawTransaction tx = RawTransaction.createTransaction(
                     nonce,

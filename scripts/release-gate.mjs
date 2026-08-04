@@ -108,10 +108,13 @@ const steps = [
     name: "Android unit tests and signed testnet release build",
     command: platformCommand("./gradlew"),
     args: [
+      "--rerun-tasks",
+      "--no-build-cache",
       "testStandardDebugUnitTest",
       "assembleStandardDebug",
       "testStellarTestnetDebugUnitTest",
       "assembleStellarTestnetDebug",
+      "lintStellarTestnetRelease",
       "assembleStellarTestnetRelease"
     ],
     cwd: path.join(repoRoot, "apps/android"),
@@ -142,6 +145,8 @@ Default behavior runs every v0.1 release gate:
 - quickstart smoke
 - cross-component smoke
 - Android standard and stellarTestnet Debug unit tests + builds
+- uncached Android release verification (all Gradle tasks are rerun with the build cache disabled)
+- full stellarTestnet Release lint
 - signed stellarTestnet Release APK (release signing configuration is mandatory)
 - iOS simulator unit tests (xcodebuild test)
 `);

@@ -32,6 +32,7 @@ import ai.agentwallet.hd.ui.theme.VelarumTheme
 sealed class AppEntry {
     data object None : AppEntry()
     data class OpenPayment(val intentId: String) : AppEntry()
+    data class OpenConnectInvitation(val invitationId: String) : AppEntry()
     data class DeepLink(val uri: String) : AppEntry()
 }
 
@@ -48,6 +49,7 @@ class MainComposeActivity : FragmentActivity() {
     companion object {
         // 与旧 MainActivity 相同的 extra key，保证在途/历史 PendingIntent 仍能匹配。
         const val EXTRA_OPEN_PAYMENT_INTENT_ID = "ai.agentwallet.hd.OPEN_PAYMENT_INTENT_ID"
+        const val EXTRA_OPEN_CONNECT_INVITATION_ID = "com.velarumpay.wallet.OPEN_CONNECT_INVITATION_ID"
     }
 
     private val pendingEntry = mutableStateOf<AppEntry>(AppEntry.None)
@@ -138,6 +140,8 @@ class MainComposeActivity : FragmentActivity() {
         if (intent == null) return AppEntry.None
         val paymentId = intent.getStringExtra(EXTRA_OPEN_PAYMENT_INTENT_ID)
         if (!paymentId.isNullOrBlank()) return AppEntry.OpenPayment(paymentId.trim())
+        val invitationId = intent.getStringExtra(EXTRA_OPEN_CONNECT_INVITATION_ID)
+        if (!invitationId.isNullOrBlank()) return AppEntry.OpenConnectInvitation(invitationId.trim())
         val data = intent.data?.toString()
         if (!data.isNullOrBlank()) return AppEntry.DeepLink(data)
         return AppEntry.None

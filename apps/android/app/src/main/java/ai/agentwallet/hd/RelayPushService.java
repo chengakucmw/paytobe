@@ -70,6 +70,9 @@ public class RelayPushService extends Service {
 
             @Override
             public void onMessage(String message) {
+                // WebSocket messages are only wake-up hints. The verified Agent
+                // identity and scopes are fetched over authenticated REST below.
+                syncMissedIntents();
             }
 
             @Override
@@ -104,6 +107,10 @@ public class RelayPushService extends Service {
                         List<PaymentIntent> items = RelayClient.sync(this);
                         for (PaymentIntent intent : items) {
                             PaymentNotifications.notifyPaymentIntent(this, intent);
+                        }
+                        List<ConnectInvitation> invitations = RelayClient.syncConnectInvitations(this);
+                        for (ConnectInvitation invitation : invitations) {
+                            PaymentNotifications.notifyConnectInvitation(this, invitation);
                         }
                     } catch (Exception error) {
                         VpLog.w("RelayPushService", "authenticated REST recovery sync failed", error);

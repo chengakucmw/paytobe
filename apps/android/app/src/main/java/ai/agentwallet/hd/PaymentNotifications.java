@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat;
 
 final class PaymentNotifications {
     static final String PAYMENT_CHANNEL_ID = "agentwallet_payment_requests";
+    static final String CONNECT_CHANNEL_ID = "velarumpay_agent_connections";
     static final String RELAY_CHANNEL_ID = "agentwallet_relay_status";
     static final int RELAY_FOREGROUND_ID = 1001;
 
@@ -32,6 +33,14 @@ final class PaymentNotifications {
         );
         payments.setDescription("OpenClaw payment requests delivered through AgentWallet Relay.");
         manager.createNotificationChannel(payments);
+
+        NotificationChannel connections = new NotificationChannel(
+                CONNECT_CHANNEL_ID,
+                "Agent Connection Requests",
+                NotificationManager.IMPORTANCE_HIGH
+        );
+        connections.setDescription("Requests from registered Agents waiting for wallet review.");
+        manager.createNotificationChannel(connections);
 
         NotificationChannel relay = new NotificationChannel(
                 RELAY_CHANNEL_ID,
@@ -101,6 +110,44 @@ final class PaymentNotifications {
         manager(context).notify(notificationId(intent.id), notification);
     }
 
+    static void notifyConnectInvitation(Context context, ConnectInvitation invitation) {
+        if (invitation == null || invitation.connectInvitationId.isEmpty()) return;
+        ensureChannels(context);
+        if (!isActionableConnectStatus(invitation.status)) {
+            if (markConnectNotified(context, invitation.connectInvitationId, invitation.status)) {
+                manager(context).cancel(connectNotificationId(invitation.connectInvitationId));
+            }
+            return;
+        }
+        if (!hasNotificationPermission(context)) return;
+        if (!markConnectNotified(context, invitation.connectInvitationId, invitation.status)) return;
+
+        Intent launch = new Intent(context, MainComposeActivity.class)
+                .setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                .putExtra(MainComposeActivity.EXTRA_OPEN_CONNECT_INVITATION_ID, invitation.connectInvitationId);
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                connectNotificationId(invitation.connectInvitationId),
+                launch,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+        String agentName = invitation.agentName == null || invitation.agentName.trim().isEmpty()
+                ? "An Agent"
+                : invitation.agentName.trim();
+        Notification notification = new Notification.Builder(context, CONNECT_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_velarum)
+                .setContentTitle("Agent connection request")
+                .setContentText(agentName + " is waiting for your review")
+                .setStyle(new Notification.BigTextStyle().bigText(
+                        agentName + " requested limited wallet access. Open VelarumPay to review the verified identity and scopes. No signing authority is granted."
+                ))
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setPriority(Notification.PRIORITY_HIGH)
+                .build();
+        manager(context).notify(connectNotificationId(invitation.connectInvitationId), notification);
+    }
+
     static Notification foregroundNotification(Context context) {
         ensureChannels(context);
 
@@ -139,6 +186,15 @@ final class PaymentNotifications {
         return true;
     }
 
+    private static boolean markConnectNotified(Context context, String invitationId, String status) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        String key = "connect_status:" + invitationId;
+        String current = status == null ? "" : status;
+        if (current.equals(prefs.getString(key, ""))) return false;
+        prefs.edit().putString(key, current).apply();
+        return true;
+    }
+
     private static void cancelPaymentNotification(Context context, String intentId) {
         manager(context).cancel(notificationId(intentId));
     }
@@ -153,6 +209,16 @@ final class PaymentNotifications {
     /** Only a still-pending request is actionable enough to show a payment card. */
     static boolean isActionablePaymentStatus(String status) {
         return PaymentIntent.STATUS_PENDING.equals(status);
+    }
+
+    static boolean isActionableConnectStatus(String status) {
+        return "claimed".equals(status);
+    }
+
+    private static int connectNotificationId(String value) {
+        int hash = value.hashCode();
+        if (hash == Integer.MIN_VALUE) return 1_002_000;
+        return 1_002_000 + Math.abs(hash % 1_000_000);
     }
 
     private static int notificationId(String value) {

@@ -155,6 +155,28 @@ class ConnectKeyViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reset() = _ui.update { ConnectKeyUiState() }
 
+    fun load(invitationId: String) {
+        val normalized = invitationId.trim()
+        if (normalized.isEmpty() || _ui.value.loading) return
+        _ui.update { ConnectKeyUiState(loading = true) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val invitation = ConnectInvitationRepository.refresh(getApplication(), normalized, "")
+                    val review = if (invitation.claimed) {
+                        RelayClient.fetchConnectReview(getApplication(), normalized).toUi()
+                    } else null
+                    invitation to review
+                }
+            }
+            result.onSuccess { (invitation, review) ->
+                _ui.update { ConnectKeyUiState(invitation = invitation, review = review) }
+            }.onFailure { error ->
+                _ui.update { ConnectKeyUiState(error = error.message ?: "Could not load the Agent connection request.") }
+            }
+        }
+    }
+
     fun create() {
         if (_ui.value.loading) return
         _ui.update { it.copy(loading = true, error = null, review = null) }

@@ -27,6 +27,7 @@ test("FCM token vault encrypts at rest and binds ciphertext to its device", () =
 
 test("FCM data message carries only opaque sync coordinates", () => {
   const payload = buildFcmDataMessage("fcm-registration-token", {
+    event_id: "cinv_opaque_456",
     request_id: "prq_opaque_123",
     event_seq: 42,
     amount: "999",
@@ -39,6 +40,7 @@ test("FCM data message carries only opaque sync coordinates", () => {
   assert.deepEqual(data, {
     type: "velarumpay.sync",
     sync_required: "true",
+    event_id: "cinv_opaque_456",
     request_id: "prq_opaque_123",
     event_seq: "42"
   });
@@ -118,6 +120,54 @@ test("an UNREGISTERED response invalidates only the matching encrypted FCM token
   assert.equal(calls.length, 2, "OAuth and FCM endpoints were called once each");
   assert.equal(store.device("device-fcm").push.status, "inactive");
   assert.equal(store.device("device-fcm").push.token_ciphertext, undefined);
+});
+
+test("Connect Invitation push uses the same opaque wake-up channel", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-fcm-connect-"));
+  const store = new Store(path.join(dir, "store.json"));
+  t.after(() => {
+    store.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+  store.registerDevice("device-connect", "device-auth-token");
+  const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const config = loadRuntimeConfig({
+    FCM_ENABLED: "true",
+    FCM_PROJECT_ID: "velarumpay-test",
+    FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({
+      client_email: "fcm-connect@velarumpay.example",
+      private_key: privateKey.export({ type: "pkcs8", format: "pem" })
+    }),
+    FCM_TOKEN_ENCRYPTION_KEY: TOKEN_KEY
+  });
+  let delivered = null;
+  const service = createFcmPushService({
+    config,
+    store,
+    observability: { recordAuditEvent() {} },
+    fetchImpl: async (url, options) => {
+      if (String(url).includes("oauth2.googleapis.com")) {
+        return new Response(JSON.stringify({ access_token: "access-token", expires_in: 3600 }), { status: 200 });
+      }
+      delivered = JSON.parse(options.body);
+      return new Response(JSON.stringify({ name: "messages/connect" }), { status: 200 });
+    }
+  });
+  const token = "fcm-connect-registration-token-with-enough-entropy";
+  store.setDevicePushToken("device-connect", {
+    token_hash: "sha256:connect",
+    token_ciphertext: service.tokenVault.encrypt(token, "device-connect")
+  });
+
+  service.notifyConnectInvitation("device-connect", { event_id: "cinv_opaque_456" });
+  for (let attempt = 0; attempt < 50 && delivered === null; attempt++) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  assert.equal(delivered.message.data.event_id, "cinv_opaque_456");
+  assert.equal(delivered.message.data.type, "velarumpay.sync");
+  assert.equal(Object.hasOwn(delivered.message.data, "agent_name"), false);
+  assert.equal(Object.hasOwn(delivered.message.data, "requested_scopes"), false);
 });
 
 test("device event stream is isolated, cursor-based, and signals retention reset", (t) => {

@@ -25,6 +25,8 @@ public final class AmountUnits {
 
     /** u64 max (2^64 - 1): the SPL token amount ceiling. */
     private static final BigInteger MAX_U64 = new BigInteger("18446744073709551615");
+    private static final BigInteger MIN_I64 = BigInteger.valueOf(Long.MIN_VALUE);
+    private static final BigInteger MAX_I64 = BigInteger.valueOf(Long.MAX_VALUE);
 
     /** XLM -&gt; stroops (1 XLM = 10^7 stroops). Behaviour unchanged from StellarTransfer.xlmToStroops. */
     public static long xlmToStroops(String xlm) {
@@ -83,9 +85,20 @@ public final class AmountUnits {
         }
         if (value.signum() <= 0) throw new IllegalStateException(nonPositiveMsg);
         try {
-            return value.movePointRight(decimals).toBigIntegerExact().longValueExact();
+            return longValueExact(value.movePointRight(decimals).toBigIntegerExact());
         } catch (ArithmeticException e) {
             throw new IllegalStateException(overflowMsg);
         }
+    }
+
+    /**
+     * Android API 26-compatible equivalent of BigInteger.longValueExact(), which
+     * is only exposed by the Android framework from API 31 onward.
+     */
+    static long longValueExact(BigInteger value) {
+        if (value.compareTo(MIN_I64) < 0 || value.compareTo(MAX_I64) > 0) {
+            throw new ArithmeticException("BigInteger out of long range");
+        }
+        return value.longValue();
     }
 }

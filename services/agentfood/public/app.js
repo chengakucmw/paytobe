@@ -11,7 +11,7 @@ const composerHint = document.querySelector("#composer-hint");
 const identityButton = document.querySelector("#identity-button");
 const identityLabel = document.querySelector("#identity-label");
 const identityDetail = document.querySelector("#identity-detail");
-const identityMark = identityButton.querySelector(".google-mark");
+const identityMark = identityButton.querySelector(".identity-mark");
 const photoPositions = ["0% center", "50% center", "100% center"];
 let sessionId = "";
 let connectInvitationId = "";
@@ -62,12 +62,13 @@ function initials(value) {
   return parts.slice(0, 2).map((part) => part[0]).join("").toUpperCase();
 }
 
+function resizeComposer() {
+  input.style.height = "auto";
+  input.style.height = `${Math.min(input.scrollHeight, 104)}px`;
+}
+
 async function configureIdentity() {
   if (["localhost", "127.0.0.1"].includes(location.hostname)) {
-    identityButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      addMessage("Google-backed sign-in is available on the hosted version through ChatGPT identity.");
-    });
     return;
   }
 
@@ -76,8 +77,8 @@ async function configureIdentity() {
     if (!session.authenticated) {
       identityButton.href = "#safety";
       identityButton.setAttribute("aria-label", "Public AgentFood testnet");
-      identityLabel.textContent = "Public testnet";
-      identityDetail.textContent = "No account required";
+      identityLabel.textContent = "Open testnet";
+      identityDetail.textContent = "No sign-in required";
       return;
     }
     const displayName = session.user.name || session.user.email;
@@ -179,6 +180,7 @@ function beginPolling() {
 function promptAgent(prompt, merchantId = "") {
   if (merchantId) preferredMerchantId = merchantId;
   input.value = prompt;
+  resizeComposer();
   input.focus();
   document.querySelector(".assistant-pane").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -195,6 +197,7 @@ form.addEventListener("submit", async (event) => {
   const message = input.value.trim();
   if (!message) return;
   input.value = "";
+  resizeComposer();
   addMessage(message, "user");
   sendButton.disabled = true;
   try {
@@ -231,6 +234,13 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
+input.addEventListener("input", resizeComposer);
+input.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) return;
+  event.preventDefault();
+  form.requestSubmit();
+});
+
 demoConnectButton.addEventListener("click", () => {
   if (!paymentReady) {
     addMessage("Wallet connection is not enabled on this production site yet. You can still explore mock recommendations; no order or payment will be created.", "error");
@@ -238,6 +248,7 @@ demoConnectButton.addEventListener("click", () => {
   }
   addMessage("Open VelarumPay, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
   input.placeholder = "Paste velarumpay-connect:ck_…";
+  resizeComposer();
   input.focus();
 });
 
@@ -312,6 +323,7 @@ function configureSiteOnlyMode() {
 }
 
 async function start() {
+  resizeComposer();
   try {
     const result = await api("/api/catalog");
     hostingMode = result.hosting_mode || "local_integration";

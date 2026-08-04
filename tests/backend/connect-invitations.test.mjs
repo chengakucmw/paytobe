@@ -116,6 +116,25 @@ test("one-time Connect Invitation completes only after the owning wallet approve
   const claimToken = claimed.body.claim_token;
   const pairingSessionId = claimed.body.pairing_session.pairing_session_id;
 
+  const ownedList = await request(base, "/v1/connect-invitations", {
+    headers: {
+      "x-app-device-id": wallet.device_id,
+      "x-app-device-token": wallet.token
+    }
+  });
+  assert.equal(ownedList.response.status, 200);
+  assert.equal(ownedList.body.items.some((item) => item.connect_invitation_id === invitationId), true);
+  assert.equal(ownedList.body.items.find((item) => item.connect_invitation_id === invitationId).status, "claimed");
+
+  const crossWalletList = await request(base, "/v1/connect-invitations", {
+    headers: {
+      "x-app-device-id": otherWallet.device_id,
+      "x-app-device-token": otherWallet.token
+    }
+  });
+  assert.equal(crossWalletList.response.status, 200);
+  assert.equal(crossWalletList.body.items.some((item) => item.connect_invitation_id === invitationId), false);
+
   const duplicate = await request(base, "/v1/connect-invitations/claim/legacy", {
     method: "POST",
     body: JSON.stringify({ connect_key: created.body.connect_key, agent_identity: agent })

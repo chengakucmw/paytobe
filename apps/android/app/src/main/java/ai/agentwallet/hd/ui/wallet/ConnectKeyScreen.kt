@@ -40,7 +40,6 @@ fun ConnectKeyScreen(
     val clipboard = LocalClipboardManager.current
     val invitation = ui.invitation
 
-    LaunchedEffect(Unit) { vm.reset() }
     LaunchedEffect(invitation?.id, invitation?.status) {
         while (invitation != null && !invitation.terminal && invitation.status != "approved") {
             delay(2_000)
@@ -63,7 +62,7 @@ fun ConnectKeyScreen(
 
             if (invitation == null) {
                 VpPrimaryButton(
-                    text = if (ui.loading) "Creating…" else "Create Connect Key",
+                    text = if (ui.loading) "Loading request…" else "Create Connect Key",
                     onClick = vm::create,
                     enabled = !ui.loading,
                     modifier = Modifier.fillMaxWidth(),

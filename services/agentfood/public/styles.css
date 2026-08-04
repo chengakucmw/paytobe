@@ -304,6 +304,9 @@ textarea:focus-visible {
 }
 
 .demo-notice {
+  position: sticky;
+  top: 73px;
+  z-index: 25;
   display: flex;
   min-height: 32px;
   align-items: center;
@@ -329,7 +332,7 @@ textarea:focus-visible {
 .product-workspace {
   display: grid;
   max-width: 1440px;
-  min-height: calc(100vh - 105px);
+  min-height: calc(100svh - 105px);
   grid-template-columns: minmax(0, 1fr) minmax(390px, 430px);
   margin: 0 auto;
   border-right: 1px solid var(--line-hairline);
@@ -763,12 +766,13 @@ h1 {
 
 .assistant-pane {
   position: sticky;
-  top: 72px;
+  top: 105px;
   display: grid;
-  height: calc(100vh - 72px);
-  min-height: 650px;
-  grid-template-rows: auto auto minmax(190px, 1fr) auto auto auto;
+  height: calc(100svh - 105px);
+  min-height: 0;
+  grid-template-rows: auto auto minmax(80px, 1fr) auto auto auto;
   align-self: start;
+  overflow: hidden;
   border-left: 1px solid var(--line-hairline);
   background: var(--ink-800);
 }
@@ -1030,14 +1034,20 @@ h1 {
 }
 
 .composer {
-  padding: 14px 16px 16px;
+  padding: 12px 16px max(14px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line-hairline);
   background: var(--ink-800);
 }
 
-.composer > label {
-  display: block;
-  margin: 0 0 8px 3px;
+.composer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 3px 8px;
+}
+
+.composer-heading label {
   color: var(--paper-400);
   font-size: 10px;
   font-weight: 600;
@@ -1045,25 +1055,32 @@ h1 {
   text-transform: uppercase;
 }
 
+.composer-heading span {
+  color: var(--paper-400);
+  font-size: 9px;
+}
+
 .composer-field {
   display: flex;
-  min-height: 60px;
+  min-height: 54px;
   align-items: flex-end;
   gap: 8px;
-  padding: 7px 7px 7px 14px;
-  border-radius: 20px;
+  padding: 5px 5px 5px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
   background: var(--ink-700);
-  box-shadow: inset 0 0 0 1px var(--line-soft), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .composer-field:focus-within {
-  box-shadow: inset 0 0 0 1px var(--pink-500), var(--ring-focus);
+  border-color: var(--pink-400);
+  box-shadow: 0 0 0 2px rgba(255, 45, 94, 0.18);
 }
 
 .composer textarea {
   width: 100%;
-  min-height: 44px;
-  max-height: 112px;
+  min-height: 42px;
+  max-height: 104px;
   flex: 1;
   resize: none;
   border: 0;
@@ -1073,17 +1090,21 @@ h1 {
   line-height: 1.4;
 }
 
+.composer textarea:focus-visible {
+  box-shadow: none;
+}
+
 .composer textarea::placeholder {
   color: var(--paper-400);
 }
 
 .composer button[type="submit"] {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 12px;
   color: var(--paper-000);
   background: var(--grad-accent);
   box-shadow: var(--glow-accent), inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -1173,8 +1194,8 @@ h1 {
     position: relative;
     top: auto;
     grid-area: assistant;
-    height: min(760px, calc(100svh - 104px));
-    min-height: 620px;
+    height: min(760px, calc(100svh - 105px));
+    min-height: 560px;
     border-bottom: 1px solid var(--line-hairline);
     border-left: 0;
   }
@@ -1218,6 +1239,7 @@ h1 {
   }
 
   .demo-notice {
+    top: 65px;
     min-height: 40px;
     justify-content: flex-start;
     overflow-x: auto;
@@ -1226,9 +1248,9 @@ h1 {
   }
 
   .assistant-pane {
-    height: calc(100svh - 104px);
-    min-height: 610px;
-    grid-template-rows: auto auto minmax(160px, 1fr) auto auto auto;
+    height: calc(100svh - 105px);
+    min-height: 560px;
+    grid-template-rows: auto auto minmax(100px, 1fr) auto auto auto;
   }
 
   .assistant-header,
@@ -1260,6 +1282,10 @@ h1 {
 
   .connect-card .primary-button {
     width: 100%;
+  }
+
+  .composer-heading span {
+    display: none;
   }
 
   .browse-intro {

@@ -142,12 +142,37 @@ final class PaymentInboxStore {
     }
 
     static String deviceId(Context context) {
-        SharedPreferences p = prefs(context);
-        String existing = p.getString(KEY_DEVICE_ID, "");
+        SharedPreferences preferences = prefs(context);
+        return getOrCreateDeviceId(new DeviceIdStore() {
+            @Override
+            public String read() {
+                return preferences.getString(KEY_DEVICE_ID, "");
+            }
+
+            @Override
+            public boolean persist(String value) {
+                return preferences.edit().putString(KEY_DEVICE_ID, value).commit();
+            }
+        });
+    }
+
+    static synchronized String getOrCreateDeviceId(DeviceIdStore store) {
+        String existing = store.read();
         if (existing != null && existing.length() > 0) return existing;
+
         String generated = "android-" + java.util.UUID.randomUUID().toString();
-        p.edit().putString(KEY_DEVICE_ID, generated).apply();
-        return generated;
+        if (store.persist(generated)) return generated;
+
+        // Fail closed if storage rejected the synchronous write. A value may still
+        // have won a cross-process race, so accept it only after reading it back.
+        String persisted = store.read();
+        if (persisted != null && persisted.length() > 0) return persisted;
+        throw new IllegalStateException("Unable to persist the device identity.");
+    }
+
+    interface DeviceIdStore {
+        String read();
+        boolean persist(String value);
     }
 
     static String relayUrl(Context context) {

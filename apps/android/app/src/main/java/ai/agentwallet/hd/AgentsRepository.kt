@@ -9,10 +9,15 @@ import android.content.Context
 object AgentsRepository {
 
     fun list(context: Context): List<AgentUi> = try {
-        AgentConnectionStore.list(context).map { it.toUi() }
+        RelayClient.syncConnections(context).map { it.toUi() }
     } catch (e: Exception) {
-        VpLog.w("AgentsRepository", "list agents failed", e)
-        emptyList()
+        VpLog.w("AgentsRepository", "relay sync failed; using cached agents", e)
+        try {
+            AgentConnectionStore.list(context).map { it.toUi() }
+        } catch (cacheError: Exception) {
+            VpLog.w("AgentsRepository", "cached agent list failed", cacheError)
+            emptyList()
+        }
     }
 
     fun detail(context: Context, connectionId: String): AgentUi? = try {
@@ -78,6 +83,9 @@ object ConnectInvitationRepository {
 
     fun cancel(context: Context, invitationId: String, connectKey: String): ConnectInvitationUi =
         RelayClient.cancelConnectInvitation(context, invitationId, connectKey).toUi()
+
+    fun list(context: Context): List<ConnectInvitationUi> =
+        RelayClient.syncConnectInvitations(context).map { it.toUi() }
 
     private fun ConnectInvitation.toUi() = ConnectInvitationUi(
         id = connectInvitationId,

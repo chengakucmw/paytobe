@@ -148,6 +148,10 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
     LaunchedEffect(entry) {
         when (entry) {
             is AppEntry.OpenPayment -> navController.navigate("${Routes.DETAIL}/${entry.intentId}")
+            is AppEntry.OpenConnectInvitation -> {
+                connectKeyVm.load(entry.invitationId)
+                navController.navigate(Routes.CONNECT_KEY)
+            }
             is AppEntry.DeepLink -> {
                 val outcome = ScanContract.classify(entry.uri)
                 if (outcome is ScanOutcome.Pairing) {
@@ -265,7 +269,10 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             vm = agentsVm,
                             onBack = { navController.popBackStack() },
                             onOpen = { id -> navController.navigate("${Routes.AGENT_DETAIL}/$id") },
-                            onCreateConnectKey = { navController.navigate(Routes.CONNECT_KEY) },
+                            onCreateConnectKey = {
+                                connectKeyVm.reset()
+                                navController.navigate(Routes.CONNECT_KEY)
+                            },
                         )
                     }
                     screen("${Routes.AGENT_DETAIL}/{id}") { entry ->

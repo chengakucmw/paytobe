@@ -137,6 +137,15 @@ public final class RelayClient {
         return ConnectInvitation.parse(response, connectKey);
     }
 
+    static List<ConnectInvitation> syncConnectInvitations(Context context) throws Exception {
+        JSONArray items = getAuthenticated(context, "/v1/connect-invitations").getJSONArray("items");
+        List<ConnectInvitation> invitations = new ArrayList<>();
+        for (int index = 0; index < items.length(); index++) {
+            invitations.add(ConnectInvitation.parse(items.getJSONObject(index), ""));
+        }
+        return invitations;
+    }
+
     static ConnectInvitation cancelConnectInvitation(Context context, String invitationId, String connectKey) throws Exception {
         JSONObject body = new JSONObject()
                 .put("device_id", PaymentInboxStore.deviceId(context))

@@ -298,7 +298,12 @@ test("site-only HTTP surface serves the production UI and mock recommendations",
 
   let response = await fetch(`${base}/`);
   assert.equal(response.status, 200);
-  assert.match(await response.text(), /Real testnet payment flow/);
+  const home = await response.text();
+  assert.match(home, /Real testnet payment flow/);
+  assert.match(home, /Open testnet/);
+  assert.match(home, /No sign-in required/);
+  assert.match(home, /Enter to send/);
+  assert.doesNotMatch(home, /<span class="identity-mark" aria-hidden="true">G<\/span>/);
 
   response = await fetch(`${base}/api/catalog`);
   const catalog = await response.json();

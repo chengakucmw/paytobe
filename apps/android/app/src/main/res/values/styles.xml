@@ -5,15 +5,6 @@
         <item name="android:statusBarColor">#F6F8F6</item>
         <item name="android:navigationBarColor">#FFFFFF</item>
         <item name="android:windowNoTitle">true</item>
-        <!--
-            Real-device fix: the app targets SDK 35 (Android 15), which enforces
-            edge-to-edge. Under that enforcement the window no longer shrinks for the
-            soft keyboard, so windowSoftInputMode="adjustResize" stops lifting the Send
-            form above the keyboard and the focused field gets covered / the page lurches.
-            The whole WebView layout is built around adjustResize + 100dvh, so we opt back
-            into the classic resize behavior. (Ignored on Android 14 and below.)
-        -->
-        <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>
     </style>
 
     <!--
