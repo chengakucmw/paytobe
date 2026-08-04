@@ -123,11 +123,13 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
     val currentRoute = backStackEntry?.destination?.route ?: Routes.HOME
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // ActivityViewModel is app-scoped, so its init-time snapshot becomes stale after a
-    // transfer made in the same process. Reload whenever the history route becomes visible;
-    // TransactionHistoryStore is local and inexpensive, and chain-success records then appear
-    // immediately without requiring an app restart.
+    // These ViewModels are app-scoped, so their init-time snapshots become stale while the
+    // process stays alive. Reload whenever Inbox or Activity becomes visible: FCM/REST may have
+    // updated the local Inbox in the background, and a transfer may have updated local history.
     LaunchedEffect(currentRoute) {
+        if (shouldReloadInbox(currentRoute)) {
+            inboxVm.reload()
+        }
         if (currentRoute == Routes.ACTIVITY || currentRoute.startsWith(Routes.ASSET_HISTORY)) {
             activityVm.reload()
         }
@@ -354,3 +356,5 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
         }
     }
 }
+
+internal fun shouldReloadInbox(route: String): Boolean = route == Routes.INBOX
