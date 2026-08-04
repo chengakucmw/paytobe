@@ -136,7 +136,9 @@ test("OpenAI Sites reference demo remains Stellar testnet-only", () => {
   const localAgent = fs.readFileSync(path.join(root, "examples/agentfood-platform-demo/src/agent.mjs"), "utf8");
   const hostedApi = fs.readFileSync(path.join(root, "examples/agentfood-platform-demo/cloud/real-connect-api.mjs"), "utf8");
   assert.match(localAgent, /agentfood-reference-recipient/);
-  assert.match(hostedApi, /agentfood-reference-recipient/);
+  assert.match(hostedApi, /AGENTFOOD_RECIPIENT_ID/);
+  assert.match(hostedApi, /AGENTFOOD_RECIPIENT_VERSION_ID/);
+  assert.doesNotMatch(hostedApi, /recipient_id:\s*["']agentfood-reference-recipient["']/);
   assert.doesNotMatch(localAgent, /network:\s*["']stellar_public["']/);
   assert.doesNotMatch(hostedApi, /network:\s*["']stellar_public["']/);
 });

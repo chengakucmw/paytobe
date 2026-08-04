@@ -73,7 +73,9 @@ test("hosted AgentFood uses an Ed25519 Agent Assertion and standard Platform con
     AGENTFOOD_AGENT_ID: "agentfood-testnet",
     AGENTFOOD_AGENT_CLIENT_ID: "agentfood-cloud-demo",
     AGENTFOOD_AGENT_CREDENTIAL_KID: "agentfood-reference-key",
-    AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_JWK: JSON.stringify(privateJwk)
+    AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_JWK: JSON.stringify(privateJwk),
+    AGENTFOOD_RECIPIENT_ID: "agentfood-reference-recipient",
+    AGENTFOOD_RECIPIENT_VERSION_ID: "agentfood-reference-recipient-v1"
   };
   const originalFetch = globalThis.fetch;
   const calls = [];

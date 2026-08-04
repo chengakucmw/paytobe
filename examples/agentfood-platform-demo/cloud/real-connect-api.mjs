@@ -38,8 +38,10 @@ function remotePlatformConfig(env) {
   const clientId = String(env?.AGENTFOOD_AGENT_CLIENT_ID || "agentfood-cloud-demo").trim();
   const kid = String(env?.AGENTFOOD_AGENT_CREDENTIAL_KID || "").trim();
   const privateKeyJwk = String(env?.AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_JWK || "").trim();
-  return baseUrl && agentId && clientId && kid && privateKeyJwk
-    ? { baseUrl, agentId, clientId, kid, privateKeyJwk }
+  const recipientId = String(env?.AGENTFOOD_RECIPIENT_ID || "").trim();
+  const recipientVersionId = String(env?.AGENTFOOD_RECIPIENT_VERSION_ID || "").trim();
+  return baseUrl && agentId && clientId && kid && privateKeyJwk && recipientId && recipientVersionId
+    ? { baseUrl, agentId, clientId, kid, privateKeyJwk, recipientId, recipientVersionId }
     : null;
 }
 
@@ -84,7 +86,7 @@ async function remoteAgentAccessToken(config) {
   return token ? { token } : { response: realApiError(502, "invalid_agent_token_response", "Platform returned an invalid Agent token response") };
 }
 
-async function createRealHostedArtifacts(order, origin) {
+async function createRealHostedArtifacts(order, origin, config) {
   const now = new Date();
   const createdAt = now.toISOString();
   const transactionId = `txn_${order.order_id}`;
@@ -122,8 +124,8 @@ async function createRealHostedArtifacts(order, origin) {
       metadata: { food_order: foodOrder }
     },
     paymentRequest: {
-      recipient_id: "agentfood-reference-recipient",
-      recipient_version_id: "agentfood-reference-recipient-v1",
+      recipient_id: config.recipientId,
+      recipient_version_id: config.recipientVersionId,
       transaction_context_ref: { transaction_id: transactionId },
       expires_at: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
       idempotency_key: `${order.order_id}-payment-1`,
@@ -159,7 +161,7 @@ async function handleAgentFoodRealChat(request, url, env) {
   const connectionToken = String(payload.connection_token || "");
   if (!connectionToken) return realApiError(409, "connection_required", "Approve the Connect Invitation in VelarumPay before requesting an order");
   const order = recommend(message, String(payload.preferred_merchant_id || ""));
-  const artifacts = await createRealHostedArtifacts(order, url.origin);
+  const artifacts = await createRealHostedArtifacts(order, url.origin, remote);
   const contextResult = await remotePlatformRequest(remote, "/v1/transaction-contexts", { token: connectionToken, payload: artifacts.context });
   if (contextResult.response) return contextResult.response;
   const paymentResult = await remotePlatformRequest(remote, "/v1/payment-requests", { token: connectionToken, payload: artifacts.paymentRequest });

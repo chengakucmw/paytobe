@@ -21,7 +21,14 @@ async function request(base, path, { method = "GET", token = "", payload } = {})
 await request(platform, "/v1/devices/app", { method: "POST", payload: device });
 const created = await request(platform, "/v1/connect-invitations", { method: "POST", payload: { ...device, expires_in_seconds: 300 } });
 const claimed = await request(agentFood, "/api/chat", { method: "POST", payload: { message: created.connect_key } });
-if (claimed.connect_invitation?.identity_assurance !== "registered" || claimed.connect_invitation?.agent_identity?.agent_name !== "AgentFood") {
+const registeredIdentity = claimed.connect_invitation?.agent_identity;
+if (
+  claimed.connect_invitation?.identity_assurance !== "registered" ||
+  registeredIdentity?.verified !== true ||
+  !registeredIdentity.agent_id ||
+  !registeredIdentity.merchant_id ||
+  !registeredIdentity.credential_id
+) {
   throw new Error("AgentFood identity was not sourced from the registered Platform client");
 }
 await request(platform, `/v1/pairing/sessions/${encodeURIComponent(claimed.pairing_session.pairing_session_id)}/approve`, {
