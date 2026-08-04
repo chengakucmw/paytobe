@@ -7,8 +7,11 @@
 // relies on (it seeds the openclaw socket map, then calls confirmLater).
 
 import { stellarConfirmationResult } from "../risk.js";
+import { compareDecimalStrings } from "../decimal.js";
 
-export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
+const RECOVERABLE_MISSING_HORIZON_ERROR = "Missing Stellar Horizon URL for confirmation";
+
+export function createConfirmation({ store, notifyApp, notifyOpenClaw, stellarTestnetHorizonUrl = "" }) {
   async function confirmLater(intent, txHash) {
     try {
       const confirmed = await waitForConfirmation(intent, txHash);
@@ -91,8 +94,10 @@ export function createConfirmation({ store, notifyApp, notifyOpenClaw }) {
         }
       }
       if (payment.rail === "stellar_xlm") {
-        const stellar = await stellarTransaction(payment.horizon_url, txHash);
-        const result = stellarConfirmationResult(stellar);
+        const horizonUrl = payment.horizon_url
+          || (payment.network === "stellar_testnet" ? stellarTestnetHorizonUrl : "");
+        const stellar = await stellarTransaction(horizonUrl, txHash);
+        const result = validateStellarPaymentConfirmation(intent, stellar);
         if (result) return result;
       }
       await sleep(4000);
@@ -126,7 +131,51 @@ async function stellarTransaction(horizonUrl, txHash) {
   const response = await fetch(`${base}/transactions/${txHash}`);
   if (response.status === 404) return null;
   if (!response.ok) throw new Error(`Horizon HTTP ${response.status}: ${await response.text()}`);
-  return response.json();
+  const transaction = await response.json();
+  if (transaction.successful !== true) return transaction;
+  const operationsResponse = await fetch(`${base}/transactions/${txHash}/operations?limit=20&order=asc`);
+  if (!operationsResponse.ok) {
+    throw new Error(`Horizon operations HTTP ${operationsResponse.status}: ${await operationsResponse.text()}`);
+  }
+  const operations = await operationsResponse.json();
+  return { ...transaction, _velarum_operations: operations?._embedded?.records || [] };
+}
+
+export function validateStellarPaymentConfirmation(request, stellar) {
+  const chainResult = stellarConfirmationResult(stellar);
+  if (!chainResult || !chainResult.ok) return chainResult;
+  const payment = request?.payment || {};
+  const operations = stellar?._velarum_operations;
+  if (stellar.operation_count !== 1 || !Array.isArray(operations) || operations.length !== 1) {
+    return mismatch("operation_count");
+  }
+  const operation = operations[0];
+  const createAccount = operation.type === "create_account";
+  if (operation.type !== "payment" && !createAccount) return mismatch("operation_type");
+  if (!createAccount && operation.asset_type !== "native") return mismatch("asset");
+  const recipient = createAccount ? operation.account : operation.to;
+  const amount = createAccount ? operation.starting_balance : operation.amount;
+  if (!payment.to || recipient !== payment.to) return mismatch("recipient");
+  try {
+    if (compareDecimalStrings(String(amount || ""), String(payment.amount || "")) !== 0) return mismatch("amount");
+  } catch {
+    return mismatch("amount");
+  }
+
+  const expectedMemo = payment.memo == null ? "" : String(payment.memo);
+  const expectedMemoType = String(payment.memo_type || payment.memoType || (expectedMemo ? "text" : "none")).toLowerCase();
+  const actualMemo = stellar.memo == null ? "" : String(stellar.memo);
+  const actualMemoType = String(stellar.memo_type || (actualMemo ? "text" : "none")).toLowerCase();
+  const legacyNullMemo = !expectedMemo
+    && request?.error === RECOVERABLE_MISSING_HORIZON_ERROR
+    && actualMemoType === "text"
+    && actualMemo === "null";
+  if (!legacyNullMemo && (actualMemoType !== expectedMemoType || actualMemo !== expectedMemo)) return mismatch("memo");
+  return { ok: true };
+}
+
+function mismatch(field) {
+  return { ok: false, error: `Stellar transaction does not match Payment Request ${field}` };
 }
 
 function sleep(ms) {

@@ -305,7 +305,12 @@ const {
 const { refreshRuntimeMetrics, recordPairingExpired } = createMetrics({ store, observability, wsHub });
 const { uniquePairingCode, resolvePairingSession } = createPairing({ store });
 const { buildTransactionContextProjection } = createTransactionContext({ store });
-const { confirmLater, confirmPaymentRequestLater } = createConfirmation({ store, notifyApp, notifyOpenClaw });
+const { confirmLater, confirmPaymentRequestLater } = createConfirmation({
+  store,
+  notifyApp,
+  notifyOpenClaw,
+  stellarTestnetHorizonUrl: runtimeConfig.stellar_testnet.horizon_url
+});
 const pushService = createFcmPushService({ config: runtimeConfig, store, observability });
 
 // Shared bag of dependencies handed to every router factory; each router
@@ -506,7 +511,7 @@ wss.on("connection", (ws, _req, url) => {
 if (process.env.VP_NO_AUTO_LISTEN !== "1") {
   server.listen(PORT, () => {
     console.log(`AgentWallet Relay listening on http://0.0.0.0:${PORT}`);
-    void paymentRequestsRouter.reconcileBroadcasted();
+    void paymentRequestsRouter.reconcilePendingConfirmations();
   });
 
   // Background maintenance: sweep due expiries and retention-prune terminal records

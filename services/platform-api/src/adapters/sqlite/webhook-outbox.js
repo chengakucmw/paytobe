@@ -28,8 +28,8 @@ export class SqliteWebhookOutbox {
             at: event.occurred_at
           }
         ],
-        ...(patch?.tx_hash ? { tx_hash: patch.tx_hash } : {}),
-        ...(patch?.error ? { error: patch.error } : {})
+        ...(Object.hasOwn(patch || {}, "tx_hash") ? { tx_hash: patch.tx_hash || null } : {}),
+        ...(Object.hasOwn(patch || {}, "error") ? { error: patch.error || null } : {})
       };
       const changed = this.db.prepare(`UPDATE payment_requests SET json = ?, version = version + 1
         WHERE json_extract(json, '$.merchant_id') = ? AND k = ?`).run(JSON.stringify(updated), scope.merchant_id, requestId);

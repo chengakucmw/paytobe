@@ -77,4 +77,15 @@ public final class RelayResponseShapeTest {
         assertTrue(PaymentRequest.parse(new JSONObject().put("ok", true)).requestId.isEmpty());
         assertFalse(PaymentRequest.parse(paymentRequestPayload()).requestId.isEmpty());
     }
+
+    @Test
+    public void jsonNullMemoDoesNotBecomeLiteralNullText() throws Exception {
+        JSONObject payload = paymentRequestPayload();
+        payload.getJSONObject("payment")
+                .put("memo", JSONObject.NULL)
+                .put("memo_type", JSONObject.NULL);
+        PaymentRequest request = PaymentRequest.parse(payload);
+        assertEquals("", request.memo);
+        assertEquals("", request.memoType);
+    }
 }

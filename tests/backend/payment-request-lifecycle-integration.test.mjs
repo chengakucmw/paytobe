@@ -53,6 +53,15 @@ test("formal Payment Request confirms on-chain and emits durable Webhook events 
     tx_hash: "tx_testnet_b",
     history: [{ status: "broadcasted", at }]
   });
+  store.putPaymentRequest({
+    ...store.paymentRequest("request_a"),
+    request_id: "request_c",
+    transaction_id: "transaction_c",
+    status: "failed",
+    tx_hash: "tx_testnet_c",
+    error: "Missing Stellar Horizon URL for confirmation",
+    history: [{ status: "failed", tx_hash: "tx_testnet_c", error: "Missing Stellar Horizon URL for confirmation", at }]
+  });
 
   const audit = [];
   const enqueued = [];
@@ -88,7 +97,7 @@ test("formal Payment Request confirms on-chain and emits durable Webhook events 
     },
     scheduleWebhookDelivery() { schedules += 1; },
     confirmPaymentRequestLater: async (request, txHash, onResult) => {
-      assert.equal(request.status, "broadcasted");
+      assert.ok(["broadcasted", "failed"].includes(request.status));
       assert.equal(txHash, request.tx_hash);
       return onResult("confirmed", { tx_hash: txHash, error: null });
     },
@@ -129,16 +138,18 @@ test("formal Payment Request confirms on-chain and emits durable Webhook events 
   assert.equal(audit.filter((item) => item.action === "payment_request.status_updated").length, 3);
   assert.ok(store.state.events.some((event) => event.type === "payment_request.status" && event.data.status === "confirmed"));
 
-  const reconciled = await paymentRequestsRouter.reconcileBroadcasted();
-  assert.equal(reconciled.length, 1);
-  assert.equal(reconciled[0].status, "fulfilled");
+  const reconciled = await paymentRequestsRouter.reconcilePendingConfirmations();
+  assert.equal(reconciled.length, 2);
+  assert.ok(reconciled.every((result) => result.status === "fulfilled"));
   assert.equal(store.paymentRequest("request_b").status, "confirmed");
   assert.equal(store.paymentRequest("request_b").tx_hash, "tx_testnet_b");
   const recoveredEvent = store.db.prepare(`SELECT payload_json FROM webhook_events
     WHERE aggregate_id = 'request_b' ORDER BY occurred_at DESC LIMIT 1`).get();
   assert.equal(JSON.parse(recoveredEvent.payload_json).data.status, "confirmed");
-  assert.equal(enqueued.length, 4);
-  assert.equal(schedules, 4);
+  assert.equal(store.paymentRequest("request_c").status, "confirmed");
+  assert.equal(store.paymentRequest("request_c").error, null);
+  assert.equal(enqueued.length, 5);
+  assert.equal(schedules, 5);
 
   function update(origin, status, txHash) {
     return fetch(`${origin}/v1/payment-requests/request_a/status`, {

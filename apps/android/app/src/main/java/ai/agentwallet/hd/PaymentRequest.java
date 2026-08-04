@@ -168,11 +168,16 @@ final class PaymentRequest {
         decimals = payment.has("decimals") ? payment.optInt("decimals") : (asset.equalsIgnoreCase("USDC") ? 6 : 7);
         amount = firstNonEmpty(payment.optString("amount", ""), paymentFacts.optString("amount", ""));
         recipient = firstNonEmpty(payment.optString("to", ""), payment.optString("recipient", ""), paymentFacts.optString("recipient", ""));
-        memo = payment.optString("memo", "");
+        // JSONObject.optString turns JSONObject.NULL into the literal text "null".
+        // A protocol JSON null means no Stellar memo and must encode MEMO_NONE.
+        memo = payment.isNull("memo") ? "" : payment.optString("memo", "");
         // C-1: carry the memo TYPE (text / id / hash / return) so a numeric exchange
         // deposit tag is sent as MEMO_ID, not silently downgraded to MEMO_TEXT.
         // Field name mirrors iOS (Models.swift reads "memo_type" / "memoType").
-        memoType = firstNonEmpty(payment.optString("memo_type", ""), payment.optString("memoType", ""));
+        memoType = firstNonEmpty(
+                payment.isNull("memo_type") ? "" : payment.optString("memo_type", ""),
+                payment.isNull("memoType") ? "" : payment.optString("memoType", "")
+        );
         rpcUrl = payment.optString("rpc_url", "");
         stellarTestnet = payment.optBoolean("stellar_testnet", network.toLowerCase().contains("test"));
         horizonUrl = stellarHorizonUrl(payment.optString("horizon_url", ""), stellarTestnet);

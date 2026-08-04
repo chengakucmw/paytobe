@@ -27,6 +27,7 @@ import {
 
 // F1: terminal non-confirmed statuses that must RELEASE a held daily-cap reservation.
 const RELEASE_ON_STATUS = new Set(["failed", "expired", "rejected"]);
+const RECOVERABLE_CONFIRMATION_ERROR = "Missing Stellar Horizon URL for confirmation";
 
 function riskHasCode(risk, code) {
   return Array.isArray(risk?.errors) && risk.errors.some((item) => item?.code === code);
@@ -155,13 +156,23 @@ export function createPaymentRequestsRouter(deps) {
 
   function scheduleConfirmation(request) {
     const txHash = request?.tx_hash;
-    if (request?.status !== "broadcasted" || !txHash || !confirmPaymentRequestLater) return null;
+    const recoverableFailure = request?.status === "failed" && request.error === RECOVERABLE_CONFIRMATION_ERROR;
+    if ((request?.status !== "broadcasted" && !recoverableFailure) || !txHash || !confirmPaymentRequestLater) return null;
     const key = `${request.request_id}:${txHash}`;
     if (pendingConfirmations.has(key)) return null;
     pendingConfirmations.add(key);
     return confirmPaymentRequestLater(request, txHash, (nextStatus, confirmationPatch) => {
       const current = store.paymentRequest(request.request_id);
       if (!current) return null;
+      const recovering = current.status === "failed" && current.error === RECOVERABLE_CONFIRMATION_ERROR;
+      if (recovering) {
+        if (nextStatus !== "confirmed") return current;
+        return applyStatusUpdate(current, nextStatus, confirmationPatch, {
+          id: "platform:confirmation_recovery",
+          request_id: platformCore.random.id("request"),
+          audit: { type: "platform_worker", id: "chain_confirmation_recovery" }
+        });
+      }
       const next = decidePaymentStatusTransition(current, nextStatus);
       if (!next.ok || next.duplicate) return current;
       return applyStatusUpdate(current, nextStatus, confirmationPatch, {
@@ -181,9 +192,12 @@ export function createPaymentRequestsRouter(deps) {
     });
   }
 
-  async function reconcileBroadcasted() {
+  async function reconcilePendingConfirmations() {
     const confirmations = Object.values(store.state.paymentRequests)
-      .filter((request) => request.status === "broadcasted" && request.tx_hash)
+      .filter((request) => request.tx_hash && (
+        request.status === "broadcasted"
+        || (request.status === "failed" && request.error === RECOVERABLE_CONFIRMATION_ERROR)
+      ))
       .map(scheduleConfirmation)
       .filter(Boolean);
     return Promise.allSettled(confirmations);
@@ -483,7 +497,7 @@ export function createPaymentRequestsRouter(deps) {
     scheduleConfirmation(updated);
   });
 
-  router.reconcileBroadcasted = reconcileBroadcasted;
+  router.reconcilePendingConfirmations = reconcilePendingConfirmations;
   return router;
 }
 
