@@ -85,7 +85,7 @@ android {
         stellarTestnet {
             dimension "network"
             applicationIdSuffix ".testnet"
-            versionCode 29
+            versionCode 30
             versionNameSuffix "-testnet"
             buildConfigField "boolean", "TESTNET_ONLY", "true"
             manifestPlaceholders = [appLabel: "VelarumPay Testnet"]
