@@ -75,6 +75,7 @@ import ai.agentwallet.hd.ui.wallet.PairingScreen
 import ai.agentwallet.hd.ui.wallet.PairingViewModel
 import ai.agentwallet.hd.ui.wallet.ProfileScreen
 import ai.agentwallet.hd.ui.wallet.ReceiveScreen
+import ai.agentwallet.hd.ui.wallet.RecoveryPhraseScreen
 import ai.agentwallet.hd.ui.wallet.SecurityScreen
 import ai.agentwallet.hd.ui.wallet.SendScreen
 import ai.agentwallet.hd.ui.wallet.SendViewModel
@@ -341,7 +342,15 @@ fun VelarumApp(entry: AppEntry = AppEntry.None, onEntryHandled: () -> Unit = {})
                             onActivity = { navController.navigate(Routes.ACTIVITY) },
                         )
                     }
-                    screen(Routes.SECURITY) { SecurityScreen(onBack = { navController.popBackStack() }) }
+                    screen(Routes.SECURITY) {
+                        SecurityScreen(
+                            onBack = { navController.popBackStack() },
+                            onRecoveryPhrase = { navController.navigate(Routes.RECOVERY_PHRASE) },
+                        )
+                    }
+                    screen(Routes.RECOVERY_PHRASE) {
+                        RecoveryPhraseScreen(onBack = { navController.popBackStack() })
+                    }
                     screen(Routes.DISPLAY_LANGUAGE) { DisplayLanguageScreen(onBack = { navController.popBackStack() }) }
                     screen(Routes.NOTIFICATIONS) { NotificationsScreen(onBack = { navController.popBackStack() }) }
                     screen(Routes.NETWORKS) { NetworksScreen(vm = networksVm, onBack = { navController.popBackStack() }) }

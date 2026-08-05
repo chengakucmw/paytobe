@@ -14,6 +14,7 @@ object BiometricAuth {
     fun authenticate(
         activity: FragmentActivity,
         title: String,
+        subtitle: String = "Confirm to sign locally and broadcast",
         onSuccess: () -> Unit,
         onFailure: () -> Unit,
     ) {
@@ -37,7 +38,7 @@ object BiometricAuth {
         prompt.authenticate(
             BiometricPrompt.PromptInfo.Builder()
                 .setTitle(title)
-                .setSubtitle("Confirm to sign locally and broadcast")
+                .setSubtitle(subtitle)
                 .setAllowedAuthenticators(authenticators)
                 .build(),
         )

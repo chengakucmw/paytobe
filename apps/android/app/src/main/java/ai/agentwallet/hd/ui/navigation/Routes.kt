@@ -29,6 +29,7 @@ object Routes {
     const val WALLET_IDENTITY = "walletIdentity"
     const val SETTINGS = "settings"
     const val SECURITY = "security"
+    const val RECOVERY_PHRASE = "settings/security/recovery_phrase"
     const val NETWORKS = "networks"
     const val NOTIFICATIONS = "notifications"
     const val DEVELOPER = "developer"

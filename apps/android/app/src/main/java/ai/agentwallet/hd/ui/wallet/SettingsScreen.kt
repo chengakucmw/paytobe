@@ -64,7 +64,7 @@ fun SettingsScreen(
 
 /** 安全（原生）。对照 web 的 renderSecurity（只读事实 + 提示，敏感操作经各自流程）。 */
 @Composable
-fun SecurityScreen(onBack: () -> Unit) {
+fun SecurityScreen(onBack: () -> Unit, onRecoveryPhrase: () -> Unit) {
     val context = LocalContext.current
     val backup = remember { SettingsRepository.backupVerified(context) }
     Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -80,6 +80,13 @@ fun SecurityScreen(onBack: () -> Unit) {
                 VpFactRow("Backend key shares", "Not provided")
                 VpFactRow("Backup status", if (backup) "Verified" else "Needs verification", if (backup) VpTone.SAFE else VpTone.CAUTION)
             }
+            VpMenuRow(
+                title = "Show recovery phrase",
+                subtitle = "Authenticate to view it securely on this device",
+                onClick = onRecoveryPhrase,
+                badgeText = "Protected",
+                badgeTone = VpTone.CAUTION,
+            )
             VpRiskBanner(VpTone.SAFE, "Agents and servers never see the seed", "Approved agents can create requests only. The recovery phrase, seed, and final signature stay local on this device.")
         }
     }
