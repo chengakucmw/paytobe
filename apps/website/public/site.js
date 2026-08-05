@@ -81,9 +81,9 @@ if (pilotForm) {
     const integration = String(data.get("integration") || "").trim();
     const notes = String(data.get("notes") || "").trim();
     const copy = (key, fallback) => pilotForm.dataset[key] || fallback;
-    const subject = `${copy("i18nSubject", "VelarumPay Preview pilot request")} — ${organization}`;
+    const subject = `${copy("i18nSubject", "VelarumPay Official Testnet integration support")} — ${organization}`;
     const body = [
-      copy("i18nSubject", "VelarumPay Preview pilot request"),
+      copy("i18nSubject", "VelarumPay Official Testnet integration support"),
       "",
       `${copy("i18nOrganization", "Organization")}: ${organization}`,
       `${copy("i18nContact", "Contact")}: ${email}`,
@@ -93,7 +93,7 @@ if (pilotForm) {
       `${copy("i18nNotes", "Notes")}:`,
       notes || copy("i18nNoNotes", "No additional notes."),
       "",
-      copy("i18nDisclaimer", "I understand that this is a Preview and pilot request, not live merchant approval.")
+      copy("i18nDisclaimer", "I understand that this is an Official Testnet request, not mainnet or commercial production approval.")
     ].join("\n");
 
     const status = pilotForm.querySelector("[data-form-status]");

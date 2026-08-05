@@ -26,6 +26,7 @@ test("all public pages render as a clearly labelled Official Testnet", async () 
     assert.match(html, /<h1[ >]/, route);
     assert.match(html, /Official Testnet/, route);
     assert.doesNotMatch(html, /Developer Preview/, route);
+    assert.doesNotMatch(html, /selected (?:Official Testnet )?pilots?|test and pilot use only|direct-download availability is not announced|production release evidence remains gated/i, route);
     assert.match(html, /https:\/\/docs\.velarumai\.com/, route);
     assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|<script[^>]+src="https?:/i, route);
     assert.match(html, /https:\/\/velarumpay\.example\/og\.png/, route);
@@ -185,14 +186,14 @@ test("sitemap lists every English and translated page", async () => {
   assert.match(sitemap, /<loc>https:\/\/velarumai\.com\/zh-hans\/legal<\/loc>/);
 });
 
-test("the pilot flow is explicit and does not post form data to the website", async () => {
+test("the Official Testnet integration-support flow is explicit and does not post form data to the website", async () => {
   const html = await (await call("/business")).text();
   const script = await (await call("/site.js")).text();
   assert.match(html, /data-pilot-form/);
   assert.doesNotMatch(html, /<form[^>]+action=/i);
   assert.match(html, /website does not transmit or store the form/i);
   assert.match(script, /mailto:pilot@velarumai\.com/);
-  assert.match(script, /Do not|No additional notes|Preview pilot request/);
+  assert.match(script, /Do not|No additional notes|Official Testnet integration support/);
 });
 
 test("static assets and security headers are served", async () => {

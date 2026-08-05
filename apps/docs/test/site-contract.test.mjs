@@ -40,9 +40,10 @@ test("merchant quickstart keeps the canonical order and testnet safety boundary"
     cursor = next;
   }
   assert.match(quickstart, /https:\/\/api\.velarumai\.com/);
+  assert.match(quickstart, /Mainnet and commercial SLAs are not offered/);
   assert.match(quickstart, /requires_user_approval: true/);
   assert.match(quickstart, /recipient_version_id/);
-  assert.doesNotMatch(quickstart, /AgentFood|\/claim\/legacy|BEGIN [A-Z ]*PRIVATE KEY|conn_tok_|whsec_|mainnet/i);
+  assert.doesNotMatch(quickstart, /AgentFood|\/claim\/legacy|BEGIN [A-Z ]*PRIVATE KEY|conn_tok_|whsec_|horizon\.stellar\.org|STELLAR_PUBLIC_ENABLED/i);
 });
 
 test("OpenAPI covers merchant onboarding and resolves errors, schemas, and official origin", () => {
@@ -109,6 +110,8 @@ test("public HTML keeps semantic landmarks and valid local links", () => {
     assert.match(html, /<nav\b/i, `${page} needs navigation`);
     assert.match(html, /<main\b/i, `${page} needs a main landmark`);
     assert.match(html, /<h1>[^<]+<\/h1>/i, `${page} needs one visible page heading`);
+    assert.match(html, /Official Testnet/, `${page} must use the current public status`);
+    assert.doesNotMatch(html, /Developer Preview|Test and pilot use only/i, `${page} must not use superseded preview language`);
     for (const [, href] of html.matchAll(/href="(\/[^"?#]*)/g)) {
       const target = href === "/" ? path.join(publicRoot, "index.html") : path.join(publicRoot, href.slice(1));
       assert.ok(fs.existsSync(target), `${page} has a broken local link: ${href}`);
