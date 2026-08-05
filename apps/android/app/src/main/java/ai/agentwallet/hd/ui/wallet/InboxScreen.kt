@@ -1,12 +1,14 @@
 package ai.agentwallet.hd.ui.wallet
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ai.agentwallet.hd.InboxItem
 import ai.agentwallet.hd.ui.components.VpBadge
@@ -40,7 +43,10 @@ fun InboxScreen(vm: InboxViewModel, onOpen: (String) -> Unit) {
         }
         item {
             Row(
-                modifier = Modifier.padding(horizontal = Spacing.s5),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = Spacing.s5),
                 horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             ) {
                 VpChip("All", ui.filter == "all") { vm.setFilter("all") }
@@ -76,7 +82,14 @@ private fun InboxCard(item: InboxItem, onClick: () -> Unit, modifier: Modifier =
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text(item.payee, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+            Text(
+                item.payee,
+                style = MaterialTheme.typography.titleMedium,
+                color = VelarumTheme.colors.textStrong,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
             VpBadge(item.stateLabel, vpToneOf(item.tone))
         }
         Text(item.title, style = MaterialTheme.typography.bodyLarge, color = VelarumTheme.colors.textBody, modifier = Modifier.padding(top = Spacing.s1))

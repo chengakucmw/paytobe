@@ -91,6 +91,8 @@ fun VpBadge(text: String, tone: VpTone, modifier: Modifier = Modifier) {
             text = text,
             style = MaterialTheme.typography.labelMedium,
             color = toneAccent(tone),
+            maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s1),
         )
     }
@@ -104,8 +106,19 @@ fun VpFactRow(label: String, value: String, modifier: Modifier = Modifier) {
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textStrong, textAlign = TextAlign.End)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = VelarumTheme.colors.textMuted,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = VelarumTheme.colors.textStrong,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(2f),
+        )
     }
 }
 
