@@ -322,7 +322,7 @@ final class TruthPanel {
         if ("merchant_ai_claim".equals(value)) return "Merchant AI said";
         if ("merchant_api_response".equals(value)) return "Merchant API";
         if ("merchant_signed_quote".equals(value)) return "Signed quote";
-        if ("platform_verified".equals(value)) return "Velarum verified";
+        if ("platform_verified".equals(value)) return "Paytobe verified";
         if ("external_verified".equals(value)) return "Third-party verified";
         if ("unknown".equals(value)) return "Unknown source";
         if ("missing".equals(value)) return "Missing";

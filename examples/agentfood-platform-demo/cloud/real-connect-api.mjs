@@ -33,7 +33,7 @@ async function realHash(value) {
 }
 
 function remotePlatformConfig(env) {
-  const baseUrl = String(env?.VELARUMPAY_CONNECT_PLATFORM_URL || "").trim().replace(/\/+$/, "");
+  const baseUrl = String(env?.Paytobe_CONNECT_PLATFORM_URL || "").trim().replace(/\/+$/, "");
   const agentId = String(env?.AGENTFOOD_AGENT_ID || "agentfood-testnet").trim();
   const clientId = String(env?.AGENTFOOD_AGENT_CLIENT_ID || "agentfood-cloud-demo").trim();
   const kid = String(env?.AGENTFOOD_AGENT_CREDENTIAL_KID || "").trim();
@@ -54,7 +54,7 @@ async function remotePlatformRequest(config, path, { token = "", payload } = {})
     },
     body: JSON.stringify(payload || {})
   });
-  const result = await response.json().catch(() => ({ ok: false, error: { code: "invalid_platform_response", message: "VelarumPay Connect Platform returned an invalid response" } }));
+  const result = await response.json().catch(() => ({ ok: false, error: { code: "invalid_platform_response", message: "Paytobe Connect Platform returned an invalid response" } }));
   return response.ok ? { result } : { response: realJson(response.status, result) };
 }
 
@@ -64,7 +64,7 @@ async function remoteAgentAccessToken(config) {
   const claims = {
     iss: config.agentId,
     sub: config.clientId,
-    aud: "https://api.velarumai.com/v1/agent-auth/token",
+    aud: "https://api.Paytobe.com/v1/agent-auth/token",
     iat: now,
     exp: now + 300,
     jti: crypto.randomUUID(),
@@ -102,7 +102,7 @@ async function createRealHostedArtifacts(order, origin, config) {
   };
   return {
     context: {
-      protocol: "velarum.transaction_context.v1",
+      protocol: "Paytobe.transaction_context.v1",
       transaction_id: transactionId,
       created_at: createdAt,
       type: "generic",
@@ -113,7 +113,7 @@ async function createRealHostedArtifacts(order, origin, config) {
       user_intent: { prompt_summary: order.prompt_summary },
       agent_activity: [
         { at: createdAt, action: "cart_built", label: "Built a demo cart", summary: `Selected ${order.items.length} menu item(s) within budget.`, source_type: "merchant_web_observed" },
-        { at: createdAt, action: "payment_requested", label: "Created a Payment Request", summary: "Sent a testnet Payment Request to VelarumPay for user review.", source_type: "payment_request_fact" }
+        { at: createdAt, action: "payment_requested", label: "Created a Payment Request", summary: "Sent a testnet Payment Request to Paytobe for user review.", source_type: "payment_request_fact" }
       ],
       items: [], costs: {}, media: [],
       evidence: [{ evidence_id: `evidence_${order.order_id}`, type: "web_snapshot", title: "AgentFood hosted demo quote", source_url: `${origin}/merchants/${order.merchant.id}`, captured_at: createdAt, hash: evidenceHash }],
@@ -142,7 +142,7 @@ async function handleAgentFoodRealChat(request, url, env) {
   if (!message) return realApiError(400, "message_required", "A message is required");
   const remote = remotePlatformConfig(env);
   if (!remote) return realApiError(503, "agent_platform_unavailable", "AgentFood standard Platform configuration is unavailable");
-  const connectKey = message.match(/velarumpay-connect:ck_[A-Za-z0-9_-]{43}/)?.[0];
+  const connectKey = message.match(/Paytobe-connect:ck_[A-Za-z0-9_-]{43}/)?.[0];
   if (connectKey) {
     const agentToken = await remoteAgentAccessToken(remote);
     if (agentToken.response) return agentToken.response;
@@ -155,11 +155,11 @@ async function handleAgentFoodRealChat(request, url, env) {
       ...claimed.result,
       connect_invitation_id: claimed.result.connect_invitation_id || claimed.result.connect_invitation?.connect_invitation_id,
       type: "connect_invitation_claimed",
-      message: "Connect Key recognized and consumed. Review AgentFood's registered identity and requested scopes in VelarumPay, then approve or reject it."
+      message: "Connect Key recognized and consumed. Review AgentFood's registered identity and requested scopes in Paytobe, then approve or reject it."
     });
   }
   const connectionToken = String(payload.connection_token || "");
-  if (!connectionToken) return realApiError(409, "connection_required", "Approve the Connect Invitation in VelarumPay before requesting an order");
+  if (!connectionToken) return realApiError(409, "connection_required", "Approve the Connect Invitation in Paytobe before requesting an order");
   const order = recommend(message, String(payload.preferred_merchant_id || ""));
   const artifacts = await createRealHostedArtifacts(order, url.origin, remote);
   const contextResult = await remotePlatformRequest(remote, "/v1/transaction-contexts", { token: connectionToken, payload: artifacts.context });
@@ -169,7 +169,7 @@ async function handleAgentFoodRealChat(request, url, env) {
   return realJson(201, {
     ok: true,
     type: "payment_request_created",
-    message: `I prepared a ${order.total} XLM testnet order from ${order.merchant.name} and sent a Payment Request through the VelarumPay Connect Platform.`,
+    message: `I prepared a ${order.total} XLM testnet order from ${order.merchant.name} and sent a Payment Request through the Paytobe Connect Platform.`,
     order,
     transaction_context: contextResult.result.context,
     payment_request: paymentResult.result.payment_request,

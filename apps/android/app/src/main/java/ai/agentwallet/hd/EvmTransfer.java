@@ -122,7 +122,7 @@ final class EvmTransfer {
         if (USE_SHARED_CORE_SIGNING) {
             // ERC-20 is a legacy EVM transaction whose value is 0 and whose `data`
             // carries the transfer() call; the shared core signs the identical
-            // EIP-155 RLP (byte-checked vs web3j in VelarumWalletCoreConformanceTest).
+            // EIP-155 RLP (byte-checked vs web3j in PaytobeWalletCoreConformanceTest).
             raw = WalletCoreBridge.signEvm(privateKey, chainId, AmountUnits.longValueExact(nonce),
                     gasPrice.toString(), AmountUnits.longValueExact(gasLimit), contract, "0", data).rawTxHex;
         } else {

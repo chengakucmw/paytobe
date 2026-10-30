@@ -44,8 +44,8 @@ import ai.agentwallet.hd.ui.components.LocalToastController
 import ai.agentwallet.hd.ui.components.VpRiskBanner
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 首页（原生）：品牌头 + Velar Teal 渐变英雄卡（余额 + 快捷操作）+ 资产列表。
@@ -116,11 +116,11 @@ private fun HeroBalanceCard(
     onSend: () -> Unit,
     onReceive: () -> Unit,
 ) {
-    val c = VelarumTheme.colors
+    val c = PaytobeTheme.colors
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(VelarumRadii.xl)
+            .clip(PaytobeRadii.xl)
             .background(Brush.linearGradient(listOf(c.primary, c.brandStrong, c.surfaceInverse)))
             .padding(Spacing.s6),
     ) {
@@ -152,7 +152,7 @@ private fun HeroBalanceCard(
 @Composable
 private fun HeroAction(icon: ImageVector, label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.clip(VelarumRadii.md).clickable { onClick() }.padding(vertical = Spacing.s1),
+        modifier = modifier.clip(PaytobeRadii.md).clickable { onClick() }.padding(vertical = Spacing.s1),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(Spacing.s2),
     ) {
@@ -174,9 +174,9 @@ private fun AssetsPanel(wallet: WalletState, displayed: List<String>, onAdd: () 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Crypto assets", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+            Text("Crypto assets", style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
             IconButton(onClick = onAdd) {
-                Icon(Icons.Filled.Add, contentDescription = "Customize assets", tint = VelarumTheme.colors.primary)
+                Icon(Icons.Filled.Add, contentDescription = "Customize assets", tint = PaytobeTheme.colors.primary)
             }
         }
         VpCard(modifier = Modifier.fillMaxWidth()) {
@@ -208,19 +208,19 @@ private fun AssetGroupHeader(symbol: String, assets: List<DisplayAsset>, wallet:
         Text(
             symbol,
             style = MaterialTheme.typography.titleMedium,
-            color = VelarumTheme.colors.textStrong,
+            color = PaytobeTheme.colors.textStrong,
             modifier = Modifier.weight(1f),
         )
         Column(horizontalAlignment = Alignment.End) {
             Text(
                 "$" + formatUsd(usd),
                 style = MaterialTheme.typography.titleMedium,
-                color = VelarumTheme.colors.textStrong,
+                color = PaytobeTheme.colors.textStrong,
             )
             Text(
                 "${assets.size} networks",
                 style = MaterialTheme.typography.bodySmall,
-                color = VelarumTheme.colors.textMuted,
+                color = PaytobeTheme.colors.textMuted,
             )
         }
     }
@@ -240,13 +240,13 @@ private fun AssetRow(asset: DisplayAsset, wallet: WalletState, onClick: () -> Un
             Text(asset.symbol.take(1), style = MaterialTheme.typography.titleMedium, color = Color.White)
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text("${asset.symbol} · ${asset.chain}", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-            Text(shortAddress(addressFor(asset.addressKind, wallet)), style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text("${asset.symbol} · ${asset.chain}", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+            Text(shortAddress(addressFor(asset.addressKind, wallet)), style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         }
         Text(
             "${displayBalance(wallet.balances[asset.balanceKey])} ${asset.symbol}",
             style = MaterialTheme.typography.titleMedium,
-            color = VelarumTheme.colors.textStrong,
+            color = PaytobeTheme.colors.textStrong,
         )
     }
 }

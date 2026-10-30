@@ -22,9 +22,9 @@ import { PLATFORM_API_ERROR_CODES } from "../../packages/protocol/src/platform-a
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const codeRoot = path.resolve(testDirectory, "../..");
-const paymentSchemaPath = path.join(codeRoot, "packages/protocol/schema/velarum.payment_request.v1.schema.json");
-const contextSchemaPath = path.join(codeRoot, "packages/protocol/schema/velarum.transaction_context.v1.schema.json");
-const openApiPath = path.join(codeRoot, "services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json");
+const paymentSchemaPath = path.join(codeRoot, "packages/protocol/schema/Paytobe.payment_request.v1.schema.json");
+const contextSchemaPath = path.join(codeRoot, "packages/protocol/schema/Paytobe.transaction_context.v1.schema.json");
+const openApiPath = path.join(codeRoot, "services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json");
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -57,7 +57,7 @@ test("JSON Schemas stay aligned with protocol constants", () => {
 test("OpenAPI exposes the canonical v0.1 surface and resolves protocol schemas", () => {
   const document = readJson(openApiPath);
   assert.equal(document.openapi, "3.1.0");
-  assert.equal(document["x-velarumpay-contract-version"], "velarumpay.platform_api.v0.1");
+  assert.equal(document["x-Paytobe-contract-version"], "Paytobe.platform_api.v0.1");
 
   const expectedPaths = [
     "/health",
@@ -93,18 +93,18 @@ test("public developer entry points reference OpenAPI and both protocol schemas"
   ];
   const combined = files.map((filePath) => fs.readFileSync(filePath, "utf8")).join("\n");
 
-  assert.match(combined, /velarum\.payment_request\.v1\.schema\.json/);
-  assert.match(combined, /velarum\.transaction_context\.v1\.schema\.json/);
-  assert.match(combined, /velarumpay-platform-api-v0\.1\.openapi\.json/);
-  assert.match(combined, /velarum\.payment_request\.v1/);
-  assert.match(combined, /velarum\.transaction_context\.v1/);
+  assert.match(combined, /Paytobe\.payment_request\.v1\.schema\.json/);
+  assert.match(combined, /Paytobe\.transaction_context\.v1\.schema\.json/);
+  assert.match(combined, /Paytobe-platform-api-v0\.1\.openapi\.json/);
+  assert.match(combined, /Paytobe\.payment_request\.v1/);
+  assert.match(combined, /Paytobe\.transaction_context\.v1/);
 });
 
 test("published developer contract downloads are byte-identical to canonical sources", () => {
   const copies = [
-    [openApiPath, path.join(codeRoot, "apps/docs/public/contracts/velarumpay-platform-api-v0.1.openapi.json")],
-    [paymentSchemaPath, path.join(codeRoot, "apps/docs/public/contracts/velarum.payment_request.v1.schema.json")],
-    [contextSchemaPath, path.join(codeRoot, "apps/docs/public/contracts/velarum.transaction_context.v1.schema.json")]
+    [openApiPath, path.join(codeRoot, "apps/docs/public/contracts/Paytobe-platform-api-v0.1.openapi.json")],
+    [paymentSchemaPath, path.join(codeRoot, "apps/docs/public/contracts/Paytobe.payment_request.v1.schema.json")],
+    [contextSchemaPath, path.join(codeRoot, "apps/docs/public/contracts/Paytobe.transaction_context.v1.schema.json")]
   ];
 
   for (const [source, published] of copies) {
@@ -115,7 +115,7 @@ test("published developer contract downloads are byte-identical to canonical sou
 
 test("merchant documentation contract covers the canonical testnet onboarding surface", () => {
   const document = readJson(openApiPath);
-  assert.equal(document.servers[0].url, "https://api.velarumai.com");
+  assert.equal(document.servers[0].url, "https://api.paytobe.com");
   for (const endpoint of [
     "/v1/merchant-accounts/registrations", "/v1/merchant-accounts/email-verifications",
     "/v1/merchants", "/v1/merchant-sessions", "/v1/merchant-domains", "/v1/merchant-domains/{id}/verify",
@@ -125,7 +125,7 @@ test("merchant documentation contract covers the canonical testnet onboarding su
   assert.equal(document.paths["/v1/payment-requests"].post.requestBody.content["application/json"].schema.$ref,
     "#/components/schemas/PaymentRequestCreate");
 
-  const errorSchema = readJson(path.join(codeRoot, "packages/protocol/schema/velarum.platform_api.error.v1.schema.json"));
+  const errorSchema = readJson(path.join(codeRoot, "packages/protocol/schema/Paytobe.platform_api.error.v1.schema.json"));
   assert.deepEqual(errorSchema.properties.error.properties.code.enum, [...PLATFORM_API_ERROR_CODES]);
   const sdkTypes = fs.readFileSync(path.join(codeRoot, "packages/sdk-js/src/index.d.ts"), "utf8");
   for (const method of ["createAgent", "createRecipient", "claimConnectInvitation", "createPaymentRequest", "createWebhookEndpoint"]) {

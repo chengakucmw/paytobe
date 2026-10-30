@@ -1,7 +1,7 @@
 {
-  "name": "@velarumpay/sdk-js",
+  "name": "@Paytobe/sdk-js",
   "version": "0.1.0",
-  "description": "Minimal VelarumPay Platform API client for local agents and connectors.",
+  "description": "Minimal Paytobe Platform API client for local agents and connectors.",
   "type": "module",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
@@ -23,6 +23,6 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@velarumpay/protocol": "0.1.0"
+    "@Paytobe/protocol": "0.1.0"
   }
 }

@@ -26,7 +26,7 @@ UPDATE merchants SET display_name = 'AgentFood', status = 'active',
 
 UPDATE agents SET name = 'AgentFood Reference Agent', runtime = 'node',
   environment = 'testnet',
-  source_domain = 'agentfood-velarumpay-demo.chengakucmw.chatgpt.site',
+  source_domain = 'agentfood-Paytobe-demo.chengakucmw.chatgpt.site',
   allowed_scopes_json = '["payment.requests.create","payment.requests.read","transaction_contexts.create","transaction_contexts.read"]',
   status = 'active', version = version + 1,
   updated_at = '2026-08-02T00:00:00.000Z'

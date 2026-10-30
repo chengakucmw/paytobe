@@ -1,7 +1,7 @@
 {
-  "name": "@velarumpay/hermes-connector",
+  "name": "@Paytobe/hermes-connector",
   "version": "0.1.0",
-  "description": "Hermes local-agent adapter for VelarumPay Payment Request v1.",
+  "description": "Hermes local-agent adapter for Paytobe Payment Request v1.",
   "type": "module",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
@@ -24,6 +24,6 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@velarumpay/sdk-js": "0.1.0"
+    "@Paytobe/sdk-js": "0.1.0"
   }
 }

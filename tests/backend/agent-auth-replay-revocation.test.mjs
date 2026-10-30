@@ -10,7 +10,7 @@ import { AGENT_TOKEN_AUDIENCE, SqliteAgentAuthRepository } from "../../services/
 import { D1AgentAuthRepository } from "../../services/platform-api/src/adapters/d1/agent-auth-repository.js";
 import { id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-agent-replay-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-agent-replay-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class WalletNetworkStore {
-    private static final String PREFS = "velarumpay_wallet_networks";
+    private static final String PREFS = "Paytobe_wallet_networks";
     private static final String KEY_USER_NETWORKS = "user_networks";
 
     private WalletNetworkStore() {}

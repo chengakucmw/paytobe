@@ -29,7 +29,7 @@ import ai.agentwallet.hd.ui.components.VpPrimaryButton
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 已连接代理列表（原生）。对照 web 的 renderAgents。 */
 @Composable
@@ -53,11 +53,11 @@ fun AgentsScreen(vm: AgentsViewModel, onBack: () -> Unit, onOpen: (String) -> Un
         if (ui.agents.isEmpty()) {
             item {
                 VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
-                    Text("No connected agents", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("No connected agents", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     Text(
                         "Pair an agent to let it request payments that you review and approve here.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
             }
@@ -69,13 +69,13 @@ fun AgentsScreen(vm: AgentsViewModel, onBack: () -> Unit, onOpen: (String) -> Un
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(agent.name, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                        Text(agent.name, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                         VpBadge(agent.status.ifBlank { "active" }, if (agent.revoked) VpTone.DANGER else VpTone.SAFE)
                     }
                     Text(
                         listOf(agent.runtime, agent.deviceLabel).filter { it.isNotBlank() }.joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
             }
@@ -94,7 +94,7 @@ fun AgentDetailScreen(vm: AgentDetailViewModel, connectionId: String, onBack: ()
         val agent = ui.agent
         if (agent == null) {
             Box(Modifier.fillMaxWidth().padding(Spacing.s8), contentAlignment = Alignment.Center) {
-                if (ui.loading) CircularProgressIndicator() else Text("Connection not found.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                if (ui.loading) CircularProgressIndicator() else Text("Connection not found.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             }
         } else {
             Column(
@@ -107,22 +107,22 @@ fun AgentDetailScreen(vm: AgentDetailViewModel, connectionId: String, onBack: ()
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(agent.name, style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+                        Text(agent.name, style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
                         VpBadge(agent.status.ifBlank { "active" }, if (agent.revoked) VpTone.DANGER else VpTone.SAFE)
                     }
                     Text(
                         listOf(agent.runtime, agent.deviceLabel).filter { it.isNotBlank() }.joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
                 VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Granted scopes", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Granted scopes", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     if (agent.scopes.isEmpty()) {
-                        Text("No scopes recorded.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                        Text("No scopes recorded.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                     } else {
                         agent.scopes.forEach { scope ->
-                            Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody)
+                            Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textBody)
                         }
                     }
                 }

@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const golden = JSON.parse(readFileSync(`${root}tests/fixtures/hd-derivation-golden.json`, "utf8"));
 
-const iosTest = readFileSync(`${root}apps/ios/VelarumPayTests/HDDerivationGoldenTests.swift`, "utf8");
+const iosTest = readFileSync(`${root}apps/ios/PaytobeTests/HDDerivationGoldenTests.swift`, "utf8");
 const androidTest = readFileSync(
   `${root}apps/android/app/src/test/java/ai/agentwallet/hd/HDDerivationGoldenTest.java`,
   "utf8"

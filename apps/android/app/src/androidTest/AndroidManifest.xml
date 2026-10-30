@@ -4,6 +4,6 @@
         android:name="ai.agentwallet.hd.SecureCredentialInstrumentation"
         android:functionalTest="false"
         android:handleProfiling="false"
-        android:label="VelarumPay secure credential tests"
-        android:targetPackage="com.velarumpay.wallet" />
+        android:label="Paytobe secure credential tests"
+        android:targetPackage="com.paytobe.wallet" />
 </manifest>

@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Protocol · VelarumPay Docs</title>
+  <title>Protocol · Paytobe Docs</title>
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar">
     <div class="inner">
-      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
       <nav class="nav">
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
@@ -19,16 +19,16 @@
         <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
-        <a href="https://velarumai.com/business">Business</a>
+        <a href="https://paytobe.com/business">Business</a>
       </nav>
     </div>
   </header>
 
   <main>
     <span class="pill">Protocol v1</span>
-    <h1>The VelarumPay protocol</h1>
-    <p class="lead">Two small, validated formats carry everything: <code>velarum.payment_request.v1</code> (the exact on-chain facts) and <code>velarum.transaction_context.v1</code> (the human-readable explanation the user reviews).</p>
-    <div class="note">Download the canonical <a href="/contracts/velarum.payment_request.v1.schema.json">Payment Request JSON Schema</a> and <a href="/contracts/velarum.transaction_context.v1.schema.json">Transaction Context JSON Schema</a>.</div>
+    <h1>The Paytobe protocol</h1>
+    <p class="lead">Two small, validated formats carry everything: <code>Paytobe.payment_request.v1</code> (the exact on-chain facts) and <code>Paytobe.transaction_context.v1</code> (the human-readable explanation the user reviews).</p>
+    <div class="note">Download the canonical <a href="/contracts/Paytobe.payment_request.v1.schema.json">Payment Request JSON Schema</a> and <a href="/contracts/Paytobe.transaction_context.v1.schema.json">Transaction Context JSON Schema</a>.</div>
 
     <div class="note">Golden rule: payment facts come from the <code>payment</code> object only — never from <code>display</code> or <code>metadata</code>. What the user signs is exactly what is in <code>payment</code>.</div>
 
@@ -58,7 +58,7 @@
     <h2>Transaction Context v1</h2>
     <p>This is what the user actually reads before signing. It explains <em>why</em> this payment, in plain language.</p>
     <pre><code>{
-  "protocol": "velarum.transaction_context.v1",
+  "protocol": "Paytobe.transaction_context.v1",
   "transaction_id": "txn_demo_1",
   "connection_id": "conn_demo_1",
   "type": "developer_test",
@@ -77,15 +77,15 @@
     </table>
 
     <h2>Validation</h2>
-    <p>The <code>@velarumpay/protocol</code> package exports validators you can run before sending:</p>
-    <pre><code>import { normalizePaymentRequestV1, normalizeTransactionContextV1 } from "@velarumpay/protocol";
+    <p>The <code>@paytobe/protocol</code> package exports validators you can run before sending:</p>
+    <pre><code>import { normalizePaymentRequestV1, normalizeTransactionContextV1 } from "@paytobe/protocol";
 
 const result = normalizePaymentRequestV1(payload);
 if (!result.ok) console.error(result.errors);</code></pre>
     <p>The validators never sign, never store keys, and never create an automatic payment path. They only check and normalize.</p>
-    <p>For the HTTP surface and structured error envelopes, download the <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">Platform API OpenAPI document</a>.</p>
+    <p>For the HTTP surface and structured error envelopes, download the <a href="/contracts/Paytobe-platform-api-v0.1.openapi.json">Platform API OpenAPI document</a>.</p>
   </main>
 
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

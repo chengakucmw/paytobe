@@ -1,5 +1,5 @@
 {
-  "name": "velarumpay-code",
+  "name": "Paytobe-code",
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
@@ -36,8 +36,8 @@
     "smoke:cross-component": "node scripts/cross-component-smoke.mjs",
     "package:integrations": "npm --prefix packages/protocol run pack:dry && npm --prefix packages/sdk-js run pack:dry && npm --prefix connectors/mcp-server run pack:dry && npm --prefix connectors/hermes run pack:dry",
     "android:build": "cd apps/android && ./gradlew testDebugUnitTest assembleDebug",
-    "ios:build": "xcodebuild -project apps/ios/VelarumPay.xcodeproj -scheme VelarumPay -configuration Debug -sdk iphonesimulator build",
-    "wallet-core:test": "cd crates/velarum-wallet-core && cargo test",
+    "ios:build": "xcodebuild -project apps/ios/Paytobe.xcodeproj -scheme Paytobe -configuration Debug -sdk iphonesimulator build",
+    "wallet-core:test": "cd crates/Paytobe-wallet-core && cargo test",
     "license:check": "node scripts/check-license-policy.mjs",
     "sbom:release": "node scripts/generate-release-sbom.mjs",
     "contract:hd": "node --test tests/protocol/hd-derivation-contract.test.mjs",

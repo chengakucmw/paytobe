@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.Paytobe.com/Paytobe.recipient.v1.schema.json",
+  "title": "Paytobe Recipient v1",
+  "type": "object",
+  "required": ["recipient_id", "merchant_id", "name", "status", "version", "created_at", "updated_at"],
+  "properties": {
+    "recipient_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "merchant_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "name": {"type": "string", "minLength": 1, "maxLength": 120},
+    "active_version_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"type": "string", "enum": ["draft", "pending_verification", "active", "suspended", "revoked"]},
+    "version": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  },
+  "additionalProperties": false,
+  "x-Paytobe-contract-version": "Paytobe.control-plane.v1"
+}

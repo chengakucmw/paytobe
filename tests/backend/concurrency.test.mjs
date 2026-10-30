@@ -20,7 +20,7 @@ import { Store } from "../../services/platform-api/src/store.js";
 // These tests model two processes as two Store instances over one SQLite file.
 
 function freshSqlitePath() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-concurrency-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-concurrency-"));
   return { dir, file: path.join(dir, "relay-store.sqlite") }; // .sqlite => SQLite driver
 }
 

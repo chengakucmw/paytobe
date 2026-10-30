@@ -22,8 +22,8 @@ final class PaymentIntent {
     final String sourceType;
     final String sourceChannel;
     final String sourceDeviceId;
-    final String velarumRequestId;
-    final String velarumPayloadHash;
+    final String PaytobeRequestId;
+    final String PaytobeloadHash;
     final String rail;
     final String network;
     final long chainId;
@@ -66,15 +66,15 @@ final class PaymentIntent {
         if (payment == null) payment = new JSONObject();
         JSONObject source = raw.optJSONObject("source");
         if (source == null) source = new JSONObject();
-        JSONObject velarum = raw.optJSONObject("velarum");
-        if (velarum == null) velarum = new JSONObject();
+        JSONObject Paytobe = raw.optJSONObject("Paytobe");
+        if (Paytobe == null) Paytobe = new JSONObject();
         JSONObject risk = raw.optJSONObject("risk");
         if (risk == null) risk = new JSONObject();
         JSONObject display = raw.optJSONObject("display");
         if (display == null) display = new JSONObject();
-        JSONObject merchant = firstObject(raw.optJSONObject("merchant"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("merchant"));
+        JSONObject merchant = firstObject(raw.optJSONObject("merchant"), Paytobe.optJSONObject("payload") == null ? null : Paytobe.optJSONObject("payload").optJSONObject("merchant"));
         if (merchant == null) merchant = new JSONObject();
-        JSONObject recipient = firstObject(raw.optJSONObject("recipient"), velarum.optJSONObject("payload") == null ? null : velarum.optJSONObject("payload").optJSONObject("recipient"));
+        JSONObject recipient = firstObject(raw.optJSONObject("recipient"), Paytobe.optJSONObject("payload") == null ? null : Paytobe.optJSONObject("payload").optJSONObject("recipient"));
         if (recipient == null) recipient = new JSONObject();
 
         id = request.id;
@@ -84,8 +84,8 @@ final class PaymentIntent {
         sourceType = request.sourceType;
         sourceChannel = request.sourceChannel;
         sourceDeviceId = firstNonEmpty(request.sourceDeviceLabel, request.sourceDeviceId);
-        velarumRequestId = request.requestId;
-        velarumPayloadHash = velarum.optString("payload_hash", "");
+        PaytobeRequestId = request.requestId;
+        PaytobeloadHash = Paytobe.optString("payload_hash", "");
         rail = request.rail;
         network = request.network;
         chainId = request.chainId;

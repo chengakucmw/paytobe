@@ -38,9 +38,9 @@ import ai.agentwallet.hd.ui.components.VpQrCode
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumFonts
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeFonts
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 收款页（原生）：选资产 → 显示该资产对应地址的二维码 + 可复制地址。
@@ -75,7 +75,7 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
                         Text(
                             "Wallet address is not ready yet.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = VelarumTheme.colors.textMuted,
+                            color = PaytobeTheme.colors.textMuted,
                         )
                     }
                 }
@@ -84,7 +84,7 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("Network", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Network", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     VpBadge(selected.chain, VpTone.SAFE)
                 }
             }
@@ -98,8 +98,8 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
                 ) {
                     Text(
                         text = address ?: "Not ready",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-                        color = VelarumTheme.colors.textBody,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+                        color = PaytobeTheme.colors.textBody,
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(
@@ -110,18 +110,18 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
                             }
                         },
                     ) {
-                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy address", tint = VelarumTheme.colors.primary)
+                        Icon(Icons.Filled.ContentCopy, contentDescription = "Copy address", tint = PaytobeTheme.colors.primary)
                     }
                 }
                 Surface(
-                    shape = VelarumRadii.md,
-                    color = VelarumTheme.colors.primarySoft,
+                    shape = PaytobeRadii.md,
+                    color = PaytobeTheme.colors.primarySoft,
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.s3),
                 ) {
                     Text(
                         text = "${selected.chain} network only · only send ${selected.symbol} to this address. Sending a different network or asset here can lose your funds.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.primaryActive,
+                        color = PaytobeTheme.colors.primaryActive,
                         modifier = Modifier.padding(Spacing.s4),
                     )
                 }
@@ -133,15 +133,15 @@ fun ReceiveScreen(vm: WalletViewModel, onBack: () -> Unit) {
 @Composable
 private fun AssetChip(label: String, active: Boolean, onClick: () -> Unit) {
     Surface(
-        shape = VelarumRadii.pill,
-        color = if (active) VelarumTheme.colors.primary else VelarumTheme.colors.surfaceCard,
-        border = if (active) null else BorderStroke(1.dp, VelarumTheme.colors.borderDefault),
+        shape = PaytobeRadii.pill,
+        color = if (active) PaytobeTheme.colors.primary else PaytobeTheme.colors.surfaceCard,
+        border = if (active) null else BorderStroke(1.dp, PaytobeTheme.colors.borderDefault),
         modifier = Modifier.clickable { onClick() },
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (active) VelarumTheme.colors.onPrimary else VelarumTheme.colors.textStrong,
+            color = if (active) PaytobeTheme.colors.onPrimary else PaytobeTheme.colors.textStrong,
             modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s2),
         )
     }

@@ -26,7 +26,7 @@ import ai.agentwallet.hd.ui.components.VpChip
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.vpToneOf
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 收件箱列表（原生）。对照 web 的 renderInbox：Pending/All/Final 分段 + 请求卡片/空态。
  *  列表用 LazyColumn：只渲染可见请求卡片并回收，请求变多时滚动依旧顺滑。 */
@@ -58,11 +58,11 @@ fun InboxScreen(vm: InboxViewModel, onOpen: (String) -> Unit) {
         if (ui.items.isEmpty()) {
             item {
                 VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
-                    Text("No payment requests", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("No payment requests", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     Text(
                         "When a connected agent or app requests a payment, it appears here for you to review and sign.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
             }
@@ -85,18 +85,18 @@ private fun InboxCard(item: InboxItem, onClick: () -> Unit, modifier: Modifier =
             Text(
                 item.payee,
                 style = MaterialTheme.typography.titleMedium,
-                color = VelarumTheme.colors.textStrong,
+                color = PaytobeTheme.colors.textStrong,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
             VpBadge(item.stateLabel, vpToneOf(item.tone))
         }
-        Text(item.title, style = MaterialTheme.typography.bodyLarge, color = VelarumTheme.colors.textBody, modifier = Modifier.padding(top = Spacing.s1))
+        Text(item.title, style = MaterialTheme.typography.bodyLarge, color = PaytobeTheme.colors.textBody, modifier = Modifier.padding(top = Spacing.s1))
         Text(
             "${item.amount} ${item.asset} · ${item.network}",
             style = MaterialTheme.typography.bodyMedium,
-            color = VelarumTheme.colors.textMuted,
+            color = PaytobeTheme.colors.textMuted,
         )
     }
 }

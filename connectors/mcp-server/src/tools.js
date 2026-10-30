@@ -1,10 +1,10 @@
 import {
   DEFAULT_BASE_URL,
-  createVelarumPayClient,
+  createPaytobeClient,
   normalizeError as normalizeApiError,
   validatePaymentRequest,
   validateTransactionContext
-} from "@velarumpay/sdk-js";
+} from "@Paytobe/sdk-js";
 
 const DEFAULT_SCOPES = Object.freeze([
   "payment.requests.create",
@@ -18,11 +18,11 @@ const TOOL_SCOPES = new Set(DEFAULT_SCOPES);
 const commonConnectionProperties = {
   base_url: {
     type: "string",
-    description: "Platform API base URL. Defaults to VELARUMPAY_API_BASE_URL or http://127.0.0.1:8787."
+    description: "Platform API base URL. Defaults to Paytobe_API_BASE_URL or http://127.0.0.1:8787."
   },
   connection_token: {
     type: "string",
-    description: "Connection-scoped token approved by the wallet. Defaults to VELARUMPAY_CONNECTION_TOKEN."
+    description: "Connection-scoped token approved by the wallet. Defaults to Paytobe_CONNECTION_TOKEN."
   }
 };
 
@@ -30,7 +30,7 @@ export const tools = Object.freeze([
   {
     name: "create_pairing_session",
     title: "Create Pairing Session",
-    description: "Create a short-lived VelarumPay pairing session for a local agent. Requests only Payment Request and Transaction Context scopes.",
+    description: "Create a short-lived Paytobe pairing session for a local agent. Requests only Payment Request and Transaction Context scopes.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -68,7 +68,7 @@ export const tools = Object.freeze([
   {
     name: "create_transaction_context",
     title: "Create Transaction Context",
-    description: "Create a velarum.transaction_context.v1 object for a scoped connection. This does not sign or submit a payment.",
+    description: "Create a Paytobe.transaction_context.v1 object for a scoped connection. This does not sign or submit a payment.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -77,7 +77,7 @@ export const tools = Object.freeze([
         transaction_context: {
           type: "object",
           additionalProperties: true,
-          description: "Standard velarum.transaction_context.v1 payload."
+          description: "Standard Paytobe.transaction_context.v1 payload."
         }
       },
       required: ["transaction_context"]
@@ -87,7 +87,7 @@ export const tools = Object.freeze([
   {
     name: "create_payment_request",
     title: "Create Payment Request",
-    description: "Create a velarum.payment_request.v1 request for wallet review. The wallet must approve and sign locally.",
+    description: "Create a Paytobe.payment_request.v1 request for wallet review. The wallet must approve and sign locally.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -96,7 +96,7 @@ export const tools = Object.freeze([
         payment_request: {
           type: "object",
           additionalProperties: true,
-          description: "Standard velarum.payment_request.v1 payload."
+          description: "Standard Paytobe.payment_request.v1 payload."
         },
         target_app_device_id: {
           type: "string",
@@ -222,7 +222,7 @@ async function getPaymentStatus(args, settings) {
 }
 
 function clientFrom(args = {}, settings = {}) {
-  return createVelarumPayClient({
+  return createPaytobeClient({
     baseUrl: baseUrlFrom(args, settings),
     connectionToken: connectionTokenFrom(args, settings),
     fetch: settings.fetch || globalThis.fetch
@@ -233,7 +233,7 @@ function baseUrlFrom(args = {}, settings = {}) {
   return String(
     args.base_url ||
     settings.baseUrl ||
-    process.env.VELARUMPAY_API_BASE_URL ||
+    process.env.Paytobe_API_BASE_URL ||
     process.env.BASE_URL ||
     DEFAULT_BASE_URL
   ).replace(/\/+$/, "");
@@ -243,7 +243,7 @@ function connectionTokenFrom(args = {}, settings = {}) {
   return String(
     args.connection_token ||
     settings.connectionToken ||
-    process.env.VELARUMPAY_CONNECTION_TOKEN ||
+    process.env.Paytobe_CONNECTION_TOKEN ||
     process.env.CONNECTION_TOKEN ||
     ""
   ).trim();

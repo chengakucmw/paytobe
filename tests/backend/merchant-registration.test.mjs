@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-merchant-registration-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-merchant-registration-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

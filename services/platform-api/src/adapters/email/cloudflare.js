@@ -68,7 +68,7 @@ export function createCloudflareEmailAdapter(config, dependencies = {}) {
       const returning = purpose === "access";
       return deliver({
         to,
-        subject: returning ? "Continue to your VelarumPay merchant account" : "Verify your VelarumPay merchant email",
+        subject: returning ? "Continue to your Paytobe merchant account" : "Verify your Paytobe merchant email",
         text: verificationText(url, expires_at, returning),
         html: verificationHtml(url, expires_at, returning)
       });
@@ -77,7 +77,7 @@ export function createCloudflareEmailAdapter(config, dependencies = {}) {
       const url = portalUrl(config.portal_base_url, "/", { step_up_token: token });
       return deliver({
         to,
-        subject: "Complete your VelarumPay security verification",
+        subject: "Complete your Paytobe security verification",
         text: stepUpText(url, expires_at),
         html: stepUpHtml(url, expires_at)
       });
@@ -86,7 +86,7 @@ export function createCloudflareEmailAdapter(config, dependencies = {}) {
 }
 
 function verificationText(url, expiresAt, returning) {
-  const action = returning ? "Continue to your VelarumPay merchant account" : "Verify your VelarumPay merchant email";
+  const action = returning ? "Continue to your Paytobe merchant account" : "Verify your Paytobe merchant email";
   return `${action}:\n${url}\n\nThis one-time link expires at ${expiresAt}. If you did not request it, ignore this email.`;
 }
 
@@ -94,8 +94,8 @@ function verificationHtml(url, expiresAt, returning) {
   return emailFrame(
     returning ? "Continue to your merchant account" : "Verify your merchant email",
     returning
-      ? "Use this one-time link to sign in or continue creating your VelarumPay merchant workspace."
-      : "Finish creating your VelarumPay merchant account with this one-time link.",
+      ? "Use this one-time link to sign in or continue creating your Paytobe merchant workspace."
+      : "Finish creating your Paytobe merchant account with this one-time link.",
     url,
     returning ? "Continue securely" : "Verify email",
     `This link expires at ${expiresAt}.`
@@ -103,7 +103,7 @@ function verificationHtml(url, expiresAt, returning) {
 }
 
 function stepUpText(url, expiresAt) {
-  return `Complete VelarumPay security verification without signing in again:\n${url}\n\nKeep your original Portal tab open. This one-time link expires at ${expiresAt}. If you did not request it, ignore this email.`;
+  return `Complete Paytobe security verification without signing in again:\n${url}\n\nKeep your original Portal tab open. This one-time link expires at ${expiresAt}. If you did not request it, ignore this email.`;
 }
 
 function stepUpHtml(url, expiresAt) {
@@ -122,7 +122,7 @@ function emailFrame(title, message, url, action, footer) {
   const safeUrl = escapeHtml(url);
   const safeAction = escapeHtml(action);
   const safeFooter = escapeHtml(footer);
-  return `<!doctype html><html lang="en"><body style="margin:0;background:#f4efe6;color:#0a0a0a;font-family:Arial,sans-serif"><div style="max-width:560px;margin:32px auto;padding:32px;border:2px solid #0a0a0a;background:#fff"><p style="font-weight:700;color:#2727e6">VelarumPay</p><h1 style="font-size:28px">${safeTitle}</h1><p>${safeMessage}</p><p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;padding:12px 18px;border:2px solid #0a0a0a;background:#2727e6;color:#fff;text-decoration:none;font-weight:700">${safeAction}</a></p><p style="font-size:13px;color:#4a4a48">${safeFooter}</p></div></body></html>`;
+  return `<!doctype html><html lang="en"><body style="margin:0;background:#f4efe6;color:#0a0a0a;font-family:Arial,sans-serif"><div style="max-width:560px;margin:32px auto;padding:32px;border:2px solid #0a0a0a;background:#fff"><p style="font-weight:700;color:#2727e6">Paytobe</p><h1 style="font-size:28px">${safeTitle}</h1><p>${safeMessage}</p><p style="margin:28px 0"><a href="${safeUrl}" style="display:inline-block;padding:12px 18px;border:2px solid #0a0a0a;background:#2727e6;color:#fff;text-decoration:none;font-weight:700">${safeAction}</a></p><p style="font-size:13px;color:#4a4a48">${safeFooter}</p></div></body></html>`;
 }
 
 function portalUrl(base, pathname, params) {

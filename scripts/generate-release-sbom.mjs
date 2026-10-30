@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outputPath = path.resolve(
   repoRoot,
-  process.argv[2] || "tmp/release-gate/velarumpay-sbom.cdx.json"
+  process.argv[2] || "tmp/release-gate/Paytobe-sbom.cdx.json"
 );
 const skipAndroid = process.argv.includes("--skip-android");
 
@@ -27,7 +27,7 @@ const cargoMetadata = runJson("cargo", [
   "--format-version",
   "1",
   "--manifest-path",
-  "crates/velarum-wallet-core/Cargo.toml"
+  "crates/Paytobe-wallet-core/Cargo.toml"
 ]);
 
 const components = new Map();
@@ -40,7 +40,7 @@ for (const crate of cargoMetadata.packages || []) {
     version: crate.version,
     licenses: crate.license ? [{ expression: crate.license }] : undefined,
     purl: `pkg:cargo/${encodeURIComponent(crate.name)}@${encodeURIComponent(crate.version)}`,
-    properties: [{ name: "velarumpay:ecosystem", value: "cargo" }]
+    properties: [{ name: "Paytobe:ecosystem", value: "cargo" }]
   });
 }
 
@@ -58,7 +58,7 @@ if (!skipAndroid) {
       name: coordinate.name,
       version: coordinate.version,
       purl: `pkg:maven/${encodeURIComponent(coordinate.group)}/${encodeURIComponent(coordinate.name)}@${encodeURIComponent(coordinate.version)}`,
-      properties: [{ name: "velarumpay:ecosystem", value: "gradle" }]
+      properties: [{ name: "Paytobe:ecosystem", value: "gradle" }]
     });
   }
 }
@@ -75,22 +75,22 @@ const document = {
       components: [
         {
           type: "application",
-          author: "VelarumPay",
+          author: "Paytobe",
           name: "generate-release-sbom.mjs"
         }
       ]
     },
     component: {
       type: "application",
-      "bom-ref": `velarumpay:${commit}`,
-      group: "com.velarumpay",
-      name: "VelarumPay",
+      "bom-ref": `Paytobe:${commit}`,
+      group: "com.Paytobe",
+      name: "Paytobe",
       version: commit,
       licenses: [{ license: { id: "Apache-2.0" } }]
     },
     properties: [
-      { name: "velarumpay:git_commit", value: commit },
-      { name: "velarumpay:android_configuration", value: skipAndroid ? "not-included" : "stellarTestnetReleaseRuntimeClasspath" }
+      { name: "Paytobe:git_commit", value: commit },
+      { name: "Paytobe:android_configuration", value: skipAndroid ? "not-included" : "stellarTestnetReleaseRuntimeClasspath" }
     ]
   },
   components: [...components.values()].sort((left, right) => componentKey(left).localeCompare(componentKey(right)))

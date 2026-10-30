@@ -12,7 +12,7 @@ import { createPaymentRequestsRouter } from "../../services/platform-api/src/rou
 import { Store } from "../../services/platform-api/src/store.js";
 
 test("formal Payment Request confirms on-chain and emits durable Webhook events for every status", async (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-payment-lifecycle-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-payment-lifecycle-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const store = new Store(path.join(directory, "relay.sqlite"));
   t.after(() => store.close());

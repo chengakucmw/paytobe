@@ -25,7 +25,7 @@ import ai.agentwallet.hd.ui.components.VpFactRow
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.vpToneOf
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 交易档案（原生）。对照 web 的 renderDossier：商家证明、视觉证据、决策快照、AI 任务轨迹、
@@ -39,7 +39,7 @@ fun DossierScreen(vm: DetailViewModel, onBack: () -> Unit) {
         VpSubheader(eyebrow = "Transaction dossier", title = "Context and proof", onBack = onBack)
         if (dossier == null) {
             Box(Modifier.fillMaxWidth().padding(Spacing.s8), contentAlignment = Alignment.Center) {
-                Text("No dossier available.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                Text("No dossier available.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             }
         } else {
             Column(
@@ -52,10 +52,10 @@ fun DossierScreen(vm: DetailViewModel, onBack: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(dossier.title.ifBlank { "Payment dossier" }, style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+                        Text(dossier.title.ifBlank { "Payment dossier" }, style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
                         VpBadge(dossier.status.ifBlank { "Dossier" }, vpToneOf(dossier.tone))
                     }
-                    Text("${dossier.agentName} · ${dossier.source}", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("${dossier.agentName} · ${dossier.source}", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
                 if (dossier.evidence.isNotEmpty()) {
                     Section("Visual evidence") { dossier.evidence.forEach { VpFactRow(it.title, it.meta) } }
@@ -85,7 +85,7 @@ fun DossierScreen(vm: DetailViewModel, onBack: () -> Unit) {
 @Composable
 private fun Section(title: String, content: @Composable () -> Unit) {
     VpCard(modifier = Modifier.fillMaxWidth()) {
-        Text(title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
+        Text(title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
         content()
     }
 }
@@ -97,11 +97,11 @@ private fun DossierRow(row: DossierRowUi) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
-            Text(row.label, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted, modifier = Modifier.weight(1f))
-            Text(row.value, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.weight(1f))
+            Text(row.label, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted, modifier = Modifier.weight(1f))
+            Text(row.value, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textStrong, modifier = Modifier.weight(1f))
         }
         if (row.detail.isNotBlank()) {
-            Text(row.detail, style = MaterialTheme.typography.labelMedium, color = VelarumTheme.colors.textFaint)
+            Text(row.detail, style = MaterialTheme.typography.labelMedium, color = PaytobeTheme.colors.textFaint)
         }
     }
 }
@@ -112,11 +112,11 @@ private fun TraceStep(number: Int, step: TraceStepUi) {
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s1),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Text("$number", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.primary)
+        Text("$number", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.primary)
         Column {
-            Text(step.title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+            Text(step.title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
             if (step.body.isNotBlank()) {
-                Text(step.body, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                Text(step.body, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             }
         }
     }

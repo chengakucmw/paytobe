@@ -7,7 +7,7 @@ import {
 import {
   normalizePaymentRequestV1 as normalizeApiPaymentRequestV1,
   normalizeTransactionContextV1 as normalizeApiTransactionContextV1
-} from "../../services/platform-api/src/velarum.js";
+} from "../../services/platform-api/src/Paytobe.js";
 import {
   paymentRequestFixtures,
   protocolFixtureClock,

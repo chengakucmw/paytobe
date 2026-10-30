@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-connect-invitations-"));
+const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-connect-invitations-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "json";
 process.env.RELAY_STORE_PATH = path.join(storeDir, "relay-store.json");
@@ -84,7 +84,7 @@ test("one-time Connect Invitation completes only after the owning wallet approve
     body: JSON.stringify(wallet)
   });
   assert.equal(created.response.status, 201);
-  assert.match(created.body.connect_key, /^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/);
+  assert.match(created.body.connect_key, /^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/);
   assert.equal(created.body.connect_key.includes(":v1:"), false);
   assert.equal(created.body.connect_invitation.status, "waiting");
   const invitationId = created.body.connect_invitation.connect_invitation_id;
@@ -92,7 +92,7 @@ test("one-time Connect Invitation completes only after the owning wallet approve
   const invalid = await request(base, "/v1/connect-invitations/claim/legacy", {
     method: "POST",
     body: JSON.stringify({
-      connect_key: "velarumpay-connect:ck_not-a-real-key",
+      connect_key: "Paytobe-connect:ck_not-a-real-key",
       agent_identity: agent
     })
   });

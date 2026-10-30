@@ -26,7 +26,7 @@ import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTextField
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 配对页（原生）。对照 web 的 renderPairing：输入/扫得配对码 → 取会话 → 展示请求的权限 → 批准/拒绝。
@@ -60,22 +60,22 @@ fun PairingScreen(vm: PairingViewModel, presetCode: String, onBack: () -> Unit, 
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text(session.name, style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+                        Text(session.name, style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
                         VpBadge(if (session.pending) "Pending" else "Closed", if (session.pending) VpTone.CAUTION else VpTone.INFO)
                     }
                     Text(
                         listOf(session.runtime, session.deviceLabel).filter { it.isNotBlank() }.joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
                 VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Requested scopes", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Requested scopes", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     if (session.requestedScopes.isEmpty()) {
-                        Text("None requested.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                        Text("None requested.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                     } else {
                         session.requestedScopes.forEach { scope ->
-                            Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody)
+                            Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textBody)
                         }
                     }
                 }

@@ -42,8 +42,8 @@ import ai.agentwallet.hd.ui.components.VpRiskBanner
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -149,7 +149,7 @@ fun RecoveryPhraseScreen(onBack: () -> Unit) {
 
             if (words.isEmpty()) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Protected by device authentication", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Protected by device authentication", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     Spacer(Modifier.padding(top = Spacing.s1))
                     VpFactRow("Screenshot protection", "On", VpTone.SAFE)
                     VpFactRow("Clipboard copy", "Disabled", VpTone.SAFE)
@@ -192,7 +192,7 @@ internal fun canDisplayRecoveryPhrase(
 
 @Composable
 private fun RecoveryWordGrid(words: List<String>) {
-    Surface(shape = VelarumRadii.xl, color = VelarumTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = PaytobeRadii.xl, color = PaytobeTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             words.chunked(2).forEachIndexed { rowIndex, pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -212,12 +212,12 @@ private fun RecoveryWordGrid(words: List<String>) {
 
 @Composable
 private fun RecoveryWordCell(index: Int, word: String, modifier: Modifier = Modifier) {
-    Surface(shape = VelarumRadii.sm, color = Color.White.copy(alpha = 0.08f), modifier = modifier) {
+    Surface(shape = PaytobeRadii.sm, color = Color.White.copy(alpha = 0.08f), modifier = modifier) {
         Row(
             modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            Text(index.toString(), style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textFaint)
+            Text(index.toString(), style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textFaint)
             Text(word, style = MaterialTheme.typography.bodyMedium, color = Color.White)
         }
     }

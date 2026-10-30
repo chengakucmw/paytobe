@@ -98,7 +98,7 @@ function paymentPayload(requestId, idempotencyKey, amount, recipientBound) {
     };
   }
   return {
-    protocol: "velarum.payment_request.v1",
+    protocol: "Paytobe.payment_request.v1",
     request_id: requestId,
     idempotency_key: idempotencyKey,
     created_at: createdAt,

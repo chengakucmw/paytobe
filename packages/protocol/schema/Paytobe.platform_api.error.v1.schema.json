@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.Paytobe.com/Paytobe.platform_api.error.v1.schema.json",
+  "title": "Paytobe Platform API Error Envelope v1",
+  "type": "object",
+  "required": ["ok", "error"],
+  "properties": {
+    "ok": { "const": false },
+    "error": {
+      "type": "object",
+      "required": ["code", "message", "request_id"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": [
+            "resource_not_found",
+            "invalid_request",
+            "validation_failed",
+            "unauthenticated",
+            "forbidden",
+            "scope_denied",
+            "tenant_scope_violation",
+            "idempotency_conflict",
+            "concurrency_conflict",
+            "rate_limited",
+            "internal_error"
+          ]
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "severity": { "type": "string", "enum": ["blocker", "warning", "review_required", "info"] },
+        "field": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "details": { "type": "object", "additionalProperties": true }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "x-Paytobe-contract-version": "Paytobe.platform-api.v1"
+}

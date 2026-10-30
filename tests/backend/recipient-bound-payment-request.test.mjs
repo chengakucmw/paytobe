@@ -112,7 +112,7 @@ test("draft, cooling, suspended, revoked, cross-tenant, stale, and unsupported v
 });
 
 function setup(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-recipient-payment-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-recipient-payment-"));
   const store = new Store(path.join(directory, "platform.sqlite"));
   t.after(() => {
     store.close();

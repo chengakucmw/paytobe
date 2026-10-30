@@ -14,7 +14,7 @@ import { Store } from "../../services/platform-api/src/store.js";
 // reload+snapshot cost stays small as history accumulates.
 
 function freshSqlite() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-prune-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-prune-"));
   return { dir, file: path.join(dir, "relay-store.sqlite") };
 }
 

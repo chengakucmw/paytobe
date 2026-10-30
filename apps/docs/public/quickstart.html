@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Merchant Quickstart · VelarumPay Docs</title>
+  <title>Merchant Quickstart · Paytobe Docs</title>
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar"><div class="inner">
-    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
     <nav class="nav">
       <a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a>
       <a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a><a href="/protocol.html">Protocol</a>
@@ -19,7 +19,7 @@
   <main>
     <span class="pill">Merchant Quickstart · Testnet</span>
     <h1>From merchant registration to a user-approved test request</h1>
-    <p class="lead">This is the canonical onboarding order for the official testnet origin <code>https://api.velarumai.com</code>. A local offline mock exercises the same order without network access or credentials.</p>
+    <p class="lead">This is the canonical onboarding order for the official testnet origin <code>https://api.paytobe.com</code>. A local offline mock exercises the same order without network access or credentials.</p>
     <div class="note">This flow never asks for a wallet private key and never grants payment-signing authority to an Agent. Recipient facts come from an active verified Recipient version; the wallet still reviews and approves every payment.</div>
 
     <h2>0. Run the offline contract first</h2>
@@ -85,10 +85,10 @@ await merchant.updateAgent(agent.agent.agent_id, { status: "active", version: 1 
     <p>The registration response contains a five-minute proof challenge. Sign that challenge locally before activation. Generate and retain signing material in your secure local signer; upload only the public key and proof of possession. See <a href="/agent-auth.html">Agent Auth</a> for the exact assertion fields.</p>
 
     <h2>5. Exchange a local Agent Assertion for a short token</h2>
-    <pre><code>import { createVelarumPayClient } from "@velarumpay/sdk-js";
+    <pre><code>import { createPaytobeClient } from "@paytobe/sdk-js";
 
-const agentClient = createVelarumPayClient({
-  baseUrl: "https://api.velarumai.com",
+const agentClient = createPaytobeClient({
+  baseUrl: "https://api.paytobe.com",
   agentAuth: {
     agentId,
     clientId,
@@ -108,7 +108,7 @@ await agentClient.exchangeAgentToken();</code></pre>
   "payment.requests.read"
 ]);
 
-// The user reviews verified merchant + Agent identity and scopes in VelarumPay.
+// The user reviews verified merchant + Agent identity and scopes in Paytobe.
 const connection = await agentClient.exchangeConnectInvitation(
   claim.connect_invitation.connect_invitation_id,
   claim.claim_token
@@ -135,8 +135,8 @@ const events = await agentClient.pollEvents({ since: 0 });</code></pre>
     <p>Create and verify the endpoint in Merchant Portal, display the generated endpoint secret once, and store it only in your server-side secret manager. Verify the exact raw body before parsing JSON; see the <a href="/webhooks.html">Webhook verification guide and fixed vector</a>.</p>
 
     <h2>Contracts and errors</h2>
-    <p>Download the <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1 contract</a> and protocol schemas. Errors are stable envelopes with <code>error.code</code>, <code>error.message</code>, and <code>error.request_id</code>. Cross-tenant lookups use a non-enumerating <code>resource_not_found</code> response.</p>
+    <p>Download the <a href="/contracts/Paytobe-platform-api-v0.1.openapi.json">OpenAPI 3.1 contract</a> and protocol schemas. Errors are stable envelopes with <code>error.code</code>, <code>error.message</code>, and <code>error.request_id</code>. Cross-tenant lookups use a non-enumerating <code>resource_not_found</code> response.</p>
   </main>
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

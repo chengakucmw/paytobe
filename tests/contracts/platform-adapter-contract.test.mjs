@@ -10,7 +10,7 @@ import { tokenHash } from "../../services/platform-api/src/crypto.js";
 
 const codeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixture = JSON.parse(fs.readFileSync(path.join(codeRoot, "tests/fixtures/platform-adapter-contract.json"), "utf8"));
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-adapter-contract-"));
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-adapter-contract-"));
 const workerAdminToken = "admin_contract_test_token_1234567890";
 
 process.env.VP_NO_AUTO_LISTEN = "1";
@@ -73,7 +73,7 @@ const adapters = {
 };
 
 test("the runtime-independent adapter interface exposes request normalization and reset", async () => {
-  assert.equal(fixture.version, "velarum.platform-adapter-contract.v1");
+  assert.equal(fixture.version, "Paytobe.platform-adapter-contract.v1");
   for (const adapter of Object.values(adapters)) {
     assert.equal(typeof adapter.reset, "function");
     assert.equal(typeof adapter.scenarioHealth, "function");

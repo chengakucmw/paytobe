@@ -183,7 +183,7 @@ function seedD1MerchantAndPayment(db, merchantId, requestId) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-webhook-outbox-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-webhook-outbox-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

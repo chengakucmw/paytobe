@@ -7,7 +7,7 @@ const VALUE_FINGERPRINT_KEY_PATTERN = /(^to$|address|recipient|tx_hash|transacti
 const VALUE_REDACT_KEY_PATTERN = /(^amount$|total|fee|price|cost)/i;
 
 export function createObservability(options = {}) {
-  const service = options.service || "velarumpay-platform-api";
+  const service = options.service || "Paytobe-platform-api";
   const environment = options.environment || process.env.NODE_ENV || "development";
   const startedAt = Date.now();
   const auditRetention = normalizeRetention(options.auditRetention ?? process.env.AUDIT_EVENT_RETENTION);
@@ -32,7 +32,7 @@ export function createObservability(options = {}) {
     nextAuditSeq += 1;
     auditEvents.push(event);
     while (auditEvents.length > auditRetention) auditEvents.shift();
-    incrementCounter("velarumpay_audit_events_total", {
+    incrementCounter("Paytobe_audit_events_total", {
       action: event.action,
       outcome: event.outcome
     });
@@ -54,20 +54,20 @@ export function createObservability(options = {}) {
         const route = routeLabel(req);
         const status = Number(res.statusCode || 0);
         const durationSeconds = Number(process.hrtime.bigint() - started) / 1e9;
-        incrementCounter("velarumpay_http_requests_total", {
+        incrementCounter("Paytobe_http_requests_total", {
           method: req.method,
           route,
           status: String(status),
           status_class: `${Math.floor(status / 100)}xx`
         });
-        observeSummary("velarumpay_http_request_duration_seconds", {
+        observeSummary("Paytobe_http_request_duration_seconds", {
           method: req.method,
           route
         }, durationSeconds);
 
         if (res.locals?.api_error) {
           const error = res.locals.api_error;
-          incrementCounter("velarumpay_api_errors_total", {
+          incrementCounter("Paytobe_api_errors_total", {
             code: error.code || "unknown",
             status: String(error.status || status || 0),
             route
@@ -129,8 +129,8 @@ export function createObservability(options = {}) {
   }
 
   function prometheusText() {
-    setGauge("velarumpay_audit_buffer_events", {}, auditEvents.length);
-    setGauge("velarumpay_process_uptime_seconds", {}, (Date.now() - startedAt) / 1000);
+    setGauge("Paytobe_audit_buffer_events", {}, auditEvents.length);
+    setGauge("Paytobe_process_uptime_seconds", {}, (Date.now() - startedAt) / 1000);
     return metrics.toPrometheus();
   }
 

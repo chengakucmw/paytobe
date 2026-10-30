@@ -124,7 +124,7 @@ export function detectUnsupportedTransferTarget(input = {}) {
     return {
       blocked: true,
       code: "unsupported_tron",
-      message: "TRON, TRX, TRC10, and TRC20 are not supported by VelarumPay."
+      message: "TRON, TRX, TRC10, and TRC20 are not supported by Paytobe."
     };
   }
   if (values.some((value) => /\bnear\b|near[-_ ]?protocol/i.test(value))) {

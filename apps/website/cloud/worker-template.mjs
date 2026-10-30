@@ -78,7 +78,7 @@ async function handle(request, env) {
   if (request.method === "GET" && url.pathname === "/health") {
     return json(200, {
       ok: true,
-      service: "VelarumPay-site",
+      service: "Paytobe-site",
       android_apk_available: Boolean(env?.ANDROID_APK_DOWNLOAD_URL)
     });
   }

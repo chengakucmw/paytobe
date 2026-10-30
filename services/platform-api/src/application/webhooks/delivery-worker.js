@@ -38,10 +38,10 @@ export class WebhookDeliveryService {
         raw_body: rawBody,
         headers: {
           "content-type": "application/json",
-          "user-agent": "VelarumPay-Webhook/1",
-          "x-velarumpay-event-id": claimed.event_id,
-          "x-velarumpay-delivery-id": claimed.delivery_id,
-          "x-velarumpay-signature": signWebhookPayload(secret, timestamp, rawBody)
+          "user-agent": "Paytobe-Webhook/1",
+          "x-Paytobe-event-id": claimed.event_id,
+          "x-Paytobe-delivery-id": claimed.delivery_id,
+          "x-Paytobe-signature": signWebhookPayload(secret, timestamp, rawBody)
         }
       });
       outcome = classifyWebhookDelivery({ response_status: response.status, duration_ms: response.duration_ms });
@@ -90,8 +90,8 @@ export class WebhookDeliveryService {
 
   record(claimed, outcome) {
     const labels = { outcome: outcome.kind, failure_code: outcome.failure_code || "none", attempt: String(claimed.attempt) };
-    this.observability.incrementCounter("velarumpay_webhook_delivery_attempts_total", labels);
-    this.observability.observeSummary("velarumpay_webhook_delivery_duration_seconds", { outcome: outcome.kind }, Number(outcome.duration_ms || 0) / 1000);
+    this.observability.incrementCounter("Paytobe_webhook_delivery_attempts_total", labels);
+    this.observability.observeSummary("Paytobe_webhook_delivery_duration_seconds", { outcome: outcome.kind }, Number(outcome.duration_ms || 0) / 1000);
     this.observability.recordAuditEvent("webhook.delivery_completed", outcome.kind === "delivered" ? "success" : "failure", {
       actor: { type: "platform_worker", id: "webhook_delivery" },
       resource: { type: "webhook_delivery", id: claimed.delivery_id },

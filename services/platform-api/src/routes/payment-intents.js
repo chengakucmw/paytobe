@@ -2,7 +2,7 @@
 
 import express from "express";
 import { resolveTargetDevice } from "../routing.js";
-import { adaptVelarum } from "../velarum.js";
+import { adaptPaytobe } from "../Paytobe.js";
 import {
   INTENT_STATUS_UPDATES,
   canTransition,
@@ -65,13 +65,13 @@ export function createPaymentIntentsRouter(deps) {
       history: [{ status: "pending", at: now.toISOString() }]
     };
 
-    const velarum = adaptVelarum(intent);
-    if (!velarum.ok) return sendApiError(res, 400, "invalid_velarum_payload", velarum.error);
+    const Paytobe = adaptPaytobe(intent);
+    if (!Paytobe.ok) return sendApiError(res, 400, "invalid_Paytobe_payload", Paytobe.error);
 
     const risk = evaluateIntent(intent, store);
     intent.risk = {
       ...(intent.risk || {}),
-      warnings: [...(intent.risk?.warnings || []), ...(velarum.warnings || []), ...risk.warnings],
+      warnings: [...(intent.risk?.warnings || []), ...(Paytobe.warnings || []), ...risk.warnings],
       errors: risk.errors
     };
     if (!risk.ok) {

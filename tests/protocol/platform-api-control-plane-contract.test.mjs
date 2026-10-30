@@ -24,19 +24,19 @@ function readJson(relativePath) {
 }
 
 test("OpenAPI and all control-plane schemas declare the same stable contract version", () => {
-  const openapi = readJson("services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json");
+  const openapi = readJson("services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json");
   const schemaNames = [
-    "packages/protocol/schema/velarum.platform_api.error.v1.schema.json",
-    "packages/protocol/schema/velarum.auth_context.v1.schema.json",
-    "packages/protocol/schema/velarum.idempotency_scope.v1.schema.json"
+    "packages/protocol/schema/Paytobe.platform_api.error.v1.schema.json",
+    "packages/protocol/schema/Paytobe.auth_context.v1.schema.json",
+    "packages/protocol/schema/Paytobe.idempotency_scope.v1.schema.json"
   ];
 
-  assert.equal(PLATFORM_API_CONTRACT_VERSION, "velarum.platform-api.v1");
-  assert.equal(openapi["x-velarumpay-control-plane-contract-version"], PLATFORM_API_CONTRACT_VERSION);
+  assert.equal(PLATFORM_API_CONTRACT_VERSION, "Paytobe.platform-api.v1");
+  assert.equal(openapi["x-Paytobe-control-plane-contract-version"], PLATFORM_API_CONTRACT_VERSION);
   for (const schemaName of schemaNames) {
-    assert.equal(readJson(schemaName)["x-velarumpay-contract-version"], PLATFORM_API_CONTRACT_VERSION);
+    assert.equal(readJson(schemaName)["x-Paytobe-contract-version"], PLATFORM_API_CONTRACT_VERSION);
   }
-  assert.equal(openapi.components.schemas.ErrorEnvelope.$ref, "../../../packages/protocol/schema/velarum.platform_api.error.v1.schema.json");
+  assert.equal(openapi.components.schemas.ErrorEnvelope.$ref, "../../../packages/protocol/schema/Paytobe.platform_api.error.v1.schema.json");
   assert.ok(openapi.components.securitySchemes.merchantSession);
   assert.ok(openapi.components.securitySchemes.agentBearer);
 });

@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.ui.navigation.Routes
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 private data class VpNavItem(val route: String, val label: String, val icon: ImageVector, val badge: Int = 0)
 
@@ -43,7 +43,7 @@ fun VpBottomNav(currentRoute: String?, onSelect: (String) -> Unit, pendingCount:
         VpNavItem(Routes.INBOX, "Inbox", Icons.Filled.Bolt, badge = pendingCount),
         VpNavItem(Routes.PROFILE, "Profile", Icons.Filled.Person),
     )
-    Surface(color = VelarumTheme.colors.surfaceCard, shadowElevation = 0.dp) {
+    Surface(color = PaytobeTheme.colors.surfaceCard, shadowElevation = 0.dp) {
         Column(modifier = Modifier.navigationBarsPadding()) {
             Row(
                 modifier = Modifier.fillMaxWidth().height(Spacing.navHeight),
@@ -52,7 +52,7 @@ fun VpBottomNav(currentRoute: String?, onSelect: (String) -> Unit, pendingCount:
             ) {
                 items.forEach { item ->
                     val active = currentRoute == item.route
-                    val tint = if (active) VelarumTheme.colors.primary else VelarumTheme.colors.textMuted
+                    val tint = if (active) PaytobeTheme.colors.primary else PaytobeTheme.colors.textMuted
                     val interactionSource = remember { MutableInteractionSource() }
                     Column(
                         modifier = Modifier

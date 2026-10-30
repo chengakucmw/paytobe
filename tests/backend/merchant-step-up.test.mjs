@@ -9,7 +9,7 @@ import { SENSITIVE_MERCHANT_OPERATIONS } from "../../services/platform-api/src/a
 import { createTenantScope } from "../../services/platform-api/src/ports/tenant-repository.js";
 
 const codeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-merchant-step-up-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-merchant-step-up-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

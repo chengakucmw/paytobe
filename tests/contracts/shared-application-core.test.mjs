@@ -32,7 +32,7 @@ test("clock and random behavior is supplied through explicit ports", () => {
   const random = createRandomPort({
     id: (prefix) => `${prefix}_fixed`,
     opaqueToken: (prefix) => `${prefix}_opaque`,
-    connectKey: () => "velarumpay-connect:ck_fixed"
+    connectKey: () => "Paytobe-connect:ck_fixed"
   });
   assert.equal(clock.nowIso(), "2026-08-01T00:00:00.000Z");
   assert.equal(clock.after(1_000), "2026-08-01T00:00:01.000Z");

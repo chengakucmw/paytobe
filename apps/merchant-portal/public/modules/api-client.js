@@ -21,7 +21,7 @@ export class PortalApiError extends Error {
   }
 }
 
-export const OFFICIAL_API_ORIGIN = "https://api.velarumai.com";
+export const OFFICIAL_API_ORIGIN = "https://api.Paytobe.com";
 
 export function createApiClient({ fetchImpl = globalThis.fetch, baseUrl = OFFICIAL_API_ORIGIN } = {}) {
   if (typeof fetchImpl !== "function") throw new TypeError("fetch implementation is required");

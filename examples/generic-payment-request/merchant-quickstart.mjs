@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 
-import { createVelarumPayClient } from "../../packages/sdk-js/src/index.js";
+import { createPaytobeClient } from "../../packages/sdk-js/src/index.js";
 
-const OFFICIAL_TESTNET_ORIGIN = "https://api.velarumai.com";
+const OFFICIAL_TESTNET_ORIGIN = "https://api.paytobe.com";
 const TEST_PUBLIC_KEY = `ed25519:${"A".repeat(43)}`;
 
 export async function runOfflineMerchantQuickstart() {
   const calls = [];
   const fetch = createOfflinePlatformMock(calls);
-  const anonymous = createVelarumPayClient({
+  const anonymous = createPaytobeClient({
     baseUrl: OFFICIAL_TESTNET_ORIGIN,
     fetch,
     requestIdFactory: sequentialIds("request")
@@ -30,7 +30,7 @@ export async function runOfflineMerchantQuickstart() {
     merchant_id: organization.merchant.merchant_id,
     session_grant: organization.session_grant
   }, { auth: "none" }));
-  const merchant = createVelarumPayClient({
+  const merchant = createPaytobeClient({
     baseUrl: OFFICIAL_TESTNET_ORIGIN,
     fetch,
     csrfToken: session.csrf_token,
@@ -86,7 +86,7 @@ export async function runOfflineMerchantQuickstart() {
   ));
   await mustSucceed(merchant.updateAgent(agent.agent.agent_id, { status: "active", version: 1 }));
 
-  const agentClient = createVelarumPayClient({
+  const agentClient = createPaytobeClient({
     baseUrl: OFFICIAL_TESTNET_ORIGIN,
     fetch,
     requestIdFactory: sequentialIds("agent-request"),
@@ -106,7 +106,7 @@ export async function runOfflineMerchantQuickstart() {
     }
   });
   const claim = await mustSucceed(agentClient.claimConnectInvitation(
-    `velarumpay-connect:ck_${"B".repeat(43)}`,
+    `Paytobe-connect:ck_${"B".repeat(43)}`,
     ["payment.requests.create", "payment.requests.read"]
   ));
   await mustSucceed(agentClient.getConnectInvitation(claim.connect_invitation.connect_invitation_id, claim.claim_token));

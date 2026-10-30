@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-export const PLATFORM_API_CONTRACT_VERSION = "velarum.platform-api.v1";
-export const AUTH_CONTEXT_VERSION = "velarum.auth_context.v1";
-export const IDEMPOTENCY_SCOPE_VERSION = "velarum.idempotency_scope.v1";
+export const PLATFORM_API_CONTRACT_VERSION = "Paytobe.platform-api.v1";
+export const AUTH_CONTEXT_VERSION = "Paytobe.auth_context.v1";
+export const IDEMPOTENCY_SCOPE_VERSION = "Paytobe.idempotency_scope.v1";
 
 export const AUTH_CONTEXT_ACTOR_TYPES = Object.freeze([
   "merchant_user",

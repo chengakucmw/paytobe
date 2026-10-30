@@ -7,8 +7,8 @@ import java.util.Locale;
 
 /** Resolves the fail-closed Platform API boundary for the selected build variant. */
 final class PlatformServiceConfig {
-    static final String OFFICIAL_TESTNET_ORIGIN = "https://api.velarumai.com";
-    private static final String LOG_TAG = "VelarumPayEnvironment";
+    static final String OFFICIAL_TESTNET_ORIGIN = "https://api.paytobe.com";
+    private static final String LOG_TAG = "PaytobeEnvironment";
 
     private PlatformServiceConfig() {
     }
@@ -58,7 +58,7 @@ final class PlatformServiceConfig {
     private static String requireOfficialOrigin(String value) {
         String normalized = normalize(value);
         if (!OFFICIAL_TESTNET_ORIGIN.equals(normalized)) {
-            throw new IllegalStateException("Official builds require the VelarumPay testnet origin.");
+            throw new IllegalStateException("Official builds require the Paytobe testnet origin.");
         }
         return OFFICIAL_TESTNET_ORIGIN;
     }

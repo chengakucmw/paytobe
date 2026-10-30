@@ -13,7 +13,7 @@
         软键盘与系统栏 —— 这正是原生重写要彻底解决的痛点（旧 WebView 是关掉它来绕开）。
         Compose 自己绘制全部内容，所以平台主题只需是无标题栏的浅色 Material 主题即可。
     -->
-    <style name="Theme.Velarum.Compose" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Theme.Paytobe.Compose" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowNoTitle">true</item>
     </style>

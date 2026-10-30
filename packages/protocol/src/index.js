@@ -8,5 +8,5 @@ export * from "./transfer-assets.js";
 export * from "./recipient-validation.js";
 
 // NOTE: fixtures.js is intentionally NOT re-exported here. It is demo/test data
-// (~760 lines) and must not ship as part of the public @velarumpay/protocol
+// (~760 lines) and must not ship as part of the public @Paytobe/protocol
 // surface. Tests import it directly from "./fixtures.js".

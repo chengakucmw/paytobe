@@ -1,18 +1,18 @@
-# VelarumPay Developer Docs Site
+# Paytobe Developer Docs Site
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-08-02 02:05:41 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-08-01 18:05:41 UTC
+> - **Taipei Time / 台北时间:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-10-29 05:41:42 UTC
 
-Static developer documentation and quickstart for VelarumPay Platform API v0.1.
+Static developer documentation and quickstart for Paytobe Platform API v0.1.
 Plain HTML served by a tiny zero-dependency Node static server (same pattern as
 `apps/website`).
 
 ## Contract sources
 
-- Platform API: `services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json`.
-- Payment Request: `packages/protocol/schema/velarum.payment_request.v1.schema.json` for `velarum.payment_request.v1`.
-- Transaction Context: `packages/protocol/schema/velarum.transaction_context.v1.schema.json` for `velarum.transaction_context.v1`.
+- Platform API: `services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json`.
+- Payment Request: `packages/protocol/schema/Paytobe.payment_request.v1.schema.json` for `Paytobe.payment_request.v1`.
+- Transaction Context: `packages/protocol/schema/Paytobe.transaction_context.v1.schema.json` for `Paytobe.transaction_context.v1`.
 
 The HTML pages are explanatory guides. When an example conflicts with these machine-readable contracts or runtime validators, treat the conflict as a documentation defect and block publication until the same change updates the guide, contract, and tests.
 
@@ -57,6 +57,6 @@ served by any static host or by Caddy directly.
 
 ## Deployment boundary
 
-Deployment configuration belongs to the private sibling repository at
-`/Users/yang/code/VelarumPay/cloud`. Local documentation work does not deploy or
-publish the site.
+Deployment configuration belongs to a private operations repository outside
+this source distribution. Local documentation work does not deploy or publish
+the site.

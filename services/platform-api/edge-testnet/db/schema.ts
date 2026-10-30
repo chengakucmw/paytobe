@@ -1,4 +1,4 @@
-/** Logical D1 schema for the public VelarumPay Connect Platform testnet. */
+/** Logical D1 schema for the public Paytobe Connect Platform testnet. */
 export type Tenant = { tenantId: string; displayName: string; status: "active" | "disabled" };
 export type AgentClient = { clientId: string; tenantId: string; displayName: string; tokenHash: string; status: "active" | "disabled" };
 export type AppDevice = { deviceId: string; tokenHash: string };

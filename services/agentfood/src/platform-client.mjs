@@ -1,10 +1,10 @@
 import crypto from "node:crypto";
-import { VelarumPayClient } from "../../../packages/sdk-js/src/index.js";
+import { PaytobeClient } from "../../../packages/sdk-js/src/index.js";
 
 export class PlatformClient {
   constructor(config, { fetchImpl = fetch, signer } = {}) {
     this.timeoutMs = config.timeoutMs;
-    this.sdk = new VelarumPayClient({
+    this.sdk = new PaytobeClient({
       baseUrl: config.baseUrl,
       fetch: timedFetch(fetchImpl, config.timeoutMs),
       agentAuth: {
@@ -68,7 +68,7 @@ function timedFetch(fetchImpl, timeoutMs) {
 
 function requireSuccess(result) {
   if (result?.ok !== false) return result;
-  throw Object.assign(new Error(result.error?.message || "VelarumPay Platform API rejected the request"), {
+  throw Object.assign(new Error(result.error?.message || "Paytobe Platform API rejected the request"), {
     status: result.status >= 400 && result.status < 500 ? result.status : 502,
     code: result.error?.code || "platform_api_error",
     platformStatus: result.status,

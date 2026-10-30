@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.Paytobe.com/Paytobe.auth_context.v1.schema.json",
+  "title": "Paytobe AuthContext v1",
+  "type": "object",
+  "required": ["version", "actor_type", "actor_id", "scopes", "auth_method", "request_id"],
+  "properties": {
+    "version": { "const": "Paytobe.auth_context.v1" },
+    "actor_type": { "type": "string", "enum": ["merchant_user", "agent_client", "wallet_device", "platform_operator"] },
+    "actor_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "merchant_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "role": { "type": "string", "enum": ["owner", "admin", "developer", "viewer", "operator"] },
+    "agent_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "client_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "credential_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "device_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "connection_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "scopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "auth_method": { "type": "string", "enum": ["merchant_session", "agent_assertion", "device_token", "platform_operator"] },
+    "session_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "step_up_at": { "type": "string", "format": "date-time" },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 128 }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "actor_type": { "enum": ["merchant_user", "agent_client"] } }, "required": ["actor_type"] },
+      "then": { "required": ["merchant_id"] }
+    },
+    {
+      "if": { "properties": { "actor_type": { "const": "agent_client" } }, "required": ["actor_type"] },
+      "then": { "required": ["agent_id", "client_id", "credential_id"] }
+    },
+    {
+      "if": { "properties": { "actor_type": { "const": "wallet_device" } }, "required": ["actor_type"] },
+      "then": { "required": ["device_id"] }
+    }
+  ],
+  "additionalProperties": false,
+  "x-Paytobe-contract-version": "Paytobe.platform-api.v1"
+}

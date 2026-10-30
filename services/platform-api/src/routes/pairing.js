@@ -52,7 +52,7 @@ export function createPairingRouter(deps) {
       return sendApiError(res, 503, "pairing_code_unavailable", "Could not allocate a unique pairing code, please retry");
     }
     const expiresAt = platformCore.clock.after(ttl.seconds * 1000);
-    const pairingUri = `velarumpay://pair?session=${encodeURIComponent(pairingSessionId)}&code=${encodeURIComponent(pairingCode)}`;
+    const pairingUri = `Paytobe://pair?session=${encodeURIComponent(pairingSessionId)}&code=${encodeURIComponent(pairingCode)}`;
     const session = store.createPairingSession(pairingSessionId, pairingCode, {
       pairing_uri: pairingUri,
       agent_identity: agent.value,
@@ -68,7 +68,7 @@ export function createPairingRouter(deps) {
         expires_at: session.expires_at
       }
     });
-    observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "created" });
+    observability.incrementCounter("Paytobe_pairing_sessions_total", { result: "created" });
 
     res.status(201).json({
       ok: true,
@@ -159,8 +159,8 @@ export function createPairingRouter(deps) {
         expires_at: connection.expires_at
       }
     });
-    observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "approved" });
-    observability.incrementCounter("velarumpay_connections_total", { status: connection.status });
+    observability.incrementCounter("Paytobe_pairing_sessions_total", { result: "approved" });
+    observability.incrementCounter("Paytobe_connections_total", { status: connection.status });
 
     res.status(201).json({
       ok: true,
@@ -217,7 +217,7 @@ export function createPairingRouter(deps) {
         requested_scope_count: Array.isArray(updated.requested_scopes) ? updated.requested_scopes.length : 0
       }
     });
-    observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "rejected" });
+    observability.incrementCounter("Paytobe_pairing_sessions_total", { result: "rejected" });
     res.json({ ok: true, pairing_session: updated });
   });
 

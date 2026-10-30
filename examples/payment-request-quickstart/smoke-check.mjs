@@ -280,7 +280,7 @@ async function startOrUseServer() {
 
   const port = Number(process.env.SMOKE_PORT || 18787);
   const baseUrl = `http://127.0.0.1:${port}`;
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "velarumpay-platform-api-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "Paytobe-platform-api-"));
   let output = "";
   const child = spawn(process.execPath, [serverPath], {
     cwd: tempDir,

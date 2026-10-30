@@ -5,7 +5,7 @@
 # 用法（在项目根目录的终端里）：
 #     bash apps/android/scripts/build-release-apk.sh
 #
-# 产物：apps/android/app/build/outputs/apk/release/VelarumPay-release.apk
+# 产物：apps/android/app/build/outputs/apk/release/Paytobe-release.apk
 # 前提：本机已装好 Android SDK（装了 Android Studio 即自带）。
 # ============================================================================
 set -euo pipefail
@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."
 echo "▶ 正在构建 release APK（首次会下载依赖并做 R8 优化，耗时较久，请耐心等）…"
 ./gradlew :app:assembleRelease
 
-APK="$(pwd)/app/build/outputs/apk/release/VelarumPay-release.apk"
+APK="$(pwd)/app/build/outputs/apk/release/Paytobe-release.apk"
 echo ""
 if [ -f "$APK" ]; then
   echo "✅ 完成！可直接安装的 APK 在："

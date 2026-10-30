@@ -1,4 +1,4 @@
-export const WEBHOOK_EVENT_VERSION = "velarum.webhook_event.v1";
+export const WEBHOOK_EVENT_VERSION = "Paytobe.webhook_event.v1";
 
 export function createWebhookEventEnvelope({ event_id, merchant_id, type, occurred_at, data }) {
   const envelope = {

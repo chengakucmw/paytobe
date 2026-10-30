@@ -1,0 +1,4 @@
+module Paytobe_wallet_coreFFI {
+    header "Paytobe_wallet_coreFFI.h"
+    export *
+}

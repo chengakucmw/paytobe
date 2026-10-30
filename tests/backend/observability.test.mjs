@@ -62,8 +62,8 @@ test("observability records audit events and exposes sanitized metrics", () => {
   assert.equal(events.items[1].details.pairing_code, "[REDACTED]");
 
   const metrics = observability.prometheusText();
-  assert.match(metrics, /velarumpay_audit_events_total\{action="payment_request.created",outcome="success"\} 1/);
-  assert.match(metrics, /velarumpay_audit_buffer_events 2/);
+  assert.match(metrics, /Paytobe_audit_events_total\{action="payment_request.created",outcome="success"\} 1/);
+  assert.match(metrics, /Paytobe_audit_buffer_events 2/);
   assert.equal(metrics.includes("conn_tok_secret"), false);
   assert.equal(metrics.includes("123456"), false);
 });

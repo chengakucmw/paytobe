@@ -16,7 +16,7 @@ import { createTenantScope } from "../../services/platform-api/src/ports/tenant-
 import { createConnectKey, id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-domain-ssrf-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-domain-ssrf-"));
 const store = new Store(path.join(directory, "platform.sqlite"));
 const at = "2026-08-02T00:00:00.000Z";
 store.db.prepare(`INSERT INTO merchants

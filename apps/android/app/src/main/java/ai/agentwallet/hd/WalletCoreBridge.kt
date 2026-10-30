@@ -14,23 +14,23 @@ object WalletCoreBridge {
     private const val MAX_RESPONSE_BYTES = 1024 * 1024
 
     private interface WalletCoreNative : Library {
-        fun velarum_wallet_core_abi_version(): Int
+        fun Paytobe_wallet_core_abi_version(): Int
 
-        fun velarum_wallet_core_call(
+        fun Paytobe_wallet_core_call(
             method: ByteArray,
             methodLen: NativeLong,
             request: ByteArray,
             requestLen: NativeLong,
         ): Pointer?
 
-        fun velarum_wallet_core_result_data(result: Pointer): Pointer?
-        fun velarum_wallet_core_result_len(result: Pointer): NativeLong
-        fun velarum_wallet_core_result_free(result: Pointer)
+        fun Paytobe_wallet_core_result_data(result: Pointer): Pointer?
+        fun Paytobe_wallet_core_result_len(result: Pointer): NativeLong
+        fun Paytobe_wallet_core_result_free(result: Pointer)
     }
 
     private val native: WalletCoreNative by lazy {
-        Native.load("velarum_wallet_core", WalletCoreNative::class.java).also { core ->
-            val actual = core.velarum_wallet_core_abi_version()
+        Native.load("Paytobe_wallet_core", WalletCoreNative::class.java).also { core ->
+            val actual = core.Paytobe_wallet_core_abi_version()
             check(actual == EXPECTED_ABI_VERSION) {
                 "Unsupported wallet-core ABI $actual; expected $EXPECTED_ABI_VERSION."
             }
@@ -40,7 +40,7 @@ object WalletCoreBridge {
     private fun call(method: String, request: JSONObject): JSONObject {
         val methodBytes = method.toByteArray(StandardCharsets.UTF_8)
         val requestBytes = request.toString().toByteArray(StandardCharsets.UTF_8)
-        val result = native.velarum_wallet_core_call(
+        val result = native.Paytobe_wallet_core_call(
             methodBytes,
             NativeLong(methodBytes.size.toLong()),
             requestBytes,
@@ -48,11 +48,11 @@ object WalletCoreBridge {
         ) ?: throw WalletCoreException("native_null", "Wallet core returned a null result handle.")
 
         try {
-            val length = native.velarum_wallet_core_result_len(result).toLong()
+            val length = native.Paytobe_wallet_core_result_len(result).toLong()
             if (length <= 0 || length > MAX_RESPONSE_BYTES) {
                 throw WalletCoreException("invalid_response", "Wallet core returned an invalid response length.")
             }
-            val data = native.velarum_wallet_core_result_data(result)
+            val data = native.Paytobe_wallet_core_result_data(result)
                 ?: throw WalletCoreException("invalid_response", "Wallet core returned a null response pointer.")
             val response = JSONObject(String(data.getByteArray(0, length.toInt()), StandardCharsets.UTF_8))
             if (!response.optBoolean("ok", false)) {
@@ -65,7 +65,7 @@ object WalletCoreBridge {
             }
             return response.getJSONObject("value")
         } finally {
-            native.velarum_wallet_core_result_free(result)
+            native.Paytobe_wallet_core_result_free(result)
         }
     }
 

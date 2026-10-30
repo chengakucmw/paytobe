@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MCP for agents · VelarumPay Docs</title>
+  <title>MCP for agents · Paytobe Docs</title>
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar">
     <div class="inner">
-      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
       <nav class="nav">
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
@@ -19,15 +19,15 @@
         <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
-        <a href="https://velarumai.com/business">Business</a>
+        <a href="https://paytobe.com/business">Business</a>
       </nav>
     </div>
   </header>
 
   <main>
     <span class="pill">MCP server</span>
-    <h1>Plug VelarumPay into an AI agent</h1>
-    <p class="lead">The <code>@velarumpay/mcp-server</code> is a local MCP stdio server. It exposes VelarumPay as a small set of tools any MCP-capable agent (Claude and others) can call. It never holds private keys, signs, or approves payments.</p>
+    <h1>Plug Paytobe into an AI agent</h1>
+    <p class="lead">The <code>@paytobe/mcp-server</code> is a local MCP stdio server. It exposes Paytobe as a small set of tools any MCP-capable agent (Claude and others) can call. It never holds private keys, signs, or approves payments.</p>
 
     <h2>Tools</h2>
     <table>
@@ -40,9 +40,9 @@
     <div class="note">Only these v0.1 scopes are available: <code>payment.requests.create</code>, <code>payment.requests.read</code>, <code>transaction_contexts.create</code>, <code>transaction_contexts.read</code>. No signing, key, seed, or auto-approval scope is ever exposed.</div>
 
     <h2>Run it</h2>
-    <pre><code>export VELARUMPAY_API_BASE_URL=http://127.0.0.1:8787
-export VELARUMPAY_CONNECTION_TOKEN=conn_tok_...
-npx velarumpay-mcp-server</code></pre>
+    <pre><code>export PAYTOBE_API_BASE_URL=http://127.0.0.1:8787
+export PAYTOBE_CONNECTION_TOKEN=conn_tok_...
+npx paytobe-mcp-server</code></pre>
     <p>Tool inputs may also pass <code>base_url</code> and <code>connection_token</code> per call. If a payload includes <code>connection_id</code>, it must match the connection the token belongs to. For local agents, omit <code>connection_id</code> and the Platform API derives it from the token.</p>
 
     <h2>Example tool call</h2>
@@ -55,7 +55,7 @@ npx velarumpay-mcp-server</code></pre>
     "arguments": {
       "agent": {
         "agent_id": "agt_mcp_local",
-        "agent_name": "VelarumPay MCP Local Agent",
+        "agent_name": "Paytobe MCP Local Agent",
         "runtime": "mcp",
         "device_label": "local developer machine"
       }
@@ -67,6 +67,6 @@ npx velarumpay-mcp-server</code></pre>
     <p>The MCP server is a thin client. The Platform API still enforces connection-token checks, scope checks, and risk policy (allowlists, daily limits, idempotency) on every call. The user's wallet is always the place where real payments get approved and signed.</p>
   </main>
 
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

@@ -39,8 +39,8 @@ import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTextField
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumFonts
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeFonts
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 我的（Profile tab，原生）。对照 web 的 renderProfile：身份卡 + 代理/活动/开发者/设置入口。 */
 @Composable
@@ -64,8 +64,8 @@ fun ProfileScreen(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                     Avatar(id?.avatar ?: "V", 52.dp)
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(id?.name ?: "My Wallet", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
-                        Text(id?.walletId ?: "", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                        Text(id?.name ?: "My Wallet", style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
+                        Text(id?.walletId ?: "", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                     }
                     VpBadge("Wallet ID", VpTone.SAFE)
                 }
@@ -97,13 +97,13 @@ fun WalletIdentityScreen(vm: IdentityViewModel, onBack: () -> Unit, onSaved: () 
             VpCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                     Avatar(avatar, 80.dp)
-                    Text(nickname.ifBlank { "My Wallet" }, style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(top = Spacing.s3))
-                    Text(id?.walletId ?: "", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text(nickname.ifBlank { "My Wallet" }, style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong, modifier = Modifier.padding(top = Spacing.s3))
+                    Text(id?.walletId ?: "", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
             }
             VpTextField(value = nickname, onValueChange = { nickname = it }, label = "Nickname")
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Avatar", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
+                Text("Avatar", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
                     listOf("V", "M", "MW", "Q").forEach { option ->
                         VpChip(option, option == avatar) { avatar = option }
@@ -111,11 +111,11 @@ fun WalletIdentityScreen(vm: IdentityViewModel, onBack: () -> Unit, onSaved: () 
                 }
             }
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Wallet address (EVM)", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text("Wallet address (EVM)", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 Text(
                     id?.evmAddress ?: "—",
-                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-                    color = VelarumTheme.colors.textBody,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+                    color = PaytobeTheme.colors.textBody,
                     modifier = Modifier.padding(top = Spacing.s2),
                 )
             }
@@ -128,9 +128,9 @@ fun WalletIdentityScreen(vm: IdentityViewModel, onBack: () -> Unit, onSaved: () 
 @Composable
 private fun Avatar(initial: String, size: Dp) {
     Box(
-        modifier = Modifier.size(size).clip(CircleShape).background(VelarumTheme.colors.primary),
+        modifier = Modifier.size(size).clip(CircleShape).background(PaytobeTheme.colors.primary),
         contentAlignment = Alignment.Center,
     ) {
-        Text(initial.ifBlank { "V" }.take(2), style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.onPrimary)
+        Text(initial.ifBlank { "V" }.take(2), style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.onPrimary)
     }
 }

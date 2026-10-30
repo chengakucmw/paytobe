@@ -1,5 +1,5 @@
 {
-  "vector": "velarumpay.webhook_hmac.v1",
+  "vector": "Paytobe.webhook_hmac.v1",
   "purpose": "Public deterministic verification test only",
   "production_secret": false,
   "test_key": "PUBLIC_TEST_VECTOR_KEY_DO_NOT_USE",

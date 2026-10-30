@@ -1,64 +1,62 @@
-# VelarumPayCode
+# Paytobe
 
-> **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-08-04 00:05:02 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-08-03 16:05:02 UTC
+> **Last modified**
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
+Paytobe is a non-custodial wallet and Payment Request platform for people,
+local AI agents, and trusted applications. Agents and applications can request
+wallet capabilities, while the user reviews the real transaction facts and
+signs locally from their own wallet.
 
-VelarumPayCode is the clean development repository for VelarumPay.
+This repository contains the public Apache-2.0 source tree. It does not include
+production credentials, private product documents, user data, signing material,
+or private deployment and operations configuration.
 
-VelarumPay is a non-custodial wallet and payment request platform for local AI agents. Agents can request payments, but the user reviews and signs from their own wallet.
+## Security Model
 
-## Active Structure
+- Private keys, seed phrases, and derived signing material remain on the user's device.
+- The Platform API validates, routes, stores request state, and synchronizes status; it does not sign user transactions.
+- Agent and application connections are scoped, revocable, and unable to grant themselves signing authority.
+- Payment facts such as network, asset, amount, recipient, contract or issuer, memo, and fee outrank display or metadata text.
+- Real payments require user review and approval by default.
+
+Please report vulnerabilities through GitHub private vulnerability reporting as described in [SECURITY.md](SECURITY.md).
+
+## Repository Structure
 
 ```text
 apps/android                 Android wallet app
 apps/ios                     iOS wallet app
-apps/website                 VelarumPay website
+apps/website                 Paytobe website
 services/platform-api        Current relay backend, evolving into Platform API
 connectors/openclaw-telegram OpenClaw Telegram connector
 examples                     Demo and integration examples
-packages                     Future shared protocol and SDK packages
+packages                     Shared protocol and SDK packages
 scripts                      Development, deploy, and release scripts
 tests                        Cross-component tests
 ```
 
-## Current Mainline
+Machine-readable protocol contracts live in `packages/protocol/schema`, and the
+Platform API contract lives in `services/platform-api/openapi`. Concise module
+READMEs document the nearby code. Private product specifications, prototypes,
+screenshots, and operations material are intentionally outside this repository.
 
-- Android source was copied from `agentwallet/android-agent-relay-v1-ui-optimized-v5-order-media`.
-- iOS source was copied from `agentwallet/ios-VelarumPay`.
-- Backend source was copied from `agentwallet/relay-backend-v1`.
-- Website source now lives in `VelarumPayCode/apps/website`.
-- OpenClaw connector was copied from `agentwallet/openclaw-telegram-skill-v1`.
+Generated files, logs, local `.env` files, APKs, build folders, dependency
+caches, and `node_modules` are intentionally excluded.
 
-Generated files, logs, `.env`, APKs, build folders, Gradle caches, and `node_modules` were intentionally excluded.
+## Current Scope
 
-## Product Workspace
+The v0.1 development tree includes:
 
-Formal product, design, architecture, engineering, operations, and task-card documents are kept outside this repo at:
+- The versioned `Paytobe.payment_request.v1` protocol and Transaction Context.
+- Scoped agent-to-wallet pairing and revocation.
+- Native Android and iOS wallet clients backed by a shared Rust wallet core.
+- The Platform API, JavaScript SDK, MCP server, OpenClaw connector, and Hermes connector.
+- Website, developer documentation, merchant portal, examples, and cross-component tests.
 
-```text
-/Users/yang/code/VelarumPay/docs
-```
-
-This code repository should keep only concise READMEs that are needed to build, run, test, or understand nearby code. Do not add formal documentation, prototypes, UI design files, screenshots, or design assets here.
-
-Key formal engineering docs:
-
-- `/Users/yang/code/VelarumPay/docs/English/Architecture/00056-00003-00019-2-velarumpay-v0-1-engineering-baseline-2026-06-16.md`
-- `/Users/yang/code/VelarumPay/docs/English/Architecture/00056-00003-00013-2-velarumpay-platform-api-v0-1-engineering-contract-2026-06-16.md`
-- `/Users/yang/code/VelarumPay/docs/English/Architecture/00056-00003-00012-2-velarumpay-payment-request-v1-engineering-spec-2026-06-16.md`
-- `/Users/yang/code/VelarumPay/docs/English/task/00056-00012-00001-2-00-velarumpay-v0-1-development-execution-task-index-2026-06-16.md`
-
-## Next Engineering Goal
-
-Build VelarumPay Open Platform v0.1:
-
-1. Standardize `velarum.payment_request.v1`.
-2. Add local agent to wallet pairing.
-3. Convert wallet inbox from demo-specific intent handling to generic payment request handling.
-4. Keep transaction contexts generic (for example `metadata.food_order`) instead of hard-coding app-specific demo flows.
-5. Add MCP / OpenClaw / Hermes connectors around the same protocol.
+The project is under active development. Review the applicable package README
+and security boundaries before using it in a production or mainnet environment.
 
 ## Useful Commands
 
@@ -91,7 +89,7 @@ Android:
 
 ```bash
 cd apps/android
-./gradlew assembleDebug
+./gradlew testStandardDebugUnitTest assembleStandardDebug
 ```
 
 Release gate:
@@ -100,4 +98,15 @@ Release gate:
 npm run release:gate
 ```
 
-The release gate runs license and workspace checks, unit tests, quickstart and cross-component smoke tests, Android debug tests/builds, a mandatory signed `stellarTestnetRelease` APK build, and iOS simulator unit tests. Configure the controlled Android release key and Firebase testnet values before running the full gate. For non-release local checks on a machine without mobile toolchains, run `npm run release:gate -- --node-only`.
+The full release gate runs license and workspace checks, unit tests, quickstart
+and cross-component smoke tests, Android builds, the controlled signed testnet
+build, and iOS simulator tests. The signed build requires maintainer-managed
+credentials. Contributors without the mobile toolchains or signing environment
+can run `npm run release:gate -- --node-only`.
+
+## Contributing and License
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. The source
+code is licensed under [Apache-2.0](LICENSE). Paytobe names, logos, wordmarks,
+and other brand identifiers are not granted for third-party use by that license;
+see [NOTICE](NOTICE) for attribution and trademark boundaries.

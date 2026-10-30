@@ -63,8 +63,8 @@ import ai.agentwallet.hd.ui.navigation.appExit
 import ai.agentwallet.hd.ui.navigation.appPopEnter
 import ai.agentwallet.hd.ui.navigation.appPopExit
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 开通流程（无底部导航）。一个 NavController 串起 4 屏，共享一个 OnboardingViewModel。
@@ -143,12 +143,12 @@ private fun CreateWalletScreen(
             VpCard(modifier = Modifier.fillMaxWidth()) {
                 VpBadge("V1 default", VpTone.SAFE)
                 Spacer(Modifier.height(Spacing.s2))
-                Text("Traditional 24-word self-custody", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+                Text("Traditional 24-word self-custody", style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
                 Spacer(Modifier.height(Spacing.s2))
                 Text(
                     "The wallet generates the recovery phrase on this device, encrypts the seed locally, and never asks the backend for a key share.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = VelarumTheme.colors.textBody,
+                    color = PaytobeTheme.colors.textBody,
                 )
             }
             VpCard(modifier = Modifier.fillMaxWidth()) {
@@ -176,7 +176,7 @@ private fun CreateWalletScreen(
             Text(
                 text = "Device security check",
                 style = MaterialTheme.typography.labelLarge,
-                color = VelarumTheme.colors.primary,
+                color = PaytobeTheme.colors.primary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().clickable { onDeviceRisk() }.padding(vertical = Spacing.s2),
             )
@@ -187,11 +187,11 @@ private fun CreateWalletScreen(
 /** 品牌欢迎卡（对照原型 01 Welcome 的 "Your keys. Your crypto." 主张）。 */
 @Composable
 private fun WelcomeHero() {
-    Surface(shape = VelarumRadii.xl, color = VelarumTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = PaytobeRadii.xl, color = PaytobeTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.s6), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             Image(
-                painter = painterResource(R.drawable.velarum_mark),
-                contentDescription = "VelarumPay",
+                painter = painterResource(R.drawable.paytobe_mark),
+                contentDescription = "Paytobe",
                 modifier = Modifier.size(44.dp),
             )
             Text("Your keys. Your crypto.", style = MaterialTheme.typography.headlineSmall, color = Color.White)
@@ -215,7 +215,7 @@ private fun KeyImportScreen(vm: OnboardingViewModel, onBack: () -> Unit, onImpor
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5).padding(bottom = Spacing.s8).imePadding(),
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
-            VpRiskBanner(VpTone.SAFE, "Local import only", "The secret is never sent to VelarumPay servers, agents, or connected apps.")
+            VpRiskBanner(VpTone.SAFE, "Local import only", "The secret is never sent to Paytobe servers, agents, or connected apps.")
             VpTextField(
                 value = phrase,
                 onValueChange = { phrase = it },
@@ -228,7 +228,7 @@ private fun KeyImportScreen(vm: OnboardingViewModel, onBack: () -> Unit, onImpor
             VpRiskBanner(
                 VpTone.DANGER,
                 "Only enter your phrase on a device you trust",
-                "VelarumPay never sends your recovery phrase anywhere.",
+                "Paytobe never sends your recovery phrase anywhere.",
             )
             val err = ui.error
             if (err != null) VpRiskBanner(VpTone.DANGER, "Phrase failed local validation", err)
@@ -274,7 +274,7 @@ private fun KeyBackupScreen(vm: OnboardingViewModel, onVerify: () -> Unit) {
             }
             WordGrid(words = ui.mnemonic)
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Backup controls", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text("Backup controls", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 Spacer(Modifier.height(Spacing.s2))
                 VpFactRow("Screenshot protection", "On", VpTone.SAFE)
                 VpFactRow("Clipboard copy", "Disabled", VpTone.SAFE)
@@ -345,7 +345,7 @@ private fun KeyVerifyScreen(
                     Text(
                         "Fill " + positions.joinToString(", ") { "#${it + 1}" } + " in order",
                         style = MaterialTheme.typography.titleMedium,
-                        color = VelarumTheme.colors.textStrong,
+                        color = PaytobeTheme.colors.textStrong,
                     )
                     Spacer(Modifier.height(Spacing.s3))
                     positions.forEachIndexed { i, p ->
@@ -407,10 +407,10 @@ private fun KeyVerifyScreen(
 /** 验证页的单个编号空位：未填显示提示，已填显示所选词；点已填的空位可撤销它及其后的选择。 */
 @Composable
 private fun VerifySlot(index: Int, word: String?, active: Boolean, onClick: () -> Unit) {
-    val outline = if (word != null || active) VelarumTheme.colors.primary else VelarumTheme.colors.borderDefault
+    val outline = if (word != null || active) PaytobeTheme.colors.primary else PaytobeTheme.colors.borderDefault
     Surface(
-        shape = VelarumRadii.sm,
-        color = if (word != null) VelarumTheme.colors.primarySoft else VelarumTheme.colors.surfaceCard,
+        shape = PaytobeRadii.sm,
+        color = if (word != null) PaytobeTheme.colors.primarySoft else PaytobeTheme.colors.surfaceCard,
         border = BorderStroke(1.dp, outline),
         modifier = Modifier.fillMaxWidth().clickable(enabled = word != null) { onClick() },
     ) {
@@ -419,11 +419,11 @@ private fun VerifySlot(index: Int, word: String?, active: Boolean, onClick: () -
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("#$index", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text("#$index", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             Text(
                 word ?: "Tap a word",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (word != null) VelarumTheme.colors.textStrong else VelarumTheme.colors.textFaint,
+                color = if (word != null) PaytobeTheme.colors.textStrong else PaytobeTheme.colors.textFaint,
             )
         }
     }
@@ -433,15 +433,15 @@ private fun VerifySlot(index: Int, word: String?, active: Boolean, onClick: () -
 @Composable
 private fun WordOption(word: String, used: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
-        shape = VelarumRadii.pill,
-        color = if (used) VelarumTheme.colors.surfaceSunken else VelarumTheme.colors.surfaceCard,
-        border = BorderStroke(1.dp, if (used) VelarumTheme.colors.borderSubtle else VelarumTheme.colors.borderDefault),
+        shape = PaytobeRadii.pill,
+        color = if (used) PaytobeTheme.colors.surfaceSunken else PaytobeTheme.colors.surfaceCard,
+        border = BorderStroke(1.dp, if (used) PaytobeTheme.colors.borderSubtle else PaytobeTheme.colors.borderDefault),
         modifier = modifier.clickable(enabled = !used) { onClick() },
     ) {
         Text(
             text = word,
             style = MaterialTheme.typography.labelLarge,
-            color = if (used) VelarumTheme.colors.textFaint else VelarumTheme.colors.textStrong,
+            color = if (used) PaytobeTheme.colors.textFaint else PaytobeTheme.colors.textStrong,
             textAlign = TextAlign.Center,
             maxLines = 1,
             modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s2, vertical = Spacing.s3),
@@ -457,7 +457,7 @@ private fun WordGrid(words: List<String>) {
         }
         return
     }
-    Surface(shape = VelarumRadii.xl, color = VelarumTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
+    Surface(shape = PaytobeRadii.xl, color = PaytobeTheme.colors.surfaceInverse, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(Spacing.s4), verticalArrangement = Arrangement.spacedBy(Spacing.s2)) {
             words.chunked(2).forEachIndexed { rowIndex, pair ->
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s2)) {
@@ -474,7 +474,7 @@ private fun WordGrid(words: List<String>) {
 @Composable
 private fun WordCell(index: Int, word: String, modifier: Modifier = Modifier) {
     Surface(
-        shape = VelarumRadii.sm,
+        shape = PaytobeRadii.sm,
         color = Color.White.copy(alpha = 0.08f),
         modifier = modifier,
     ) {
@@ -482,7 +482,7 @@ private fun WordCell(index: Int, word: String, modifier: Modifier = Modifier) {
             modifier = Modifier.padding(horizontal = Spacing.s3, vertical = Spacing.s2),
             horizontalArrangement = Arrangement.spacedBy(Spacing.s2),
         ) {
-            Text("$index", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textFaint)
+            Text("$index", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textFaint)
             Text(word, style = MaterialTheme.typography.bodyMedium, color = Color.White)
         }
     }
@@ -497,7 +497,7 @@ private fun DeviceRiskScreen(onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Runtime protection", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text("Runtime protection", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 Spacer(Modifier.height(Spacing.s2))
                 VpFactRow("Jailbreak / root", "No signal", VpTone.SAFE)
                 VpFactRow("Hook frameworks", "No Frida/Xposed signal", VpTone.SAFE)

@@ -24,13 +24,13 @@ import org.json.JSONObject;
 final class SecureWalletStore {
     private static final String ANDROID_KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "agentwallet_hd_transfer_v1_aes";
-    static final String CREDENTIAL_KEY_ALIAS = "velarumpay_credential_wrap_v1_aes";
+    static final String CREDENTIAL_KEY_ALIAS = "Paytobe_credential_wrap_v1_aes";
     private static final String PREFS = "agentwallet_hd_transfer_store";
     private static final String PREF_IV = "wallet_iv";
     private static final String PREF_CT = "wallet_ciphertext";
     private static final String PREF_BACKUP_VERIFIED = "wallet_backup_verified";
 
-    private static final String CREDENTIAL_PREFS = "velarumpay_secure_credentials_v1";
+    private static final String CREDENTIAL_PREFS = "Paytobe_secure_credentials_v1";
     private static final String PREF_WRAPPED_APP_KEY = "wrapped_app_key_v1";
     private static final String SLOT_DEVICE_TOKEN = "device_token_v1";
     private static final String SLOT_CONNECTION_RECORDS = "connection_records_v1";
@@ -38,8 +38,8 @@ final class SecureWalletStore {
     private static final String LEGACY_DEVICE_TOKEN = "device_token";
     private static final String LEGACY_CONNECTION_PREFS = "agentwallet_agent_connections";
     private static final String LEGACY_CONNECTIONS = "connections";
-    private static final String APP_KEY_AAD = "velarumpay.credentials.app-key.v1";
-    private static final String VALUE_AAD_PREFIX = "velarumpay.credentials.value.v1:";
+    private static final String APP_KEY_AAD = "Paytobe.credentials.app-key.v1";
+    private static final String VALUE_AAD_PREFIX = "Paytobe.credentials.value.v1:";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private SecureWalletStore() {}

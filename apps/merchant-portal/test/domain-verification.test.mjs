@@ -11,14 +11,14 @@ test("DNS and HTTPS challenges render exact proof instructions, expiry, and re-v
   const dns = createDomainVerificationModel({ api, session: session("owner") });
   await dns.create({ domain: "pay.acme.com", method: "dns_txt" });
   const dnsHtml = renderDomainVerification(dns.getState(), true);
-  assert.match(dnsHtml, /_velarumpay\.pay\.acme\.com/);
+  assert.match(dnsHtml, /_Paytobe\.pay\.acme\.com/);
   assert.match(dnsHtml, new RegExp(challenge));
   assert.match(dnsHtml, /Aug 2, 2026|Aug 3, 2026/);
 
   const https = createDomainVerificationModel({ api: mockApi({ method: "https_well_known" }), session: session("admin") });
   await https.create({ domain: "secure.acme.com", method: "https_well_known" });
   const httpsHtml = renderDomainVerification(https.getState(), true);
-  assert.match(httpsHtml, /\.well-known\/velarumpay-domain-verification/);
+  assert.match(httpsHtml, /\.well-known\/Paytobe-domain-verification/);
   assert.match(httpsHtml, /&quot;challenge&quot;/);
   assert.doesNotMatch(httpsHtml, /fetch\(|https:\/\/secure\.acme\.com/);
 });
@@ -102,7 +102,7 @@ function mockApi({ method = "dns_txt", verifyError = null, calls = [] } = {}) {
   return {
     async createDomain(input) {
       calls.push(["createDomain", input]);
-      return { ok: true, merchant_domain: { ...pendingDomain, domain: input.domain, method: input.method || method }, challenge, dns_name: `_velarumpay.${input.domain}`, challenge_expires_at: "2026-08-02T18:00:00Z", next_reverification_at: "2026-09-01T18:00:00Z" };
+      return { ok: true, merchant_domain: { ...pendingDomain, domain: input.domain, method: input.method || method }, challenge, dns_name: `_Paytobe.${input.domain}`, challenge_expires_at: "2026-08-02T18:00:00Z", next_reverification_at: "2026-09-01T18:00:00Z" };
     },
     async verifyDomain(id) {
       calls.push(["verifyDomain", id]);

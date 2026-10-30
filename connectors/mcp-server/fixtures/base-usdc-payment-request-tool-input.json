@@ -2,7 +2,7 @@
   "connection_token": "conn_tok_dev_placeholder",
   "target_app_device_id": "wallet_dev_placeholder",
   "payment_request": {
-    "protocol": "velarum.payment_request.v1",
+    "protocol": "Paytobe.payment_request.v1",
     "request_id": "prq_mcp_base_usdc_dev_4200",
     "transaction_id": "txn_mcp_base_usdc_dev_4200",
     "created_at": "2026-06-17T10:00:00.000Z",
@@ -11,12 +11,12 @@
     "status": "pending",
     "source": {
       "agent_id": "agt_mcp_local",
-      "agent_name": "VelarumPay MCP Local Agent",
+      "agent_name": "Paytobe MCP Local Agent",
       "runtime": "mcp",
       "channel": "local_desktop"
     },
     "payee": {
-      "name": "VelarumPay Developer Test",
+      "name": "Paytobe Developer Test",
       "domain": "fixtures.example",
       "verified": false
     },

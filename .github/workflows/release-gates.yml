@@ -54,7 +54,7 @@ jobs:
         run: rustup toolchain install stable --profile minimal
 
       - name: Cargo test (derivation + signing)
-        working-directory: crates/velarum-wallet-core
+        working-directory: crates/Paytobe-wallet-core
         run: cargo test
 
       - name: License policy (Node manifests/locks + Rust graph)
@@ -91,20 +91,11 @@ jobs:
         run: sdkmanager "ndk;${NDK_VERSION}"
 
       - name: Build wallet-core (Kotlin bindings + host lib + device .so)
-        run: ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" crates/velarum-wallet-core/scripts/build-android.sh
+        run: ANDROID_NDK_HOME="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" crates/Paytobe-wallet-core/scripts/build-android.sh
 
       - name: Android unit tests and debug build
         working-directory: apps/android
         run: ./gradlew testStandardDebugUnitTest assembleStandardDebug testStellarTestnetDebugUnitTest assembleStellarTestnetDebug
-
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: VelarumPay-debug-apk
-          path: |
-            apps/android/app/build/outputs/apk/standard/debug/*.apk
-            apps/android/app/build/outputs/apk/stellarTestnet/debug/*.apk
-          if-no-files-found: error
 
   ios:
     name: iOS simulator build + unit tests
@@ -119,7 +110,7 @@ jobs:
           rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
       - name: Build wallet-core (XCFramework + Swift bindings)
-        run: crates/velarum-wallet-core/scripts/build-apple.sh
+        run: crates/Paytobe-wallet-core/scripts/build-apple.sh
 
       - name: Select an available iOS simulator
         id: sim
@@ -131,8 +122,8 @@ jobs:
       - name: iOS unit tests (HD-derivation golden + wallet-core conformance)
         run: |
           xcodebuild test \
-            -project apps/ios/VelarumPay.xcodeproj \
-            -scheme VelarumPay \
+            -project apps/ios/Paytobe.xcodeproj \
+            -scheme Paytobe \
             -sdk iphonesimulator \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             CODE_SIGNING_ALLOWED=NO

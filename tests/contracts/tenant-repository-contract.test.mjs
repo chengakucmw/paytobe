@@ -27,7 +27,7 @@ function scope(merchantId) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-tenant-repository-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-tenant-repository-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

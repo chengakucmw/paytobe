@@ -1,4 +1,4 @@
-export const CONTROL_PLANE_SCHEMA_VERSION = "velarum.control-plane.v1";
+export const CONTROL_PLANE_SCHEMA_VERSION = "Paytobe.control-plane.v1";
 
 export const CONTROL_PLANE_STATUSES = Object.freeze({
   merchant: Object.freeze(["pending_verification", "active", "suspended", "closed"]),

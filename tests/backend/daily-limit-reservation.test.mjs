@@ -17,7 +17,7 @@ import { evaluatePaymentRequest } from "../../services/platform-api/src/risk.js"
 // concurrent-bypass window is closed.
 
 function freshStore() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-reserve-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-reserve-"));
   const file = path.join(dir, "relay-store.json"); // .json => in-memory JSON driver
   return { store: new Store(file), file, dir };
 }

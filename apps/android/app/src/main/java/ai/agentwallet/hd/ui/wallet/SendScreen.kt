@@ -42,8 +42,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumFonts
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeFonts
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 发送页（原生），按四步显式状态机渲染（由 [SendViewModel] 的 step 驱动）：
@@ -111,17 +111,17 @@ private fun BigAmountField(value: String, symbol: String, onValueChange: (String
             onValueChange = onValueChange,
             singleLine = true,
             textStyle = TextStyle(
-                fontFamily = VelarumFonts.display,
+                fontFamily = PaytobeFonts.display,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 48.sp,
                 textAlign = TextAlign.Center,
-                color = VelarumTheme.colors.textStrong,
+                color = PaytobeTheme.colors.textStrong,
             ),
-            cursorBrush = SolidColor(VelarumTheme.colors.primary),
+            cursorBrush = SolidColor(PaytobeTheme.colors.primary),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
         )
-        Text(symbol, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textMuted)
+        Text(symbol, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textMuted)
     }
 }
 
@@ -193,21 +193,21 @@ private fun AssetSelectorRow(symbol: String, chain: String, sendable: Boolean, o
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Asset", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                Text("Asset", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 Text(
                     "$symbol · $chain",
                     style = MaterialTheme.typography.titleMedium,
-                    color = VelarumTheme.colors.textStrong,
+                    color = PaytobeTheme.colors.textStrong,
                 )
                 if (!sendable) {
                     Text(
                         "Under development",
                         style = MaterialTheme.typography.bodySmall,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
             }
-            Text("Change", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.primary)
+            Text("Change", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.primary)
         }
     }
 }
@@ -220,18 +220,18 @@ private fun AssetPicker(vm: SendViewModel, ui: SendUiState) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text("Select asset", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+        Text("Select asset", style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
         Text(
             "Close",
             style = MaterialTheme.typography.titleMedium,
-            color = VelarumTheme.colors.primary,
+            color = PaytobeTheme.colors.primary,
             modifier = Modifier.clickable { vm.closeChainPicker() },
         )
     }
     Text(
         "Available · ${vm.sendableAssets.size}",
         style = MaterialTheme.typography.labelMedium,
-        color = VelarumTheme.colors.textMuted,
+        color = PaytobeTheme.colors.textMuted,
     )
     VpCard(modifier = Modifier.fillMaxWidth()) {
         vm.sendableAssets.forEach { asset ->
@@ -241,7 +241,7 @@ private fun AssetPicker(vm: SendViewModel, ui: SendUiState) {
     Text(
         "Feature under development · ${vm.comingSoonAssets.size}",
         style = MaterialTheme.typography.labelMedium,
-        color = VelarumTheme.colors.textMuted,
+        color = PaytobeTheme.colors.textMuted,
     )
     VpCard(modifier = Modifier.fillMaxWidth()) {
         vm.comingSoonAssets.forEach { asset ->
@@ -267,18 +267,18 @@ private fun AssetPickerRow(
             Text(
                 "${asset.symbol} · ${asset.chain}",
                 style = MaterialTheme.typography.titleMedium,
-                color = if (enabled) VelarumTheme.colors.textStrong else VelarumTheme.colors.textMuted,
+                color = if (enabled) PaytobeTheme.colors.textStrong else PaytobeTheme.colors.textMuted,
             )
             Text(
                 if (enabled) "On-device signing" else "Under development",
                 style = MaterialTheme.typography.bodySmall,
-                color = VelarumTheme.colors.textMuted,
+                color = PaytobeTheme.colors.textMuted,
             )
         }
         if (selected) {
-            Text("Selected", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.primary)
+            Text("Selected", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.primary)
         } else if (!enabled) {
-            Text("Soon", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text("Soon", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         }
     }
 }
@@ -292,7 +292,7 @@ private fun RiskStep(vm: SendViewModel, ui: SendUiState) {
     )
     VpCard(modifier = Modifier.fillMaxWidth()) {
         ui.riskWarnings.forEach { warning ->
-            Text("• $warning", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody, modifier = Modifier.padding(vertical = Spacing.s1))
+            Text("• $warning", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textBody, modifier = Modifier.padding(vertical = Spacing.s1))
         }
     }
     Row(
@@ -304,7 +304,7 @@ private fun RiskStep(vm: SendViewModel, ui: SendUiState) {
         Text(
             "I understand and accept these risks.",
             style = MaterialTheme.typography.bodyMedium,
-            color = VelarumTheme.colors.textStrong,
+            color = PaytobeTheme.colors.textStrong,
         )
     }
     val err = ui.error
@@ -321,11 +321,11 @@ private fun RiskStep(vm: SendViewModel, ui: SendUiState) {
 @Composable
 private fun ConfirmStep(vm: SendViewModel, ui: SendUiState, onSign: () -> Unit) {
     VpCard(modifier = Modifier.fillMaxWidth()) {
-        Text("You will send", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+        Text("You will send", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         Spacer(Modifier.height(Spacing.s1))
-        Text("${ui.amount} ${ui.symbol}", style = MaterialTheme.typography.displaySmall, color = VelarumTheme.colors.textStrong)
+        Text("${ui.amount} ${ui.symbol}", style = MaterialTheme.typography.displaySmall, color = PaytobeTheme.colors.textStrong)
         // 仅展示用估值（Double）；交易金额始终用 String（ui.amount）。
-        Text("≈ $${formatUsd(fiatUsd(ui.symbol, ui.amount))}", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+        Text("≈ $${formatUsd(fiatUsd(ui.symbol, ui.amount))}", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
     }
     VpCard(modifier = Modifier.fillMaxWidth()) {
         VpFactRow("Asset", "${ui.symbol} · ${ui.network}")
@@ -360,11 +360,11 @@ private fun RecipientFactRow(address: String) {
         modifier = Modifier.fillMaxWidth().padding(vertical = Spacing.s2),
         verticalArrangement = Arrangement.spacedBy(Spacing.s1),
     ) {
-        Text("Recipient", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+        Text("Recipient", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         Text(
             address,
-            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-            color = VelarumTheme.colors.textStrong,
+            style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+            color = PaytobeTheme.colors.textStrong,
         )
     }
 }

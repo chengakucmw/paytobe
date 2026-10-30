@@ -1,4 +1,4 @@
-const HTTPS_PATH = "/.well-known/velarumpay-domain-verification";
+const HTTPS_PATH = "/.well-known/Paytobe-domain-verification";
 
 export function renderDomainVerification(state, canManage) {
   if (!state.domain) return `<section aria-labelledby="domains-title"><h2 id="domains-title">Verify a domain</h2>

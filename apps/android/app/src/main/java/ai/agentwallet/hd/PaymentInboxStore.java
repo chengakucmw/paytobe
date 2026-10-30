@@ -244,12 +244,12 @@ final class PaymentInboxStore {
 
     private static String[] itemIds(JSONObject item) {
         JSONObject payload = itemPayload(item);
-        JSONObject velarum = payload.optJSONObject("velarum");
+        JSONObject Paytobe = payload.optJSONObject("Paytobe");
         return new String[] {
                 payload.optString("request_id", ""),
                 payload.optString("intent_id", ""),
                 payload.optString("id", ""),
-                velarum == null ? "" : velarum.optString("request_id", "")
+                Paytobe == null ? "" : Paytobe.optString("request_id", "")
         };
     }
 

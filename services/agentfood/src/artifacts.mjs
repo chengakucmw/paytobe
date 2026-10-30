@@ -11,7 +11,7 @@ export function buildTestnetArtifacts(order, config, now = new Date()) {
     channel: "independent_service"
   };
   const context = {
-    protocol: "velarum.transaction_context.v1",
+    protocol: "Paytobe.transaction_context.v1",
     transaction_id: transactionId,
     created_at: createdAt,
     type: "generic",

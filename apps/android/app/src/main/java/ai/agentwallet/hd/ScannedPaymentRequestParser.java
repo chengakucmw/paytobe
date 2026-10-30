@@ -44,12 +44,12 @@ final class ScannedPaymentRequestParser {
         Map<String, String> params = queryParams(clean);
 
         Draft draft = null;
-        if (lower.startsWith("velarumpay://pay")
-                || lower.startsWith("velarumpay:pay")
-                || lower.startsWith("velarumpay://payment")
-                || lower.startsWith("velarumpay:payment")) {
+        if (lower.startsWith("paytobe://pay")
+                || lower.startsWith("Paytobe:pay")
+                || lower.startsWith("paytobe://payment")
+                || lower.startsWith("Paytobe:payment")) {
             draft = fromGenericPayParams(params);
-            draft.source = "VelarumPay QR";
+            draft.source = "Paytobe QR";
         } else if (lower.startsWith("web+stellar:pay") || lower.startsWith("stellar:pay")) {
             draft = fromStellarPay(clean, params);
         } else if (lower.startsWith("ethereum:")) {
@@ -113,12 +113,12 @@ final class ScannedPaymentRequestParser {
                 || PaymentRequest.PROTOCOL_LEGACY_INTENT.equals(protocol)) {
             return true;
         }
-        JSONObject velarum = parsed.optJSONObject("velarum");
+        JSONObject Paytobe = parsed.optJSONObject("Paytobe");
         boolean hasRequestIdentity = parsed.has("request_id")
                 || parsed.has("intent_id")
                 || parsed.has("status_projection")
                 || parsed.has("payment_facts")
-                || (velarum != null && velarum.has("request_id"));
+                || (Paytobe != null && Paytobe.has("request_id"));
         boolean hasPaymentFacts = payment.has("amount")
                 && (payment.has("to") || payment.has("recipient"))
                 && (payment.has("asset") || payment.has("rail") || payment.has("network"));

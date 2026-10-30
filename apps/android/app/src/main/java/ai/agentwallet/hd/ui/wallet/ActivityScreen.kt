@@ -21,7 +21,7 @@ import ai.agentwallet.hd.ui.components.VpCard
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.vpToneOf
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 活动历史（原生）。对照 web 的 renderActivity：真实的 TransactionHistoryStore 记录或空态。
  *  列表用 LazyColumn：只渲染可见行并回收复用，记录变多时开屏与滚动都不再卡。 */
@@ -39,11 +39,11 @@ fun ActivityScreen(vm: ActivityViewModel, onBack: () -> Unit) {
         if (ui.items.isEmpty()) {
             item {
                 VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
-                    Text("No activity yet", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("No activity yet", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     Text(
                         "Transfers you sign on this device will appear here. A new wallet starts with an empty history.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                     )
                 }
             }
@@ -56,9 +56,9 @@ fun ActivityScreen(vm: ActivityViewModel, onBack: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(item.title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                            Text(item.title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                             if (item.subtitle.isNotBlank()) {
-                                Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                                Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                             }
                         }
                         VpBadge(item.amount.ifBlank { "—" }, vpToneOf(item.tone))

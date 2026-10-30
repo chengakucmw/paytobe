@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit;
 
 /** Performs the authenticated REST compensation sync outside the short FCM callback window. */
 public final class PaymentSyncWorker extends Worker {
-    static final String UNIQUE_WORK_NAME = "velarumpay-payment-sync";
+    static final String UNIQUE_WORK_NAME = "Paytobe-payment-sync";
     static final int MAX_ATTEMPTS = 5;
 
     public PaymentSyncWorker(@NonNull Context context, @NonNull WorkerParameters parameters) {
@@ -53,7 +53,7 @@ public final class PaymentSyncWorker extends Worker {
             }
             return Result.success();
         } catch (Exception error) {
-            VpLog.w("VelarumFcm", "authenticated REST compensation sync failed", error);
+            VpLog.w("PaytobeFcm", "authenticated REST compensation sync failed", error);
             return shouldRetry(getRunAttemptCount()) ? Result.retry() : Result.failure();
         }
     }

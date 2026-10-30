@@ -19,12 +19,12 @@ export class WebhookEndpointVerifier {
     const url = normalizeWebhookUrl(value);
     const before = await resolvePublic(this.resolver, url.hostname);
     const challengeUrl = new URL(url);
-    challengeUrl.searchParams.set("velarumpay_challenge", "1");
+    challengeUrl.searchParams.set("Paytobe_challenge", "1");
     const response = await this.fetcher.fetch(challengeUrl.toString(), {
       method: "GET",
       redirect: "manual",
       timeout_ms: 5_000,
-      headers: { accept: "application/json", "user-agent": "VelarumPay-Webhook-Verifier/1" }
+      headers: { accept: "application/json", "user-agent": "Paytobe-Webhook-Verifier/1" }
     });
     if (response.status >= 300 && response.status < 400) return failed("webhook_redirect_forbidden", "Webhook verification redirects are forbidden");
     if (response.status !== 200) return failed("webhook_verification_failed", "Webhook verification endpoint did not return 200");

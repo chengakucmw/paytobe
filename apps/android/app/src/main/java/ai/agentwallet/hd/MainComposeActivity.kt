@@ -23,10 +23,10 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import ai.agentwallet.hd.ui.VelarumApp
+import ai.agentwallet.hd.ui.PaytobeApp
 import ai.agentwallet.hd.ui.navigation.Routes
 import ai.agentwallet.hd.ui.onboarding.OnboardingHost
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 通知/深链进入 App 的入口意图（退役 MainActivity 后由本 Activity 接住并路由到原生屏）。 */
 sealed class AppEntry {
@@ -39,9 +39,9 @@ sealed class AppEntry {
 /**
  * 原生 (Jetpack Compose) 宿主 + LAUNCHER + 通知/深链入口。WebView 与旧 MainActivity 均已退役。
  *  - 没钱包/未备份 → 原生开通流程；完成后进入原生主界面。
- *  - 已就绪 → 原生主界面（VelarumApp）。
+ *  - 已就绪 → 原生主界面（PaytobeApp）。
  *  - 通知点击（EXTRA_OPEN_PAYMENT_INTENT_ID）→ 原生收件箱详情；
- *    深链 velarumpay://pair → 配对；agentwallet://relay|configure-relay|setup?url= → 配置 relay。
+ *    深链 paytobe://pair → 配对；agentwallet://relay|configure-relay|setup?url= → 配置 relay。
  *
  * enableEdgeToEdge() 拥抱边到边；继承 FragmentActivity 以便支付用 BiometricPrompt。
  */
@@ -49,7 +49,7 @@ class MainComposeActivity : FragmentActivity() {
     companion object {
         // 与旧 MainActivity 相同的 extra key，保证在途/历史 PendingIntent 仍能匹配。
         const val EXTRA_OPEN_PAYMENT_INTENT_ID = "ai.agentwallet.hd.OPEN_PAYMENT_INTENT_ID"
-        const val EXTRA_OPEN_CONNECT_INVITATION_ID = "com.velarumpay.wallet.OPEN_CONNECT_INVITATION_ID"
+        const val EXTRA_OPEN_CONNECT_INVITATION_ID = "com.paytobe.wallet.OPEN_CONNECT_INVITATION_ID"
     }
 
     private val pendingEntry = mutableStateOf<AppEntry>(AppEntry.None)
@@ -69,7 +69,7 @@ class MainComposeActivity : FragmentActivity() {
         maybeRequestNotificationPermission()
 
         setContent {
-            VelarumTheme {
+            PaytobeTheme {
                 // 启动判定（是否已开通 + 起始路由）此前在首帧前同步读取加密存储，会阻塞主线程拖慢冷启动。
                 // 现改为异步在 IO 线程读取：解析完成前显示与主题同色的中性占位，避免白屏或「先错屏再跳转」的闪烁。
                 var gate by rememberSaveable { mutableStateOf<Boolean?>(null) }   // null = 判定中
@@ -87,7 +87,7 @@ class MainComposeActivity : FragmentActivity() {
                     }
                 }
                 when (gate) {
-                    true -> VelarumApp(entry = pendingEntry.value, onEntryHandled = { pendingEntry.value = AppEntry.None })
+                    true -> PaytobeApp(entry = pendingEntry.value, onEntryHandled = { pendingEntry.value = AppEntry.None })
                     false -> OnboardingHost(startRoute = startRoute, onFinished = {
                         gate = true
                         ensureRelayServiceStarted()

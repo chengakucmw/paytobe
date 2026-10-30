@@ -30,7 +30,7 @@ public final class PlatformServiceConfigTest {
         assertTrue(PlatformServiceConfig.isUnofficialEnvironment());
         assertTrue(PlatformServiceConfig.supportsWebSocket());
         assertTrue(PlatformServiceConfig.environmentLabel(
-                PlatformServiceConfig.baseUrl("https://platform-dev.velarumpay.com"), true
+                PlatformServiceConfig.baseUrl("https://platform-dev.paytobe.com"), true
         ).contains("Unofficial environment"));
     }
 
@@ -41,7 +41,7 @@ public final class PlatformServiceConfigTest {
         assertThrows(IllegalStateException.class,
                 () -> PlatformServiceConfig.baseUrl("https://temporary.example", "", false));
         assertThrows(IllegalStateException.class,
-                () -> PlatformServiceConfig.baseUrl("http://api.velarumai.com", "", false));
+                () -> PlatformServiceConfig.baseUrl("http://api.paytobe.com", "", false));
     }
 
     @Test
@@ -49,8 +49,8 @@ public final class PlatformServiceConfigTest {
         for (String override : new String[] {
                 "http://127.0.0.1:8787",
                 "https://192.168.1.10",
-                "https://velarumpay-connect-testnet.chengakucmw.chatgpt.site",
-                "https://api.velarumai.com"
+                "https://paytobe-connect-testnet.chengakucmw.chatgpt.site",
+                "https://api.paytobe.com"
         }) {
             assertEquals(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN,
                     PlatformServiceConfig.baseUrl(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN, override, false));
@@ -60,15 +60,15 @@ public final class PlatformServiceConfigTest {
     @Test
     public void internalDebugOverrideStillRejectsCleartextLanAndTemporaryHosts() {
         for (String override : new String[] {
-                "http://platform.dev.velarumpay.com",
+                "http://platform.dev.paytobe.com",
                 "https://127.0.0.1",
                 "https://192.168.1.10",
                 "https://platform",
                 "https://platform.local",
                 "https://platform.lan",
                 "https://preview.trycloudflare.com",
-                "https://velarumpay-connect-testnet.chengakucmw.chatgpt.site",
-                "https://platform.dev.velarumpay.com/path"
+                "https://paytobe-connect-testnet.chengakucmw.chatgpt.site",
+                "https://platform.dev.paytobe.com/path"
         }) {
             assertThrows(override, IllegalStateException.class,
                     () -> PlatformServiceConfig.baseUrl(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN, override, true));
@@ -79,10 +79,10 @@ public final class PlatformServiceConfigTest {
     public void internalDebugAllowsStableHttpsAndIsVisiblyUnofficial() {
         String resolved = PlatformServiceConfig.baseUrl(
                 PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN,
-                "https://platform-dev.velarumpay.com/",
+                "https://platform-dev.paytobe.com/",
                 true
         );
-        assertEquals("https://platform-dev.velarumpay.com", resolved);
+        assertEquals("https://platform-dev.paytobe.com", resolved);
         assertTrue(PlatformServiceConfig.environmentLabel(resolved, true).contains("Unofficial environment"));
         assertEquals("Official testnet",
                 PlatformServiceConfig.environmentLabel(PlatformServiceConfig.OFFICIAL_TESTNET_ORIGIN, false));

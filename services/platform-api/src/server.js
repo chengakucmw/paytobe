@@ -1,11 +1,10 @@
-// VelarumPay relay backend — application bootstrap.
+// Paytobe relay backend — application bootstrap.
 //
 // This file's only job is wiring: build the singletons (store, observability,
 // WS hub), assemble the shared dependencies, mount the per-resource routers,
 // register the WebSocket handlers, and start listening. All request handling
 // and domain logic lives in ./routes/*, ./domain/*, ./http/*, ./realtime/* and
-// ./chain/*. (Previously this was a single 1700-line file; see
-// 巨型文件拆分方案_2026-06-20.md for the decomposition.)
+// ./chain/*. This module was split from the original monolithic server.
 
 import cors from "cors";
 import express from "express";
@@ -390,7 +389,7 @@ app.use("/v1", createTestnetOnlyMiddleware(runtimeConfig, {
     res,
     400,
     "validation_failed",
-    "The official VelarumPay environment accepts Stellar testnet only.",
+    "The official Paytobe environment accepts Stellar testnet only.",
     { field, details: { reason: "mainnet_forbidden", field } }
   )
 }));
@@ -584,7 +583,7 @@ export { apiWarning };
 
 function optionalWebhookSecretVault(encodedKey) {
   try {
-    return createAes256GcmVault(encodedKey, "velarumpay.webhook_secret.v1");
+    return createAes256GcmVault(encodedKey, "Paytobe.webhook_secret.v1");
   } catch {
     return Object.freeze({
       encrypt() {

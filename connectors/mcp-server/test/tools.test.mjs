@@ -80,7 +80,7 @@ test("create_pairing_session uses default request scopes and rejects unsupported
           ok: true,
           pairing_session: {
             pairing_session_id: "pair_123",
-            pairing_uri: "velarumpay://pair?session=pair_123&code=482913",
+            pairing_uri: "Paytobe://pair?session=pair_123&code=482913",
             pairing_code: "482913",
             status: "pending"
           }
@@ -194,7 +194,7 @@ test("create_payment_request rejects approval bypass and preserves API error sha
     base_url: "http://platform.test",
     connection_token: "conn_tok_test",
     payment_request: {
-      protocol: "velarum.payment_request.v1",
+      protocol: "Paytobe.payment_request.v1",
       payment: {
         amount: "24.00"
       }

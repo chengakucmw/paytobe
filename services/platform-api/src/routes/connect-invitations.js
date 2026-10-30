@@ -18,7 +18,7 @@ import {
   normalizeRequestedScopes
 } from "../domain/scopes.js";
 
-const CONNECT_KEY_PATTERN = /^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/;
+const CONNECT_KEY_PATTERN = /^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/;
 const DEFAULT_CONNECTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 function claimTokenFromRequest(req) {
@@ -83,7 +83,7 @@ export function createConnectInvitationsRouter(deps) {
       labels: { status: invitation.status },
       details: { expires_at: invitation.expires_at }
     });
-    observability.incrementCounter("velarumpay_connect_invitations_total", { result: "created" });
+    observability.incrementCounter("Paytobe_connect_invitations_total", { result: "created" });
     res.status(201).json({
       ok: true,
       connect_key: invitation.connect_key,
@@ -154,7 +154,7 @@ export function createConnectInvitationsRouter(deps) {
       labels: { status: claimed.connect_invitation.status, identity_assurance: identityAssurance },
       details: { requested_scope_count: scopes.value.length }
     });
-    observability.incrementCounter("velarumpay_connect_invitations_total", { result: "claimed" });
+    observability.incrementCounter("Paytobe_connect_invitations_total", { result: "claimed" });
     return res.status(201).json({
       ok: true,
       claim_token: claimed.claim_token,
@@ -235,7 +235,7 @@ export function createConnectInvitationsRouter(deps) {
       labels: { status: "approved", identity_state: review.state },
       details: { connection_id: connection.connection_id, approved_scope_count: scopes.value.length }
     });
-    observability.incrementCounter("velarumpay_connect_invitations_total", { result: "approved" });
+    observability.incrementCounter("Paytobe_connect_invitations_total", { result: "approved" });
     return res.status(201).json({
       ok: true,
       connect_invitation: connectInvitationResponse(approved, connectIdentityReview(store, approved)),
@@ -338,7 +338,7 @@ export function createConnectInvitationsRouter(deps) {
       labels: { status: connected.status },
       details: { connection_id: rotated.connection_id, exchange_count: connected.exchange_count }
     });
-    observability.incrementCounter("velarumpay_connect_invitations_total", { result: "connected" });
+    observability.incrementCounter("Paytobe_connect_invitations_total", { result: "connected" });
     res.json({
       ok: true,
       connect_invitation: connectInvitationResponse(connected, connectIdentityReview(store, connected)),

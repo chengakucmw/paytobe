@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the VelarumPay Android debug APK locally.
+# Build the Paytobe Android debug APK locally.
 # Requirements: JDK 17 and the Android SDK (both installed by Android Studio).
 set -euo pipefail
 cd "$(dirname "$0")"

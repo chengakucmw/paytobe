@@ -138,14 +138,14 @@ async function stellarTransaction(horizonUrl, txHash) {
     throw new Error(`Horizon operations HTTP ${operationsResponse.status}: ${await operationsResponse.text()}`);
   }
   const operations = await operationsResponse.json();
-  return { ...transaction, _velarum_operations: operations?._embedded?.records || [] };
+  return { ...transaction, _Paytobe_operations: operations?._embedded?.records || [] };
 }
 
 export function validateStellarPaymentConfirmation(request, stellar) {
   const chainResult = stellarConfirmationResult(stellar);
   if (!chainResult || !chainResult.ok) return chainResult;
   const payment = request?.payment || {};
-  const operations = stellar?._velarum_operations;
+  const operations = stellar?._Paytobe_operations;
   if (stellar.operation_count !== 1 || !Array.isArray(operations) || operations.length !== 1) {
     return mismatch("operation_count");
   }

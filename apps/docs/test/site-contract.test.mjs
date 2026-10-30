@@ -39,7 +39,7 @@ test("merchant quickstart keeps the canonical order and testnet safety boundary"
     assert.ok(next > cursor, `${marker} must appear in canonical quickstart order`);
     cursor = next;
   }
-  assert.match(quickstart, /https:\/\/api\.velarumai\.com/);
+  assert.match(quickstart, /https:\/\/api\.paytobe\.com/);
   assert.match(quickstart, /Mainnet and commercial SLAs are not offered/);
   assert.match(quickstart, /requires_user_approval: true/);
   assert.match(quickstart, /recipient_version_id/);
@@ -47,8 +47,8 @@ test("merchant quickstart keeps the canonical order and testnet safety boundary"
 });
 
 test("OpenAPI covers merchant onboarding and resolves errors, schemas, and official origin", () => {
-  const openapi = json("services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json");
-  assert.equal(openapi.servers[0].url, "https://api.velarumai.com");
+  const openapi = json("services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json");
+  assert.equal(openapi.servers[0].url, "https://api.paytobe.com");
   const paths = [
     "/v1/merchant-accounts/registrations", "/v1/merchant-accounts/email-verifications",
     "/v1/merchants", "/v1/merchant-sessions", "/v1/merchant-domains", "/v1/merchant-domains/{id}/verify",
@@ -68,7 +68,7 @@ test("OpenAPI covers merchant onboarding and resolves errors, schemas, and offic
     "#/components/schemas/PaymentRequestCreate");
   assert.equal(openapi.components.schemas.PaymentRequestCreate.properties.payment.additionalProperties, false);
 
-  const errorSchema = json("packages/protocol/schema/velarum.platform_api.error.v1.schema.json");
+  const errorSchema = json("packages/protocol/schema/Paytobe.platform_api.error.v1.schema.json");
   assert.deepEqual(errorSchema.properties.error.properties.code.enum, [...PLATFORM_API_ERROR_CODES]);
   assert.deepEqual(errorSchema.properties.error.required, ["code", "message", "request_id"]);
 });
@@ -110,6 +110,8 @@ test("public HTML keeps semantic landmarks and valid local links", () => {
     assert.match(html, /<nav\b/i, `${page} needs navigation`);
     assert.match(html, /<main\b/i, `${page} needs a main landmark`);
     assert.match(html, /<h1>[^<]+<\/h1>/i, `${page} needs one visible page heading`);
+    assert.match(html, /<span class="mark">P<\/span> Paytobe/, `${page} needs the Paytobe brand mark`);
+    assert.doesNotMatch(html, /<span class="mark">V<\/span>/, `${page} must not retain the legacy brand mark`);
     assert.match(html, /Official Testnet/, `${page} must use the current public status`);
     assert.doesNotMatch(html, /Developer Preview|Test and pilot use only/i, `${page} must not use superseded preview language`);
     for (const [, href] of html.matchAll(/href="(\/[^"?#]*)/g)) {

@@ -1,0 +1,30 @@
+[package]
+name = "Paytobe-wallet-core"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Paytobe cross-platform wallet core: HD key derivation and signing shared by the Android and iOS apps (Phase 1: Stellar)."
+publish = false
+
+[lib]
+name = "Paytobe_wallet_core"
+# "lib" keeps the rlib for `cargo test`; "cdylib" is the
+# shared library the apps load (.so on Android, linked into the iOS framework);
+# "staticlib" supports static linking on iOS.
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[dependencies]
+# Mature, widely-audited crypto building blocks. The whole point of a Rust core
+# is that BOTH platforms run these exact same primitives.
+bip39 = "2.2"            # BIP-39 mnemonic validation + PBKDF2-HMAC-SHA512 seed
+ed25519-dalek = "2"      # ed25519 keypair + signing (RFC 8032)
+hmac = "0.12"            # HMAC-SHA512 for the SLIP-0010 derivation chain
+sha2 = "0.10"
+stellar-strkey = "0.0.18" # Strkey encode/decode (G.../S..., muxed M... detection)
+stellar-xdr = { version = "27", features = ["base64"] }  # canonical Stellar XDR (tx envelope build/parse)
+base64 = "0.22"          # MEMO_HASH / MEMO_RETURN base64 decoding (C-1)
+bip32 = { version = "0.5", default-features = false, features = ["secp256k1", "std"] }  # EVM BIP32 secp256k1
+k256 = "0.13"            # secp256k1 public key -> Ethereum address
+sha3 = "0.10"            # Keccak-256 (Ethereum address + EIP-55 checksum)
+bs58 = "0.5"             # Solana base58 address
+serde_json = "1"         # versioned C ABI request/response envelope

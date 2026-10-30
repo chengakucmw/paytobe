@@ -9,15 +9,15 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * 通过 CompositionLocal 向下传递自定义语义色。组件用 VelarumTheme.colors.xxx 取色。
+ * 通过 CompositionLocal 向下传递自定义语义色。组件用 PaytobeTheme.colors.xxx 取色。
  */
-val LocalVelarumColors = staticCompositionLocalOf { velarumLightColors() }
+val LocalPaytobeColors = staticCompositionLocalOf { PaytobeLightColors() }
 
 /**
  * 把语义色映射到 Material3 的 ColorScheme，确保 Material 组件（按钮/卡片等）默认就是品牌色，
- * 而不是默认的紫色。其余更细的语义角色通过 VelarumTheme.colors 访问。
+ * 而不是默认的紫色。其余更细的语义角色通过 PaytobeTheme.colors 访问。
  */
-private fun velarumColorScheme(c: VelarumColors) = lightColorScheme(
+private fun PaytobeColorScheme(c: PaytobeColors) = lightColorScheme(
     primary = c.primary,
     onPrimary = c.onPrimary,
     primaryContainer = c.primarySoft,
@@ -38,24 +38,24 @@ private fun velarumColorScheme(c: VelarumColors) = lightColorScheme(
     onErrorContainer = c.failed,
 )
 
-/** 全 App 主题包装。在 Activity 的 setContent { VelarumTheme { ... } } 里使用。 */
+/** 全 App 主题包装。在 Activity 的 setContent { PaytobeTheme { ... } } 里使用。 */
 @Composable
-fun VelarumTheme(content: @Composable () -> Unit) {
-    val colors = velarumLightColors()
-    CompositionLocalProvider(LocalVelarumColors provides colors) {
+fun PaytobeTheme(content: @Composable () -> Unit) {
+    val colors = PaytobeLightColors()
+    CompositionLocalProvider(LocalPaytobeColors provides colors) {
         MaterialTheme(
-            colorScheme = velarumColorScheme(colors),
-            typography = VelarumTypography,
-            shapes = VelarumShapes,
+            colorScheme = PaytobeColorScheme(colors),
+            typography = PaytobeTypography,
+            shapes = PaytobeShapes,
             content = content,
         )
     }
 }
 
-/** 访问入口：VelarumTheme.colors.primary 等（函数与对象同名，仿 Material 的 MaterialTheme）。 */
-object VelarumTheme {
-    val colors: VelarumColors
+/** 访问入口：PaytobeTheme.colors.primary 等（函数与对象同名，仿 Material 的 MaterialTheme）。 */
+object PaytobeTheme {
+    val colors: PaytobeColors
         @Composable
         @ReadOnlyComposable
-        get() = LocalVelarumColors.current
+        get() = LocalPaytobeColors.current
 }

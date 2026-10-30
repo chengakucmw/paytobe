@@ -6,12 +6,12 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const builtPublicDir = path.join(__dirname, "dist", "public");
 const publicDir = existsSync(builtPublicDir) ? builtPublicDir : path.join(__dirname, "public");
-const apkDownloadName = "VelarumPay-Android-Official-Testnet.apk";
+const apkDownloadName = "Paytobe-Android-Official-Testnet.apk";
 // APKs stay outside the public code repository. Operators replace the stable file in
 // releases/android, while the public /download/android URL remains unchanged.
-const apkPath = process.env.VELARUMPAY_APK_PATH
-  ? path.resolve(process.env.VELARUMPAY_APK_PATH)
-  : path.resolve(__dirname, "..", "..", "..", "releases", "android", "VelarumPay-latest.apk");
+const apkPath = process.env.PAYTOBE_APK_PATH
+  ? path.resolve(process.env.PAYTOBE_APK_PATH)
+  : path.resolve(__dirname, "..", "..", "..", "releases", "android", "Paytobe-latest.apk");
 const port = Number(process.env.PORT || 8091);
 
 const mime = {
@@ -47,7 +47,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === "/health") {
     sendJson(res, 200, {
       ok: true,
-      service: "VelarumPay-site",
+      service: "Paytobe-site",
       android_apk_available: isAvailableApk(),
       time: new Date().toISOString()
     });
@@ -83,7 +83,7 @@ const server = http.createServer((req, res) => {
 server.listen(port, () => {
   const address = server.address();
   const boundPort = typeof address === "object" && address ? address.port : port;
-  console.log(`VelarumPay site listening on http://localhost:${boundPort}`);
+  console.log(`Paytobe site listening on http://localhost:${boundPort}`);
 });
 
 function isAvailableApk() {

@@ -1,10 +1,10 @@
-# VelarumPay Platform API
+# Paytobe Platform API
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-08-03 19:42:23 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-08-03 11:42:23 UTC
+> - **Taipei Time / 台北时间:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-10-29 05:41:42 UTC
 
-Local development API for VelarumPay payment requests, Transaction Context Lite, and legacy AgentWallet relay compatibility.
+Local development API for Paytobe payment requests, Transaction Context Lite, and legacy AgentWallet relay compatibility.
 
 ## Features
 
@@ -13,7 +13,7 @@ Local development API for VelarumPay payment requests, Transaction Context Lite,
 - Minimal-data FCM wake-up delivery plus authenticated REST compensation sync.
 - WebSocket delivery as a foreground/legacy secondary channel.
 - Wallet status update and agent observation: `pending`, `signed`, `broadcasted`, `confirmed`, `failed`, `expired`, `rejected`.
-- Velarum Payment Request v1 normalization.
+- Paytobe Payment Request v1 normalization.
 - Transaction Context v1 validation and latest-context store.
 - Agent pairing sessions with QR URI and short code.
 - Connection-scoped tokens for standard Payment Request create/read.
@@ -23,7 +23,7 @@ Local development API for VelarumPay payment requests, Transaction Context Lite,
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/services/platform-api
+cd services/platform-api
 cp .env.example .env
 npm install
 npm start
@@ -43,9 +43,9 @@ default SQLite store is first created, it is imported once and a
 Useful environment variables:
 
 ```bash
-RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite
+RELAY_STORE_PATH=/var/lib/Paytobe/relay-store.sqlite
 RELAY_STORE_DRIVER=sqlite
-RELAY_STORE_LEGACY_JSON=/var/lib/velarumpay/relay-store.json
+RELAY_STORE_LEGACY_JSON=/var/lib/Paytobe/relay-store.json
 ```
 
 For local compatibility tests, `RELAY_STORE_DRIVER=json` or a `.json` store path
@@ -54,7 +54,7 @@ keeps the legacy JSON-backed store.
 Create a store backup before deploys or schema changes:
 
 ```bash
-npm run backup -- /var/backups/velarumpay/relay-store-before-deploy.sqlite
+npm run backup -- /var/backups/Paytobe/relay-store-before-deploy.sqlite
 ```
 
 ## Runtime Security
@@ -64,12 +64,12 @@ The production preflight is strict by design:
 ```bash
 NODE_ENV=production \
 RUNTIME_ENV=production \
-RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite \
+RELAY_STORE_PATH=/var/lib/Paytobe/relay-store.sqlite \
 CORS_ALLOWED_ORIGINS=https://wallet.example.com \
 OPENCLAW_DEVICE_SECRET=replace-with-random-secret \
 METRICS_TOKEN=replace-with-random-metrics-token \
 FCM_ENABLED=true \
-FCM_PROJECT_ID=velarumpay-production \
+FCM_PROJECT_ID=Paytobe-production \
 FCM_SERVICE_ACCOUNT_FILE=/run/secrets/firebase-service-account.json \
 FCM_TOKEN_ENCRYPTION_KEY=replace-with-base64-32-byte-key \
 npm run check:runtime-config
@@ -97,7 +97,7 @@ tokens are returned only when created or rotated.
 
 FCM registration tokens are encrypted with AES-256-GCM at rest and bound to the wallet device identifier. Push payloads contain no amount, address, memo, payment status, or business context. The device receives only a sync signal, opaque request id, and event cursor, then retrieves authoritative data over authenticated REST. Production requires FCM so delivery cannot be silently omitted, while REST remains the source of truth.
 
-The official VelarumPay environment is testnet-only. Production startup and the
+The official Paytobe environment is testnet-only. Production startup and the
 request middleware reject `stellar_public`, `base_mainnet`, a mainnet Horizon
 endpoint, and any attempt to enable a mainnet route. The only supported Stellar
 endpoint in the official environment is:
@@ -117,7 +117,7 @@ security review and is not an operator-configurable path in this deployment.
 Docker Compose, systemd, health checks, preflight, and rollback notes live in:
 
 ```text
-/Users/yang/code/VelarumPay/code/services/platform-api/deploy
+services/platform-api/deploy
 ```
 
 ## Observability and Audit Logs
@@ -162,10 +162,10 @@ http://10.0.2.2:8787
 
 ## API
 
-The machine-readable public contract is `openapi/velarumpay-platform-api-v0.1.openapi.json`. It references:
+The machine-readable public contract is `openapi/Paytobe-platform-api-v0.1.openapi.json`. It references:
 
-- `packages/protocol/schema/velarum.payment_request.v1.schema.json` for `velarum.payment_request.v1`.
-- `packages/protocol/schema/velarum.transaction_context.v1.schema.json` for `velarum.transaction_context.v1`.
+- `packages/protocol/schema/Paytobe.payment_request.v1.schema.json` for `Paytobe.payment_request.v1`.
+- `packages/protocol/schema/Paytobe.transaction_context.v1.schema.json` for `Paytobe.transaction_context.v1`.
 
 Legacy PaymentIntent and OpenClaw-specific routes are implemented for migration but are not part of the canonical public OpenAPI surface.
 
@@ -284,7 +284,7 @@ X-Connection-Token: conn_tok_...
 
 Connection auth errors return `unauthorized_connection`. Missing scope or cross-connection reads return `scope_denied`. The legacy OpenClaw shared-secret path is only kept as a migration fallback when an OpenClaw signature is supplied or local-only `ALLOW_UNSIGNED_OPENCLAW=true` is set.
 
-`POST /v1/transaction-contexts` accepts `velarum.transaction_context.v1`, validates it, and stores the latest object by `transaction_id`. Standard callers should use a connection token with `transaction_contexts.create` or `transaction_contexts.read`; the legacy OpenClaw path remains available for migration and local quickstarts.
+`POST /v1/transaction-contexts` accepts `Paytobe.transaction_context.v1`, validates it, and stores the latest object by `transaction_id`. Standard callers should use a connection token with `transaction_contexts.create` or `transaction_contexts.read`; the legacy OpenClaw path remains available for migration and local quickstarts.
 
 `transaction_id` is the standard reference for opening the full dossier or audit trail. The Platform API builds any immutable `transaction_context_snapshot` from the stored context owned by the same connection; caller-supplied snapshots are never trusted or used as a safe-looking fallback.
 
@@ -358,7 +358,7 @@ Status update responses return the standard `payment_request` projection and app
 Copyable Payment Request and Transaction Context examples live under:
 
 ```text
-/Users/yang/code/VelarumPay/code/examples/payment-request-quickstart
+examples/payment-request-quickstart
 ```
 
 Run the local smoke check from the repository root:
@@ -367,4 +367,4 @@ Run the local smoke check from the repository root:
 node examples/payment-request-quickstart/smoke-check.mjs
 ```
 
-Formal specs live in `/Users/yang/code/VelarumPay/docs`; this README only documents nearby code.
+Public machine-readable contracts live in `packages/protocol/schema` and `services/platform-api/openapi`; this README only documents nearby code.

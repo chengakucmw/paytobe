@@ -27,7 +27,7 @@ import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTextField
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 网络（原生）。对照 web 的 renderNetworks：已启用网络列表 + 添加自定义 EVM 网络。 */
 @Composable
@@ -45,9 +45,9 @@ fun NetworksScreen(vm: NetworksViewModel, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Enabled networks", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text("Enabled networks", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 if (ui.networks.isEmpty()) {
-                    Text("No networks configured.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("No networks configured.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 } else {
                     ui.networks.forEach { net ->
                         VpFactRow(net.name, "chain ${net.chainId} · ${net.symbol}")
@@ -55,7 +55,7 @@ fun NetworksScreen(vm: NetworksViewModel, onBack: () -> Unit) {
                 }
             }
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Add EVM network", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
+                Text("Add EVM network", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong, modifier = Modifier.padding(bottom = Spacing.s2))
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                     VpTextField(value = name, onValueChange = { name = it }, label = "Network name")
                     VpTextField(value = rpc, onValueChange = { rpc = it }, label = "RPC URL")

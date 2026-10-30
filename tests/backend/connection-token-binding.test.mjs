@@ -161,7 +161,7 @@ function request(token, body = {}, query = {}) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-connection-binding-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-connection-binding-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

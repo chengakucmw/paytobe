@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.dp
  * 圆角令牌，来自 tokens/radii.css。pill 用百分比 50 自动得到半圆端，
  * circle 用 CircleShape（在用到的地方直接引 androidx.compose.foundation.shape.CircleShape）。
  */
-object VelarumRadii {
+object PaytobeRadii {
     val xs = RoundedCornerShape(8.dp)
     val sm = RoundedCornerShape(12.dp)
     val md = RoundedCornerShape(16.dp)
@@ -19,10 +19,10 @@ object VelarumRadii {
 }
 
 /** 映射到 Material3 的 Shapes 槽位，供组件默认形状使用。 */
-val VelarumShapes = Shapes(
-    extraSmall = VelarumRadii.xs,
-    small = VelarumRadii.sm,
-    medium = VelarumRadii.md,
-    large = VelarumRadii.lg,
-    extraLarge = VelarumRadii.xl,
+val PaytobeShapes = Shapes(
+    extraSmall = PaytobeRadii.xs,
+    small = PaytobeRadii.sm,
+    medium = PaytobeRadii.md,
+    large = PaytobeRadii.lg,
+    extraLarge = PaytobeRadii.xl,
 )

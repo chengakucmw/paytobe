@@ -31,7 +31,7 @@ async function registerDevice(worker, suffix) {
 async function createKey(worker, device) {
   const response = await api(worker, "/v1/connect-invitations", { method: "POST", payload: { ...device, expires_in_seconds: 300 } });
   assert.equal(response.status, 201);
-  assert.match(response.body.connect_key, /^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/);
+  assert.match(response.body.connect_key, /^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/);
   return response.body;
 }
 
@@ -77,7 +77,7 @@ test("the live smoke exercises AgentFood's standard hosted API instead of dedica
 test("controlled public webhook receivers verify ownership and HMAC without logging secrets or payloads", async (t) => {
   const challenge = "whv_test_receiver_a_ownership";
   const secret = "whsec_test_receiver_a_signing_secret";
-  const payload = JSON.stringify({ version: "velarum.webhook_event.v1", type: "payment_request.status_updated", private_note: "never log this" });
+  const payload = JSON.stringify({ version: "Paytobe.webhook_event.v1", type: "payment_request.status_updated", private_note: "never log this" });
   const timestamp = String(Math.floor(Date.now() / 1000));
   const signature = `t=${timestamp},v1=${crypto.createHmac("sha256", secret).update(`${timestamp}.`).update(payload).digest("hex")}`;
   const logs = [];
@@ -86,7 +86,7 @@ test("controlled public webhook receivers verify ownership and HMAC without logg
   t.after(() => { console.info = originalInfo; });
   const worker = createTestWorker({ WEBHOOK_A_OWNERSHIP_CHALLENGE: challenge, WEBHOOK_A_SECRET: secret });
 
-  const ownership = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a?velarumpay_challenge=1"));
+  const ownership = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a?Paytobe_challenge=1"));
   assert.equal(ownership.status, 200);
   assert.deepEqual(await ownership.json(), { challenge });
 
@@ -94,9 +94,9 @@ test("controlled public webhook receivers verify ownership and HMAC without logg
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-velarumpay-event-id": "event_receiver_a",
-      "x-velarumpay-delivery-id": "delivery_receiver_a",
-      "x-velarumpay-signature": signature
+      "x-Paytobe-event-id": "event_receiver_a",
+      "x-Paytobe-delivery-id": "delivery_receiver_a",
+      "x-Paytobe-signature": signature
     },
     body: payload
   }));
@@ -108,7 +108,7 @@ test("controlled public webhook receivers verify ownership and HMAC without logg
 
   const rejected = await worker.fetch(new Request("https://connect.test/testing/webhooks/merchant-a", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-velarumpay-signature": `t=${timestamp},v1=${"0".repeat(64)}` },
+    headers: { "content-type": "application/json", "x-Paytobe-signature": `t=${timestamp},v1=${"0".repeat(64)}` },
     body: payload
   }));
   assert.equal(rejected.status, 401);
@@ -184,7 +184,7 @@ test("multiple merchants and devices remain tenant- and device-isolated", async 
   const bobConnection = await exchange(worker, bobClaim.body.connect_invitation.connect_invitation_id, bobClaim.body.claim_token);
 
   const payment = {
-    protocol: "velarum.payment_request.v1",
+    protocol: "Paytobe.payment_request.v1",
     request_id: "prq_alice_1",
     idempotency_key: "alice-order-1",
     created_at: new Date().toISOString(),
@@ -217,7 +217,7 @@ test("testnet platform rejects mainnet and supports wallet revocation", async ()
 
   const mainnet = await api(worker, "/v1/payment-requests", {
     method: "POST", token: connection.connection_token,
-    payload: { protocol: "velarum.payment_request.v1", request_id: "mainnet", idempotency_key: "mainnet", policy: { requires_user_approval: true }, payment: { rail: "stellar_xlm", network: "stellar_public", stellar_testnet: false, amount: "1" } }
+    payload: { protocol: "Paytobe.payment_request.v1", request_id: "mainnet", idempotency_key: "mainnet", policy: { requires_user_approval: true }, payment: { rail: "stellar_xlm", network: "stellar_public", stellar_testnet: false, amount: "1" } }
   });
   assert.equal(mainnet.status, 400);
   assert.equal(mainnet.body.error.code, "testnet_only");
@@ -226,7 +226,7 @@ test("testnet platform rejects mainnet and supports wallet revocation", async ()
   assert.equal(revoked.status, 200);
   const afterRevoke = await api(worker, "/v1/payment-requests", {
     method: "POST", token: connection.connection_token,
-    payload: { protocol: "velarum.payment_request.v1", request_id: "revoked", idempotency_key: "revoked", policy: { requires_user_approval: true }, payment: { rail: "stellar_xlm", network: "stellar_testnet", stellar_testnet: true, amount: "1" } }
+    payload: { protocol: "Paytobe.payment_request.v1", request_id: "revoked", idempotency_key: "revoked", policy: { requires_user_approval: true }, payment: { rail: "stellar_xlm", network: "stellar_testnet", stellar_testnet: true, amount: "1" } }
   });
   assert.equal(afterRevoke.status, 401);
 });

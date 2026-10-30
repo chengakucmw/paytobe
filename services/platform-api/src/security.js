@@ -17,7 +17,7 @@ const WEAK_SECRET_VALUES = new Set([
 ]);
 const REDACTED = "[redacted]";
 const SENSITIVE_KEY = /(authorization|token|secret|signature|password|seed|private|mnemonic)/i;
-export const OFFICIAL_API_ORIGIN = "https://api.velarumai.com";
+export const OFFICIAL_API_ORIGIN = "https://api.Paytobe.com";
 export const OFFICIAL_STELLAR_TESTNET_HORIZON = "https://horizon-testnet.stellar.org";
 
 export function loadRuntimeConfig(env = process.env) {
@@ -69,7 +69,7 @@ export function loadRuntimeConfig(env = process.env) {
       account_id: String(env.CLOUDFLARE_EMAIL_ACCOUNT_ID || "").trim(),
       api_token: String(env.CLOUDFLARE_EMAIL_API_TOKEN || "").trim(),
       from: String(env.TRANSACTIONAL_EMAIL_FROM || "").trim().toLowerCase(),
-      from_name: String(env.TRANSACTIONAL_EMAIL_FROM_NAME || "VelarumPay").trim(),
+      from_name: String(env.TRANSACTIONAL_EMAIL_FROM_NAME || "Paytobe").trim(),
       reply_to: String(env.TRANSACTIONAL_EMAIL_REPLY_TO || "").trim().toLowerCase(),
       portal_base_url: String(env.MERCHANT_PORTAL_PUBLIC_URL || "").trim().replace(/\/+$/, ""),
       timeout_ms: positiveInt(env.TRANSACTIONAL_EMAIL_TIMEOUT_MS, 10_000)
@@ -289,7 +289,7 @@ export function createTestnetOnlyMiddleware(config, options = {}) {
       ok: false,
       error: {
         code: "validation_failed",
-        message: "The official VelarumPay environment accepts Stellar testnet only.",
+        message: "The official Paytobe environment accepts Stellar testnet only.",
         severity: "blocker",
         details: { reason: "mainnet_forbidden", field: forbidden }
       }

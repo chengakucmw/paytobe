@@ -29,7 +29,7 @@ export function createAgentFoodServer({ config, store, platformClient }) {
       if (req.method === "GET" && url.pathname === "/api/auth/session") {
         return sendJson(res, 200, { ok: true, authenticated: false });
       }
-      if (req.method === "GET" && url.pathname === "/.well-known/velarumpay-domain-verification") {
+      if (req.method === "GET" && url.pathname === "/.well-known/Paytobe-domain-verification") {
         if (!config.domainVerificationChallenge) {
           return sendError(res, 404, "domain_challenge_unavailable", "Domain verification challenge is not configured");
         }
@@ -48,7 +48,7 @@ export function createAgentFoodServer({ config, store, platformClient }) {
         const body = await readJson(req);
         const message = String(body.message || "").trim();
         if (!message) return sendError(res, 400, "message_required", "A message is required");
-        const connectKey = message.match(/^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/)?.[0];
+        const connectKey = message.match(/^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/)?.[0];
         if (connectKey) {
           if (!platformClient || config.siteOnly || !configHealth(config).payment_ready) {
             return sendError(res, 503, "wallet_connection_unavailable", "Wallet connection is not available");
@@ -59,7 +59,7 @@ export function createAgentFoodServer({ config, store, platformClient }) {
             type: "connect_started",
             session_id: session.session_id,
             connection: publicConnectSession(session),
-            message: "Connect Key accepted once. Approve AgentFood in VelarumPay to continue."
+            message: "Connect Key accepted once. Approve AgentFood in Paytobe to continue."
           });
         }
         const order = recommendMockOrder(message, String(body.preferred_merchant_id || ""));
@@ -84,9 +84,9 @@ export function createAgentFoodServer({ config, store, platformClient }) {
         const body = await readJson(req);
         const connectSessionId = String(body.session_id || "").trim();
         const session = connectSessions.get(connectSessionId);
-        if (!session) return sendError(res, 409, "connection_required", "Connect AgentFood to VelarumPay first");
+        if (!session) return sendError(res, 409, "connection_required", "Connect AgentFood to Paytobe first");
         await refreshConnectSession(session, platformClient);
-        if (!session.connection_token) return sendError(res, 409, "connection_required", "Approve AgentFood in VelarumPay first");
+        if (!session.connection_token) return sendError(res, 409, "connection_required", "Approve AgentFood in Paytobe first");
         const clientRequestId = String(body.client_request_id || "").trim();
         if (!/^[A-Za-z0-9_-]{16,64}$/.test(clientRequestId)) {
           return sendError(res, 400, "client_request_id_required", "A safe client request identifier is required");
@@ -125,9 +125,9 @@ export function createAgentFoodServer({ config, store, platformClient }) {
       if (req.method === "GET" && isPublicPath(url.pathname)) {
         return serveStatic(url.pathname, req, res, config.publicBaseUrl);
       }
-      if (req.method === "POST" && url.pathname === "/v1/webhooks/velarumpay") {
+      if (req.method === "POST" && url.pathname === "/v1/webhooks/Paytobe") {
         const rawBody = await readBody(req);
-        const signature = String(req.headers["x-velarumpay-signature"] || "");
+        const signature = String(req.headers["x-Paytobe-signature"] || "");
         const verified = await verifyWebhookSignature(config.webhook.secret, rawBody, signature, {
           toleranceSeconds: config.webhook.toleranceSeconds
         });
@@ -150,8 +150,8 @@ export function createAgentFoodServer({ config, store, platformClient }) {
         if (!platformClient) return sendError(res, 503, "payment_connector_unavailable", "AgentFood payment connector is not configured");
         const body = await readJson(req);
         const connectKey = String(body.connect_key || "").trim();
-        if (!/^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/.test(connectKey)) {
-          return sendError(res, 400, "invalid_connect_key", "A canonical VelarumPay Connect Key is required");
+        if (!/^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/.test(connectKey)) {
+          return sendError(res, 400, "invalid_connect_key", "A canonical Paytobe Connect Key is required");
         }
         const session = await claimConnectSession(connectSessions, platformClient, connectKey);
         return sendJson(res, 201, {
@@ -276,7 +276,7 @@ async function createOrderPaymentRequest({ order, store, config, connectSessions
     return {
       status: 409,
       payload: {
-        ...errorPayload("platform_payment_blocked", "VelarumPay created the request but blocked signing under its independent risk policy"),
+        ...errorPayload("platform_payment_blocked", "Paytobe created the request but blocked signing under its independent risk policy"),
         order: updated,
         payment_request: paymentRequest
       }
@@ -370,7 +370,7 @@ function sendJson(res, status, payload) {
 
 function isPublicPath(pathname) {
   return pathname === "/"
-    || pathname === "/.well-known/velarumpay-domain-verification"
+    || pathname === "/.well-known/Paytobe-domain-verification"
     || pathname === "/app.js"
     || pathname === "/styles.css"
     || pathname.startsWith("/assets/")
@@ -409,7 +409,7 @@ async function serveStatic(pathname, req, res, publicBaseUrl) {
 
 function configOrigin(req, publicBaseUrl) {
   if (publicBaseUrl) return publicBaseUrl;
-  return `https://${req.headers.host || "agentfood.velarumai.com"}`;
+  return `https://${req.headers.host || "agentfood.Paytobe.com"}`;
 }
 
 function contentType(filename) {

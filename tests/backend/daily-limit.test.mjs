@@ -18,7 +18,7 @@ import {
 // in exact BigInt minor units (see services/platform-api/src/decimal.js).
 
 function freshStore() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-limit-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-limit-"));
   const file = path.join(dir, "relay-store.json"); // .json => in-memory JSON driver
   const store = new Store(file);
   return { store, file, dir };
@@ -36,7 +36,7 @@ function stellarIntent(amount, { ttlMs = 3_600_000 } = {}) {
   return {
     expires_at: new Date(Date.now() + ttlMs).toISOString(),
     idempotency_key: "idem_test",
-    velarum: { request_id: "req_test" },
+    Paytobe: { request_id: "req_test" },
     payment: {
       rail: "stellar_xlm",
       network: "stellar_public",

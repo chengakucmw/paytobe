@@ -1,8 +1,8 @@
 # Payment Request Quickstart Fixtures
 
 > **Last modified**
-> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-07-21 13:50:07 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
 Copyable Payment Request and Transaction Context examples for local developer preview.
 
@@ -88,23 +88,23 @@ The SDK and connector packages have typed entry points and dry-run tarball
 checks:
 
 ```bash
-cd /Users/yang/code/VelarumPay/code
+cd /path/to/Paytobe
 npm run package:integrations
 ```
 
 This verifies the packable file lists for:
 
-- `@velarumpay/protocol@0.1.0`
-- `@velarumpay/sdk-js@0.1.0`
-- `@velarumpay/mcp-server@0.1.0`
-- `@velarumpay/hermes-connector@0.1.0`
+- `@Paytobe/protocol@0.1.0`
+- `@Paytobe/sdk-js@0.1.0`
+- `@Paytobe/mcp-server@0.1.0`
+- `@Paytobe/hermes-connector@0.1.0`
 
 ## CLI Quickstart
 
 Start the local Platform API first:
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/services/platform-api
+cd /path/to/Paytobe/services/platform-api
 npm install
 OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
 ```
@@ -112,7 +112,7 @@ OPENCLAW_DEVICE_SECRET=change-me-openclaw-secret npm start
 In another terminal, create and approve a local dev pairing. The dev approval uses wallet device credentials only; it does not grant signing permission and does not touch private keys:
 
 ```bash
-cd /Users/yang/code/VelarumPay/code
+cd /path/to/Paytobe
 node examples/payment-request-quickstart/cli.mjs pair --approve-dev-wallet
 ```
 

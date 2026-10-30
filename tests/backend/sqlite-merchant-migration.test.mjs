@@ -37,7 +37,7 @@ const CORE_TABLES = [
   "audit_events"
 ];
 
-function temporaryDatabase(t, prefix = "velarum-merchant-migration-") {
+function temporaryDatabase(t, prefix = "Paytobe-merchant-migration-") {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return { directory, file: path.join(directory, "relay-store.sqlite") };

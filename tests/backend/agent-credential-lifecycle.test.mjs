@@ -8,7 +8,7 @@ import test from "node:test";
 import { AGENT_TOKEN_AUDIENCE } from "../../services/platform-api/src/application/agent-auth/service.js";
 import { id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-agent-credential-lifecycle-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-agent-credential-lifecycle-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

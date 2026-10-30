@@ -29,7 +29,7 @@ import ai.agentwallet.hd.ui.components.VpRiskBanner
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 设置入口（原生）。对照 web 的 renderSettings。 */
 @Composable
@@ -74,7 +74,7 @@ fun SecurityScreen(onBack: () -> Unit, onRecoveryPhrase: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(Spacing.s4),
         ) {
             VpCard(modifier = Modifier.fillMaxWidth()) {
-                Text("Seed phrase wallet", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text("Seed phrase wallet", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 VpFactRow("Key source", "24-word BIP-39")
                 VpFactRow("Local storage", "Encrypted keyring")
                 VpFactRow("Backend key shares", "Not provided")

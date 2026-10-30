@@ -1,18 +1,18 @@
-# VelarumPay MCP Server
+# Paytobe MCP Server
 
 > **Last modified**
-> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-07-21 13:50:07 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
-Local MCP stdio server for VelarumPay Payment Request v1. It exposes tools for
+Local MCP stdio server for Paytobe Payment Request v1. It exposes tools for
 pairing, Transaction Context creation, Payment Request creation, and status
 reads. It does not hold wallet private keys, sign transactions, approve
 payments, reject payments, or update wallet status.
 
-Package name: `@velarumpay/mcp-server`  
+Package name: `@Paytobe/mcp-server`
 Version: `0.1.0`  
-CLI bin: `velarumpay-mcp-server`  
-Programmatic export: `tools` and `callTool` from `@velarumpay/mcp-server`  
+CLI bin: `Paytobe-mcp-server`
+Programmatic export: `tools` and `callTool` from `@Paytobe/mcp-server`
 Types: `./src/tools.d.ts`
 
 ## Tools
@@ -36,23 +36,23 @@ connection token and scope checks for every create/read call.
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/connectors/mcp-server
+cd connectors/mcp-server
 npm run start
 ```
 
 After workspace install, the packaged bin can also be exercised locally:
 
 ```bash
-VELARUMPAY_API_BASE_URL=http://127.0.0.1:8787 \
-VELARUMPAY_CONNECTION_TOKEN=conn_tok_... \
-npx velarumpay-mcp-server
+Paytobe_API_BASE_URL=http://127.0.0.1:8787 \
+Paytobe_CONNECTION_TOKEN=conn_tok_... \
+npx Paytobe-mcp-server
 ```
 
 Environment variables:
 
 ```bash
-export VELARUMPAY_API_BASE_URL=http://127.0.0.1:8787
-export VELARUMPAY_CONNECTION_TOKEN=conn_tok_...
+export Paytobe_API_BASE_URL=http://127.0.0.1:8787
+export Paytobe_CONNECTION_TOKEN=conn_tok_...
 ```
 
 Tool inputs may also pass `base_url` and `connection_token` per call.
@@ -74,7 +74,7 @@ Create a pairing session:
     "arguments": {
       "agent": {
         "agent_id": "agt_mcp_local",
-        "agent_name": "VelarumPay MCP Local Agent",
+        "agent_name": "Paytobe MCP Local Agent",
         "runtime": "mcp",
         "device_label": "local developer machine"
       }
@@ -96,7 +96,7 @@ connection token:
     "arguments": {
       "connection_token": "conn_tok_...",
       "transaction_context": {
-        "protocol": "velarum.transaction_context.v1",
+        "protocol": "Paytobe.transaction_context.v1",
         "transaction_id": "txn_mcp_demo_1",
         "type": "developer_test",
         "title": "Developer test checkout",
@@ -126,7 +126,7 @@ Create a Payment Request:
       "connection_token": "conn_tok_...",
       "target_app_device_id": "wallet_dev_1",
       "payment_request": {
-        "protocol": "velarum.payment_request.v1",
+        "protocol": "Paytobe.payment_request.v1",
         "transaction_id": "txn_mcp_demo_1",
         "idempotency_key": "mcp-demo-payment-1",
         "payment": {
@@ -140,7 +140,7 @@ Create a Payment Request:
           "decimals": 6
         },
         "payee": {
-          "name": "VelarumPay Developer Test",
+          "name": "Paytobe Developer Test",
           "verified": false
         },
         "policy": {
@@ -175,7 +175,7 @@ Minimal tool input examples live in `fixtures/`. Full quickstart Payment Request
 fixtures remain in:
 
 ```text
-/Users/yang/code/VelarumPay/code/examples/payment-request-quickstart/fixtures
+examples/payment-request-quickstart/fixtures
 ```
 
 ## Check

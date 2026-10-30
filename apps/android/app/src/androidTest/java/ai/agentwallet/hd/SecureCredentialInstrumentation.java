@@ -17,7 +17,7 @@ import java.util.Map;
  * alter the reviewed dependency graph.
  */
 public final class SecureCredentialInstrumentation extends Instrumentation {
-    private static final String SECURE_PREFS = "velarumpay_secure_credentials_v1";
+    private static final String SECURE_PREFS = "Paytobe_secure_credentials_v1";
     private static final String LEGACY_DEVICE_PREFS = "agentwallet_payment_inbox";
     private static final String LEGACY_CONNECTION_PREFS = "agentwallet_agent_connections";
     private static final int TEST_COUNT = 7;
@@ -70,7 +70,7 @@ public final class SecureCredentialInstrumentation extends Instrumentation {
 
     private Bundle status(String name) {
         Bundle bundle = new Bundle();
-        bundle.putString("id", "VelarumPaySecureCredentials");
+        bundle.putString("id", "PaytobeSecureCredentials");
         bundle.putString("class", getClass().getName());
         bundle.putString("test", name);
         bundle.putInt("current", current);
@@ -158,14 +158,14 @@ public final class SecureCredentialInstrumentation extends Instrumentation {
 
     private void fcmHintIgnoresPaymentFacts() {
         Map<String, String> data = new HashMap<>();
-        data.put("type", "velarumpay.sync");
+        data.put("type", "Paytobe.sync");
         data.put("sync_required", "true");
         data.put("request_id", "prq_instrumentation");
         data.put("amount", "999");
         data.put("recipient", "not-authoritative");
         data.put("status", "confirmed");
-        VelarumFirebaseMessagingService.PushHintDecision decision =
-                VelarumFirebaseMessagingService.evaluateData(data);
+        PaytobeFirebaseMessagingService.PushHintDecision decision =
+                PaytobeFirebaseMessagingService.evaluateData(data);
         check(decision.syncRequired);
         check(decision.ignoredFields);
         check("prq_instrumentation".equals(decision.requestId));

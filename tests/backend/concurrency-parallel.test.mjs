@@ -62,7 +62,7 @@ function runWorker(file, { id, iterations, asset, addend }) {
 }
 
 test("parallel writers accumulate daily spend exactly under real SQLite contention", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-parallel-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-parallel-"));
   const file = path.join(dir, "relay-store.sqlite"); // .sqlite => SQLite driver (cross-connection locking)
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 
@@ -95,7 +95,7 @@ test("parallel writers accumulate daily spend exactly under real SQLite contenti
 });
 
 test("parallel writers on two assets keep each cap independent and exact", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-parallel-2-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-parallel-2-"));
   const file = path.join(dir, "relay-store.sqlite");
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
 

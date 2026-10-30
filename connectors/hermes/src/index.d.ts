@@ -1,4 +1,4 @@
-import type { ApiResult, VelarumPayClient, VelarumPayClientOptions } from "@velarumpay/sdk-js";
+import type { ApiResult, PaytobeClient, PaytobeClientOptions } from "@Paytobe/sdk-js";
 
 export type HermesAgentIdentity = {
   agent_id: string;
@@ -9,11 +9,11 @@ export type HermesAgentIdentity = {
   [key: string]: unknown;
 };
 
-export type HermesAdapterOptions = VelarumPayClientOptions & {
+export type HermesAdapterOptions = PaytobeClientOptions & {
   connectionId?: string;
   agent?: HermesAgentIdentity;
   now?: string | Date | (() => string | Date);
-  client?: VelarumPayClient;
+  client?: PaytobeClient;
 };
 
 export type HermesPrepareResult = ApiResult<{
@@ -33,7 +33,7 @@ export class HermesPaymentRequestAdapter {
   connectionToken: string;
   connectionId: string;
   agent: HermesAgentIdentity;
-  client: VelarumPayClient;
+  client: PaytobeClient;
   setConnectionToken(connectionToken: string): this;
   createPairingSession(options?: Record<string, unknown>): Promise<ApiResult>;
   preparePaymentRequest(input?: Record<string, unknown>): HermesPrepareResult;

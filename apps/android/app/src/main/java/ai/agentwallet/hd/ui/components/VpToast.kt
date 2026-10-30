@@ -19,8 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 import kotlinx.coroutines.delay
 
 /** 一条 toast 的数据（对照 web 的 showToast(title, message, isError)）。 */
@@ -52,8 +52,8 @@ fun VpToastHost(controller: ToastController, modifier: Modifier = Modifier) {
     }
     Box(modifier = modifier.fillMaxSize().padding(Spacing.s5), contentAlignment = Alignment.BottomCenter) {
         Surface(
-            shape = VelarumRadii.lg,
-            color = if (data.isError) VelarumTheme.colors.failed else VelarumTheme.colors.surfaceInverse,
+            shape = PaytobeRadii.lg,
+            color = if (data.isError) PaytobeTheme.colors.failed else PaytobeTheme.colors.surfaceInverse,
             shadowElevation = 8.dp,
             modifier = Modifier.fillMaxWidth(),
         ) {

@@ -14,7 +14,7 @@ const legalRoutes = ["/legal", "/zh-hans/legal"];
 const localePaths = ["zh-hans", "zh-hant", "ja", "ko", "es", "pt-br", "fr"];
 
 async function call(pathname, options = {}, env = {}) {
-  return worker.fetch(new Request(`https://velarumpay.example${pathname}`, options), env);
+  return worker.fetch(new Request(`https://paytobe.example${pathname}`, options), env);
 }
 
 test("all public pages render as a clearly labelled Official Testnet", async () => {
@@ -27,9 +27,9 @@ test("all public pages render as a clearly labelled Official Testnet", async () 
     assert.match(html, /Official Testnet/, route);
     assert.doesNotMatch(html, /Developer Preview/, route);
     assert.doesNotMatch(html, /selected (?:Official Testnet )?pilots?|test and pilot use only|direct-download availability is not announced|production release evidence remains gated/i, route);
-    assert.match(html, /https:\/\/docs\.velarumai\.com/, route);
+    assert.match(html, /https:\/\/docs\.paytobe\.com/, route);
     assert.doesNotMatch(html, /fonts\.googleapis|fonts\.gstatic|<script[^>]+src="https?:/i, route);
-    assert.match(html, /https:\/\/velarumpay\.example\/og\.png/, route);
+    assert.match(html, /https:\/\/paytobe\.example\/og\.png/, route);
     assert.match(html, /\/site\.js\?v=i18n-20260804-1/, route);
     assert.match(html, /\/styles\.css\?v=language-20260803-1/, route);
     assert.match(html, /class="language-picker-globe"/, route);
@@ -81,18 +81,18 @@ test("the effective bilingual legal center publishes the complete testnet docume
     assert.match(html, /Sydney/, route);
     assert.match(html, /1021 E Lincolnway/, route);
     assert.match(html, /Suite #9996/, route);
-    assert.doesNotMatch(html, /Velarum Labs LLC|Contracted non-Singapore VPS|签约的非新加坡 VPS/, route);
+    assert.doesNotMatch(html, /Paytobe Labs LLC|Contracted non-Singapore VPS|签约的非新加坡 VPS/, route);
     assert.match(html, /2026-08-03|August 3, 2026/, route);
     assert.match(html, /00056-00006-00004/, route);
     assert.match(html, /00056-00006-00011/, route);
-    assert.match(html, /legal@velarumai\.com/, route);
-    assert.match(html, /privacy@velarumai\.com/, route);
+    assert.match(html, /legal@paytobe\.com/, route);
+    assert.match(html, /privacy@paytobe\.com/, route);
     assert.match(html, /Stellar testnet/, route);
     assert.match(html, /United States federal law|美国联邦法/, route);
     assert.match(html, /Wyoming/, route);
     assert.match(html, /FinCEN/, route);
     assert.doesNotMatch(html, /Taiwan PDPA|台湾个人资料保护法|EU GDPR/, route);
-    assert.doesNotMatch(html, /release-gated|Preview language is intentionally limited|\[VELARUM_/i, route);
+    assert.doesNotMatch(html, /release-gated|Preview language is intentionally limited|\[PAYTOBE_/i, route);
   }
 });
 
@@ -108,20 +108,20 @@ test("the personal page exposes one stable Android APK download URL", async () =
   assert.equal(unavailable.status, 503);
 
   const configured = await call("/download/android", {}, {
-    ANDROID_APK_DOWNLOAD_URL: "https://downloads.example/VelarumPay-latest.apk"
+    ANDROID_APK_DOWNLOAD_URL: "https://downloads.example/Paytobe-latest.apk"
   });
   assert.equal(configured.status, 307);
-  assert.equal(configured.headers.get("location"), "https://downloads.example/VelarumPay-latest.apk");
+  assert.equal(configured.headers.get("location"), "https://downloads.example/Paytobe-latest.apk");
 });
 
 test("the self-hosted download route serves the current APK with download headers", async (t) => {
-  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "velarumpay-site-apk-"));
-  const temporaryApk = path.join(temporaryDirectory, "VelarumPay-latest.apk");
+  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "paytobe-site-apk-"));
+  const temporaryApk = path.join(temporaryDirectory, "Paytobe-latest.apk");
   const apkBytes = Buffer.from("test-apk-bytes");
   await fs.writeFile(temporaryApk, apkBytes);
 
   const child = spawn(process.execPath, [path.join(root, "server.mjs")], {
-    env: { ...process.env, PORT: "0", VELARUMPAY_APK_PATH: temporaryApk },
+    env: { ...process.env, PORT: "0", PAYTOBE_APK_PATH: temporaryApk },
     stdio: ["ignore", "pipe", "pipe"]
   });
   t.after(async () => {
@@ -144,7 +144,7 @@ test("the self-hosted download route serves the current APK with download header
   const response = await fetch(`http://127.0.0.1:${port}/download/android`);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("content-type"), "application/vnd.android.package-archive");
-  assert.equal(response.headers.get("content-disposition"), 'attachment; filename="VelarumPay-Android-Official-Testnet.apk"');
+  assert.equal(response.headers.get("content-disposition"), 'attachment; filename="Paytobe-Android-Official-Testnet.apk"');
   assert.equal(response.headers.get("cache-control"), "no-cache, must-revalidate");
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), apkBytes);
 
@@ -162,9 +162,9 @@ test("all translated pages are complete, discoverable, and locally navigable", a
       assert.equal(response.status, 200, localizedRoute);
       assert.match(html, new RegExp(`<html lang="(?:${locale === "zh-hant" ? "zh-Hant-TW" : locale === "es" ? "es-419" : locale === "pt-br" ? "pt-BR" : locale === "zh-hans" ? "zh-Hans" : locale})">`), localizedRoute);
       assert.match(html, /data-language-picker/, localizedRoute);
-      assert.match(html, new RegExp(`rel="canonical" href="https://velarumai\\.com/${locale}/`), localizedRoute);
+      assert.match(html, new RegExp(`rel="canonical" href="https://paytobe\\.com/${locale}/`), localizedRoute);
       assert.match(html, /hreflang="x-default"/, localizedRoute);
-      assert.match(html, /property="og:image" content="https:\/\/velarumpay\.example\/og\.png"/, localizedRoute);
+      assert.match(html, /property="og:image" content="https:\/\/paytobe\.example\/og\.png"/, localizedRoute);
 
       const targets = [...html.matchAll(/href="(\/[^"#?]*)/g)]
         .map((match) => match[1])
@@ -180,10 +180,10 @@ test("sitemap lists every English and translated page", async () => {
   const sitemap = await (await call("/sitemap.xml")).text();
   assert.equal([...sitemap.matchAll(/<url>/g)].length, pageRoutes.length * (localePaths.length + 1) + legalRoutes.length);
   for (const locale of localePaths) {
-    assert.match(sitemap, new RegExp(`<loc>https://velarumai\\.com/${locale}/</loc>`));
+    assert.match(sitemap, new RegExp(`<loc>https://paytobe\\.com/${locale}/</loc>`));
   }
-  assert.match(sitemap, /<loc>https:\/\/velarumai\.com\/legal<\/loc>/);
-  assert.match(sitemap, /<loc>https:\/\/velarumai\.com\/zh-hans\/legal<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/paytobe\.com\/legal<\/loc>/);
+  assert.match(sitemap, /<loc>https:\/\/paytobe\.com\/zh-hans\/legal<\/loc>/);
 });
 
 test("the Official Testnet integration-support flow is explicit and does not post form data to the website", async () => {
@@ -192,7 +192,7 @@ test("the Official Testnet integration-support flow is explicit and does not pos
   assert.match(html, /data-pilot-form/);
   assert.doesNotMatch(html, /<form[^>]+action=/i);
   assert.match(html, /website does not transmit or store the form/i);
-  assert.match(script, /mailto:pilot@velarumai\.com/);
+  assert.match(script, /mailto:pilot@paytobe\.com/);
   assert.match(script, /Do not|No additional notes|Official Testnet integration support/);
 });
 

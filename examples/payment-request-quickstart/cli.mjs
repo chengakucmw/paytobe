@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   DEFAULT_BASE_URL,
-  createVelarumPayClient,
+  createPaytobeClient,
   validatePaymentRequest,
   validateTransactionContext
 } from "../../packages/sdk-js/src/index.js";
@@ -125,7 +125,7 @@ async function pair(options) {
   const payload = {
     agent: {
       agent_id: readOption(options, "agentId") || `agt_cli_${Date.now()}`,
-      agent_name: readOption(options, "agentName") || "VelarumPay CLI Quickstart",
+      agent_name: readOption(options, "agentName") || "Paytobe CLI Quickstart",
       runtime: readOption(options, "runtime") || "cli",
       device_label: readOption(options, "deviceLabel") || "local developer shell"
     },
@@ -289,7 +289,7 @@ async function updateRequestStatus(args, options, status) {
 
 function clientFrom(options) {
   const token = readOption(options, "connectionToken") || process.env.CONNECTION_TOKEN || "";
-  return createVelarumPayClient({
+  return createPaytobeClient({
     baseUrl: baseUrlFrom(options),
     connectionToken: token
   });
@@ -371,7 +371,7 @@ async function api(baseUrl, method, urlPath, body = null) {
     });
   } catch (error) {
     throw new CliError(`Could not reach Platform API at ${baseUrl}`, {
-      hint: "Start it with: cd /Users/yang/code/VelarumPay/code/services/platform-api && npm start",
+      hint: "Start it from the repository root with: cd services/platform-api && npm start",
       cause: error
     });
   }
@@ -389,7 +389,7 @@ async function unwrap(promise) {
     result = await promise;
   } catch (error) {
     throw new CliError("Could not reach Platform API", {
-      hint: "Start it with: cd /Users/yang/code/VelarumPay/code/services/platform-api && npm start",
+      hint: "Start it from the repository root with: cd services/platform-api && npm start",
       cause: error
     });
   }
@@ -511,7 +511,7 @@ function printWarnings(warnings = []) {
 }
 
 function printHelp() {
-  console.log(`VelarumPay CLI quickstart
+  console.log(`Paytobe CLI quickstart
 
 Usage:
   node examples/payment-request-quickstart/cli.mjs <command> [options]

@@ -142,7 +142,7 @@ async function pollConnection() {
 
 async function createPaymentRequest(recommendation, button) {
   if (!connected || !sessionId) {
-    addMessage("Connect and approve AgentFood in VelarumPay before creating a Payment Request.", "error");
+    addMessage("Connect and approve AgentFood in Paytobe before creating a Payment Request.", "error");
     return;
   }
   button.disabled = true;
@@ -162,8 +162,8 @@ async function createPaymentRequest(recommendation, button) {
       body: JSON.stringify({ session_id: sessionId })
     });
     const request = result.payment_request;
-    addMessage(`Payment Request ${request.request_id} is now in VelarumPay. Review 0.1 XLM on Stellar testnet, the official AgentFood Recipient, and the mock-order warning before approving and signing.`);
-    button.textContent = "Request created in VelarumPay";
+    addMessage(`Payment Request ${request.request_id} is now in Paytobe. Review 0.1 XLM on Stellar testnet, the official AgentFood Recipient, and the mock-order warning before approving and signing.`);
+    button.textContent = "Request created in Paytobe";
   } catch (error) {
     button.disabled = false;
     button.textContent = "Retry 0.1 test XLM request";
@@ -246,8 +246,8 @@ demoConnectButton.addEventListener("click", () => {
     addMessage("Wallet connection is not enabled on this production site yet. You can still explore mock recommendations; no order or payment will be created.", "error");
     return;
   }
-  addMessage("Open VelarumPay, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
-  input.placeholder = "Paste velarumpay-connect:ck_…";
+  addMessage("Open Paytobe, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
+  input.placeholder = "Paste Paytobe-connect:ck_…";
   resizeComposer();
   input.focus();
 });
@@ -301,17 +301,17 @@ function renderMerchants(merchants) {
 
 function configureHostedMode() {
   document.body.dataset.hostingMode = "cloud-real-connect";
-  composerHint.textContent = "Create a one-time key in VelarumPay. Never share a device token or private key.";
-  demoConnectButton.textContent = "Connect VelarumPay";
-  addMessage("This hosted version uses VelarumPay Connect. Create a key in VelarumPay, paste it here, then approve my registered identity and scopes in the wallet.");
+  composerHint.textContent = "Create a one-time key in Paytobe. Never share a device token or private key.";
+  demoConnectButton.textContent = "Connect Paytobe";
+  addMessage("This hosted version uses Paytobe Connect. Create a key in Paytobe, paste it here, then approve my registered identity and scopes in the wallet.");
 }
 
 function configureProductionConnectorMode() {
   document.body.dataset.hostingMode = "production-connector";
   composerHint.textContent = "Use a fresh one-time Connect Key. The payment process is real; funds remain Stellar testnet XLM.";
-  demoConnectButton.textContent = "Connect VelarumPay";
+  demoConnectButton.textContent = "Connect Paytobe";
   connectCard.querySelector("strong").textContent = "Connect to create a real testnet Payment Request.";
-  addMessage("AgentFood is ready for VelarumPay Connect. Menus and fulfillment are mock, while wallet approval, Payment Request creation, local signing, testnet broadcast and status synchronization use the real platform flow.");
+  addMessage("AgentFood is ready for Paytobe Connect. Menus and fulfillment are mock, while wallet approval, Payment Request creation, local signing, testnet broadcast and status synchronization use the real platform flow.");
 }
 
 function configureSiteOnlyMode() {
@@ -333,8 +333,8 @@ async function start() {
     else if (hostingMode === "cloud_real_connect") configureHostedMode();
     else if (hostingMode === "production_connector") configureProductionConnectorMode();
     else {
-      composerHint.textContent = "Paste a fresh key from the VelarumPay app.";
-      demoConnectButton.textContent = "Connect VelarumPay";
+      composerHint.textContent = "Paste a fresh key from the Paytobe app.";
+      demoConnectButton.textContent = "Connect Paytobe";
     }
   } catch (error) {
     merchantGrid.innerHTML = `<p>Catalog unavailable: ${escapeHtml(error.message)}</p>`;

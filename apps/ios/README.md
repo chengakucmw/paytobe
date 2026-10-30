@@ -1,19 +1,19 @@
-# VelarumPay iOS
+# Paytobe iOS
 
 > **Last modified**
-> - **Taipei Time:** 2026-07-22 15:36:47 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-07-22 07:36:47 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
-SwiftUI iOS wallet shell for VelarumPay mobile QA. The app reviews Payment
+SwiftUI iOS wallet shell for Paytobe mobile QA. The app reviews Payment
 Request v1 payloads, pairing sessions, inbox status, risk states, and local
 Stellar XLM signing boundaries.
 
 ## Simulator Build
 
 ```bash
-cd /Users/yang/code/VelarumPay/code
-xcodebuild -project apps/ios/VelarumPay.xcodeproj \
-  -scheme VelarumPay \
+cd /path/to/Paytobe
+xcodebuild -project apps/ios/Paytobe.xcodeproj \
+  -scheme Paytobe \
   -configuration Debug \
   -sdk iphonesimulator \
   build
@@ -24,9 +24,9 @@ xcodebuild -project apps/ios/VelarumPay.xcodeproj \
 Run the iOS unit tests on the local simulator:
 
 ```bash
-cd /Users/yang/code/VelarumPay/code
-xcodebuild -project apps/ios/VelarumPay.xcodeproj \
-  -scheme VelarumPay \
+cd /path/to/Paytobe
+xcodebuild -project apps/ios/Paytobe.xcodeproj \
+  -scheme Paytobe \
   -configuration Debug \
   -sdk iphonesimulator \
   -destination 'platform=iOS Simulator,name=iPhone 17' \
@@ -47,7 +47,7 @@ Run the preflight first. It builds and tests on simulator, lists available
 devices, and prints the manual acceptance checklist:
 
 ```bash
-cd /Users/yang/code/VelarumPay/code
+cd /path/to/Paytobe
 apps/ios/scripts/device-qa.sh --preflight
 ```
 

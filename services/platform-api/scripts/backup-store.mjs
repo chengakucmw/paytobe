@@ -5,7 +5,7 @@ import { Store } from "../src/store.js";
 
 loadDotEnv();
 
-const backupDir = process.env.RELAY_BACKUP_DIR || "/var/backups/velarumpay";
+const backupDir = process.env.RELAY_BACKUP_DIR || "/var/backups/Paytobe";
 const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
 const target = process.argv[2] || path.join(backupDir, `relay-store-${timestamp}.sqlite`);
 const store = new Store();

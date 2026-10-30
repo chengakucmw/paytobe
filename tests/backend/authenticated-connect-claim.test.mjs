@@ -10,7 +10,7 @@ import { createConnectKey, id, opaqueToken } from "../../services/platform-api/s
 import { createConnectInvitationsRouter } from "../../services/platform-api/src/routes/connect-invitations.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-auth-connect-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-auth-connect-"));
 const store = new Store(path.join(directory, "connect.sqlite"));
 const agent = {
   agent_id: "agent_verified",

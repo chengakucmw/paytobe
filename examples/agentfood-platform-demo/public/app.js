@@ -183,8 +183,8 @@ form.addEventListener("submit", async (event) => {
 });
 
 demoConnectButton.addEventListener("click", () => {
-  addMessage("Open VelarumPay, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
-  input.placeholder = "Paste velarumpay-connect:ck_…";
+  addMessage("Open Paytobe, create a fresh one-time Connect Key and paste it here. I’ll use it once, then wait for your approval in the wallet.");
+  input.placeholder = "Paste Paytobe-connect:ck_…";
   input.focus();
 });
 
@@ -237,9 +237,9 @@ function renderMerchants(merchants) {
 
 function configureHostedMode() {
   document.body.dataset.hostingMode = "cloud-real-connect";
-  composerHint.textContent = "Create a one-time key in VelarumPay. Never share a device token or private key.";
-  demoConnectButton.textContent = "Connect VelarumPay";
-  addMessage("This hosted version uses VelarumPay Connect. Create a key in VelarumPay, paste it here, then approve my registered identity and scopes in the wallet.");
+  composerHint.textContent = "Create a one-time key in Paytobe. Never share a device token or private key.";
+  demoConnectButton.textContent = "Connect Paytobe";
+  addMessage("This hosted version uses Paytobe Connect. Create a key in Paytobe, paste it here, then approve my registered identity and scopes in the wallet.");
 }
 
 async function start() {
@@ -249,8 +249,8 @@ async function start() {
     renderMerchants(catalog.merchants);
     if (hostingMode === "cloud_real_connect") configureHostedMode();
     else {
-      composerHint.textContent = "Paste a fresh key from the VelarumPay app.";
-      demoConnectButton.textContent = "Connect VelarumPay";
+      composerHint.textContent = "Paste a fresh key from the Paytobe app.";
+      demoConnectButton.textContent = "Connect Paytobe";
     }
   } catch (error) {
     merchantGrid.innerHTML = `<p>Catalog unavailable: ${escapeHtml(error.message)}</p>`;

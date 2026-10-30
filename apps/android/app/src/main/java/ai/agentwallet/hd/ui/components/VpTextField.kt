@@ -7,8 +7,8 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 主题化输入框。后续发送页的金额/备注输入会复用它；键盘让位由所在屏的 imePadding 处理，
@@ -31,12 +31,12 @@ fun VpTextField(
         placeholder = placeholder?.let { p -> @Composable { Text(p) } },
         singleLine = singleLine,
         keyboardOptions = keyboardOptions,
-        shape = VelarumRadii.md,
+        shape = PaytobeRadii.md,
         modifier = modifier.fillMaxWidth(),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = VelarumTheme.colors.primary,
-            focusedLabelColor = VelarumTheme.colors.primary,
-            cursorColor = VelarumTheme.colors.primary,
+            focusedBorderColor = PaytobeTheme.colors.primary,
+            focusedLabelColor = PaytobeTheme.colors.primary,
+            cursorColor = PaytobeTheme.colors.primary,
         ),
     )
 }

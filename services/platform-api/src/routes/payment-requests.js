@@ -3,7 +3,7 @@
 
 import express from "express";
 import { resolveTargetDevice } from "../routing.js";
-import { normalizePaymentRequestV1 } from "../velarum.js";
+import { normalizePaymentRequestV1 } from "../Paytobe.js";
 import { canTransition, dailyLimitFor, evaluatePaymentRequest, shouldRecordSpent } from "../risk.js";
 import { buildPaymentRequestPayload } from "../domain/payloads.js";
 import { bindRecipientPaymentRequest } from "../application/payment-requests/recipient-binding.js";
@@ -150,7 +150,7 @@ export function createPaymentRequestsRouter(deps) {
         has_error: Boolean(patch.error)
       }
     });
-    observability.incrementCounter("velarumpay_payment_request_status_updates_total", paymentRequestMetricLabels(updated));
+    observability.incrementCounter("Paytobe_payment_request_status_updates_total", paymentRequestMetricLabels(updated));
     return updated;
   }
 
@@ -173,7 +173,7 @@ export function createPaymentRequestsRouter(deps) {
           audit: { type: "platform_worker", id: "chain_confirmation_recovery" }
         });
       }
-      const next = decidePaymentStatusTransition(current, nextStatus);
+      const next = decidePaymentStatusTransition(current, nextStatus, platformCore.clock.now().getTime());
       if (!next.ok || next.duplicate) return current;
       return applyStatusUpdate(current, nextStatus, confirmationPatch, {
         id: "platform:confirmation",
@@ -209,7 +209,7 @@ export function createPaymentRequestsRouter(deps) {
 
     const body = req.body || {};
     const idempotencyKey = req.get("x-idempotency-key") || body.idempotency_key || "";
-    if (idempotencyKey && auth.connection?.binding_version !== "velarum.connection_binding.v1") {
+    if (idempotencyKey && auth.connection?.binding_version !== "Paytobe.connection_binding.v1") {
       const existing = store.findPaymentRequestByIdempotency(idempotencyKey, auth.connection?.connection_id || body.connection_id || "");
       if (existing) {
         observability.recordAuditEvent("payment_request.idempotency_duplicate", "success", {
@@ -220,7 +220,7 @@ export function createPaymentRequestsRouter(deps) {
             connection_id: existing.connection_id || null
           }
         });
-        observability.incrementCounter("velarumpay_payment_request_duplicates_total", paymentRequestMetricLabels(existing));
+        observability.incrementCounter("Paytobe_payment_request_duplicates_total", paymentRequestMetricLabels(existing));
         return res.status(200).json({ ok: true, duplicate: true, payment_request: paymentRequestProjection(existing) });
       }
     }
@@ -235,7 +235,7 @@ export function createPaymentRequestsRouter(deps) {
     let recipientBinding = null;
     let tenantScope = null;
     let idempotencyRequestHash = "";
-    if (auth.connection?.binding_version === "velarum.connection_binding.v1") {
+    if (auth.connection?.binding_version === "Paytobe.connection_binding.v1") {
       const scope = createTenantScope(Object.freeze({
         merchant_id: auth.connection.merchant_id,
         actor_id: auth.connection.agent_id,
@@ -339,7 +339,7 @@ export function createPaymentRequestsRouter(deps) {
         recipient_facts_hash: request.recipient_facts_hash || null
       }
     });
-    observability.incrementCounter("velarumpay_payment_requests_total", paymentRequestMetricLabels(request));
+    observability.incrementCounter("Paytobe_payment_requests_total", paymentRequestMetricLabels(request));
     res.status(201).json({
       ok: true,
       payment_request: paymentRequestProjection(request),
@@ -361,7 +361,7 @@ export function createPaymentRequestsRouter(deps) {
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
     store.touchConnection(auth.connection.connection_id);
-    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+    if (auth.connection.binding_version === "Paytobe.connection_binding.v1") {
       try {
         const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
         const page = tenantRepository.listForConnection(scope, auth.connection.connection_id, req.query || {});
@@ -396,7 +396,7 @@ export function createPaymentRequestsRouter(deps) {
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
     store.touchConnection(auth.connection.connection_id);
-    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+    if (auth.connection.binding_version === "Paytobe.connection_binding.v1") {
       try {
         const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
         const window = tenantRepository.eventsForConnection(scope, auth.connection.connection_id, req.query.cursor || "");
@@ -438,7 +438,7 @@ export function createPaymentRequestsRouter(deps) {
 
     const auth = authorizeConnection(req, "payment.requests.read");
     if (!auth.ok) return sendAuthFailure(res, auth);
-    if (auth.connection.binding_version === "velarum.connection_binding.v1") {
+    if (auth.connection.binding_version === "Paytobe.connection_binding.v1") {
       const scope = tenantRepository.scopeForConnection(auth.connection, req.request_id || req.id);
       request = tenantRepository.get(scope, req.params.id);
     }
@@ -470,7 +470,7 @@ export function createPaymentRequestsRouter(deps) {
       });
     }
 
-    const transition = decidePaymentStatusTransition(request, status);
+    const transition = decidePaymentStatusTransition(request, status, platformCore.clock.now().getTime());
     if (!transition.ok) {
       return sendApiError(res, transition.status, transition.code, transition.message, {
         details: transition.details

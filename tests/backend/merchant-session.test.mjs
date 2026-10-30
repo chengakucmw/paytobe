@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-merchant-session-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-merchant-session-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

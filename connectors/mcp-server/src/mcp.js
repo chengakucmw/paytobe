@@ -91,11 +91,11 @@ function initializeResult(params = {}) {
       }
     },
     serverInfo: {
-      name: "velarumpay-mcp-server",
-      title: "VelarumPay MCP Server",
+      name: "Paytobe-mcp-server",
+      title: "Paytobe MCP Server",
       version: "0.1.0"
     },
-    instructions: "Use these tools to create VelarumPay pairing sessions, Transaction Contexts, Payment Requests, and read status. This server never signs transactions or bypasses wallet approval."
+    instructions: "Use these tools to create Paytobe pairing sessions, Transaction Contexts, Payment Requests, and read status. This server never signs transactions or bypasses wallet approval."
   };
 }
 

@@ -6,12 +6,12 @@
 export function createMetrics({ store, observability, wsHub }) {
   function refreshRuntimeMetrics() {
     const storage = store.info();
-    observability.setGauge("velarumpay_store_info", {
+    observability.setGauge("Paytobe_store_info", {
       driver: storage.driver,
       schema_version: storage.schema_version || "none"
     }, 1);
-    observability.setGauge("velarumpay_websocket_connections", { role: "app" }, wsHub.countOpenSockets(wsHub.appSockets));
-    observability.setGauge("velarumpay_websocket_connections", { role: "agent" }, wsHub.countOpenSockets(wsHub.openclawSockets));
+    observability.setGauge("Paytobe_websocket_connections", { role: "app" }, wsHub.countOpenSockets(wsHub.appSockets));
+    observability.setGauge("Paytobe_websocket_connections", { role: "agent" }, wsHub.countOpenSockets(wsHub.openclawSockets));
   }
 
   function recordPairingExpired(session, options = {}) {
@@ -24,7 +24,7 @@ export function createMetrics({ store, observability, wsHub }) {
         expires_at: session.expires_at || null
       }
     });
-    observability.incrementCounter("velarumpay_pairing_sessions_total", { result: "expired" });
+    observability.incrementCounter("Paytobe_pairing_sessions_total", { result: "expired" });
   }
 
   return { refreshRuntimeMetrics, recordPairingExpired };

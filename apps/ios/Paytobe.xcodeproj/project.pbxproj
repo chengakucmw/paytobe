@@ -1,0 +1,580 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		100000000000000000000101 /* PaytobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000201 /* PaytobeApp.swift */; };
+		100000000000000000000102 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000202 /* ContentView.swift */; };
+		100000000000000000000103 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000203 /* AppState.swift */; };
+		100000000000000000000104 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000204 /* Models.swift */; };
+		100000000000000000000105 /* Stores.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000205 /* Stores.swift */; };
+		100000000000000000000106 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000206 /* RelayClient.swift */; };
+		100000000000000000000107 /* StellarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000207 /* StellarService.swift */; };
+		100000000000000000000108 /* WebAssets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000208 /* WebAssets */; };
+		100000000000000000000150 /* Fonts in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000250 /* Fonts */; };
+		100000000000000000000160 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000260 /* Assets.xcassets */; };
+		100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001201 /* PaymentRequestParsingTests.swift */; };
+		100000000000000000000109 /* WalletViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000209 /* WalletViews.swift */; };
+		100000000000000000000110 /* InboxHistoryViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000210 /* InboxHistoryViews.swift */; };
+		100000000000000000000111 /* SettingsViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000211 /* SettingsViews.swift */; };
+		100000000000000000000112 /* PairingViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000212 /* PairingViews.swift */; };
+		100000000000000000000113 /* ConnectionDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000213 /* ConnectionDetailView.swift */; };
+		100000000000000000000114 /* PaymentDetailViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000214 /* PaymentDetailViews.swift */; };
+		100000000000000000000115 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000215 /* Components.swift */; };
+		100000000000000000000116 /* UIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000216 /* UIModels.swift */; };
+		100000000000000000000117 /* PaymentPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000217 /* PaymentPresentation.swift */; };
+		100000000000000000000118 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000218 /* Extensions.swift */; };
+		100000000000000000000119 /* RiskPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000219 /* RiskPolicy.swift */; };
+		100000000000000000001102 /* HDDerivationGoldenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001202 /* HDDerivationGoldenTests.swift */; };
+		100000000000000000001103 /* PaytobeWalletCoreConformanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001203 /* PaytobeWalletCoreConformanceTests.swift */; };
+		100000000000000000001104 /* LocalRiskPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001204 /* LocalRiskPolicyTests.swift */; };
+		100000000000000000001105 /* PaymentIntentStatusGuardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */; };
+		100000000000000000001106 /* PaymentRequestExpiryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001206 /* PaymentRequestExpiryTests.swift */; };
+		100000000000000000001107 /* ConnectInvitationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001207 /* ConnectInvitationTests.swift */; };
+		100000000000000000001110 /* Paytobe_wallet_core.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000001210 /* Paytobe_wallet_core.swift */; };
+		100000000000000000001111 /* PaytobeWalletCore.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 100000000000000000001211 /* PaytobeWalletCore.xcframework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		100000000000000000001801 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 100000000000000000000801 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 100000000000000000000501;
+			remoteInfo = Paytobe;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		100000000000000000000001 /* Paytobe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Paytobe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000002 /* PaytobeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PaytobeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		100000000000000000000201 /* PaytobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaytobeApp.swift; sourceTree = "<group>"; };
+		100000000000000000000202 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		100000000000000000000203 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		100000000000000000000204 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		100000000000000000000205 /* Stores.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stores.swift; sourceTree = "<group>"; };
+		100000000000000000000206 /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		100000000000000000000207 /* StellarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StellarService.swift; sourceTree = "<group>"; };
+		100000000000000000000208 /* WebAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = WebAssets; sourceTree = "<group>"; };
+		100000000000000000000250 /* Fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Fonts; sourceTree = "<group>"; };
+		100000000000000000000260 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		100000000000000000001201 /* PaymentRequestParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentRequestParsingTests.swift; sourceTree = "<group>"; };
+		100000000000000000000209 /* WalletViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/WalletViews.swift"; sourceTree = "<group>"; };
+		100000000000000000000210 /* InboxHistoryViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/InboxHistoryViews.swift"; sourceTree = "<group>"; };
+		100000000000000000000211 /* SettingsViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/SettingsViews.swift"; sourceTree = "<group>"; };
+		100000000000000000000212 /* PairingViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/PairingViews.swift"; sourceTree = "<group>"; };
+		100000000000000000000213 /* ConnectionDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/ConnectionDetailView.swift"; sourceTree = "<group>"; };
+		100000000000000000000214 /* PaymentDetailViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Views/PaymentDetailViews.swift"; sourceTree = "<group>"; };
+		100000000000000000000215 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Components.swift"; sourceTree = "<group>"; };
+		100000000000000000000216 /* UIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIModels.swift"; sourceTree = "<group>"; };
+		100000000000000000000217 /* PaymentPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Presentation/PaymentPresentation.swift"; sourceTree = "<group>"; };
+		100000000000000000000218 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Extensions.swift"; sourceTree = "<group>"; };
+		100000000000000000000219 /* RiskPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RiskPolicy.swift; sourceTree = "<group>"; };
+		100000000000000000001202 /* HDDerivationGoldenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HDDerivationGoldenTests.swift; sourceTree = "<group>"; };
+		100000000000000000001203 /* PaytobeWalletCoreConformanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaytobeWalletCoreConformanceTests.swift; sourceTree = "<group>"; };
+		100000000000000000001204 /* LocalRiskPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalRiskPolicyTests.swift; sourceTree = "<group>"; };
+		100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentIntentStatusGuardTests.swift; sourceTree = "<group>"; };
+		100000000000000000001206 /* PaymentRequestExpiryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaymentRequestExpiryTests.swift; sourceTree = "<group>"; };
+		100000000000000000001207 /* ConnectInvitationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectInvitationTests.swift; sourceTree = "<group>"; };
+		100000000000000000001210 /* Paytobe_wallet_core.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = Paytobe_wallet_core.swift; path = Generated/Paytobe_wallet_core.swift; sourceTree = SOURCE_ROOT; };
+		100000000000000000001211 /* PaytobeWalletCore.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = PaytobeWalletCore.xcframework; path = Generated/PaytobeWalletCore.xcframework; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		100000000000000000000301 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000001111 /* PaytobeWalletCore.xcframework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000001301 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		100000000000000000000401 = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000402 /* Paytobe */,
+				100000000000000000001402 /* PaytobeTests */,
+				100000000000000000000404 /* Generated */,
+				100000000000000000000403 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		100000000000000000000402 /* Paytobe */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000201 /* PaytobeApp.swift */,
+				100000000000000000000202 /* ContentView.swift */,
+				100000000000000000000203 /* AppState.swift */,
+				100000000000000000000204 /* Models.swift */,
+				100000000000000000000205 /* Stores.swift */,
+				100000000000000000000206 /* RelayClient.swift */,
+				100000000000000000000207 /* StellarService.swift */,
+				100000000000000000000208 /* WebAssets */,
+				100000000000000000000250 /* Fonts */,
+				100000000000000000000260 /* Assets.xcassets */,
+				100000000000000000000209 /* WalletViews.swift */,
+				100000000000000000000210 /* InboxHistoryViews.swift */,
+				100000000000000000000211 /* SettingsViews.swift */,
+				100000000000000000000212 /* PairingViews.swift */,
+				100000000000000000000213 /* ConnectionDetailView.swift */,
+				100000000000000000000214 /* PaymentDetailViews.swift */,
+				100000000000000000000215 /* Components.swift */,
+				100000000000000000000216 /* UIModels.swift */,
+				100000000000000000000217 /* PaymentPresentation.swift */,
+				100000000000000000000218 /* Extensions.swift */,
+				100000000000000000000219 /* RiskPolicy.swift */,
+			);
+			path = Paytobe;
+			sourceTree = "<group>";
+		};
+		100000000000000000000403 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000001 /* Paytobe.app */,
+				100000000000000000000002 /* PaytobeTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		100000000000000000001402 /* PaytobeTests */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000001201 /* PaymentRequestParsingTests.swift */,
+				100000000000000000001202 /* HDDerivationGoldenTests.swift */,
+				100000000000000000001203 /* PaytobeWalletCoreConformanceTests.swift */,
+				100000000000000000001204 /* LocalRiskPolicyTests.swift */,
+				100000000000000000001205 /* PaymentIntentStatusGuardTests.swift */,
+				100000000000000000001206 /* PaymentRequestExpiryTests.swift */,
+				100000000000000000001207 /* ConnectInvitationTests.swift */,
+			);
+			path = PaytobeTests;
+			sourceTree = "<group>";
+		};
+		100000000000000000000404 /* Generated */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000001210 /* Paytobe_wallet_core.swift */,
+				100000000000000000001211 /* PaytobeWalletCore.xcframework */,
+			);
+			name = Generated;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		100000000000000000000501 /* Paytobe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000901 /* Build configuration list for PBXNativeTarget "Paytobe" */;
+			buildPhases = (
+				100000000000000000000601 /* Sources */,
+				100000000000000000000301 /* Frameworks */,
+				100000000000000000000701 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Paytobe;
+			productName = Paytobe;
+			productReference = 100000000000000000000001 /* Paytobe.app */;
+			productType = "com.apple.product-type.application";
+		};
+		100000000000000000001501 /* PaytobeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000001903 /* Build configuration list for PBXNativeTarget "PaytobeTests" */;
+			buildPhases = (
+				100000000000000000001601 /* Sources */,
+				100000000000000000001301 /* Frameworks */,
+				100000000000000000001701 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				100000000000000000001802 /* PBXTargetDependency */,
+			);
+			name = PaytobeTests;
+			productName = PaytobeTests;
+			productReference = 100000000000000000000002 /* PaytobeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		100000000000000000000801 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					100000000000000000000501 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+					100000000000000000001501 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 100000000000000000000501;
+					};
+				};
+			};
+			buildConfigurationList = 100000000000000000000902 /* Build configuration list for PBXProject "Paytobe" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 100000000000000000000401;
+			productRefGroup = 100000000000000000000403 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				100000000000000000000501 /* Paytobe */,
+				100000000000000000001501 /* PaytobeTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		100000000000000000000701 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000108 /* WebAssets in Resources */,
+				100000000000000000000150 /* Fonts in Resources */,
+				100000000000000000000160 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000001701 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		100000000000000000000601 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000101 /* PaytobeApp.swift in Sources */,
+				100000000000000000000102 /* ContentView.swift in Sources */,
+				100000000000000000000103 /* AppState.swift in Sources */,
+				100000000000000000000104 /* Models.swift in Sources */,
+				100000000000000000000105 /* Stores.swift in Sources */,
+				100000000000000000000106 /* RelayClient.swift in Sources */,
+				100000000000000000000107 /* StellarService.swift in Sources */,
+				100000000000000000000109 /* WalletViews.swift in Sources */,
+				100000000000000000000110 /* InboxHistoryViews.swift in Sources */,
+				100000000000000000000111 /* SettingsViews.swift in Sources */,
+				100000000000000000000112 /* PairingViews.swift in Sources */,
+				100000000000000000000113 /* ConnectionDetailView.swift in Sources */,
+				100000000000000000000114 /* PaymentDetailViews.swift in Sources */,
+				100000000000000000000115 /* Components.swift in Sources */,
+				100000000000000000000116 /* UIModels.swift in Sources */,
+				100000000000000000000117 /* PaymentPresentation.swift in Sources */,
+				100000000000000000000118 /* Extensions.swift in Sources */,
+				100000000000000000000119 /* RiskPolicy.swift in Sources */,
+				100000000000000000001110 /* Paytobe_wallet_core.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		100000000000000000001601 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000001101 /* PaymentRequestParsingTests.swift in Sources */,
+				100000000000000000001102 /* HDDerivationGoldenTests.swift in Sources */,
+				100000000000000000001103 /* PaytobeWalletCoreConformanceTests.swift in Sources */,
+				100000000000000000001104 /* LocalRiskPolicyTests.swift in Sources */,
+				100000000000000000001105 /* PaymentIntentStatusGuardTests.swift in Sources */,
+				100000000000000000001106 /* PaymentRequestExpiryTests.swift in Sources */,
+				100000000000000000001107 /* ConnectInvitationTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		100000000000000000001802 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 100000000000000000000501 /* Paytobe */;
+			targetProxy = 100000000000000000001801 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		100000000000000000000A01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		100000000000000000000A02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		100000000000000000000B01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Generated",
+				);
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Paytobe;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Scan Paytobe pairing QR codes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Paytobe.wallet.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		100000000000000000000B02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Generated",
+				);
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_ASSET_PATHS = "";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Paytobe;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.finance";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Scan Paytobe pairing QR codes.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Paytobe.wallet.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		100000000000000000001B01 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Paytobe.wallet.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Paytobe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Paytobe";
+			};
+			name = Debug;
+		};
+		100000000000000000001B02 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.Paytobe.wallet.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Paytobe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Paytobe";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		100000000000000000000901 /* Build configuration list for PBXNativeTarget "Paytobe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000B01 /* Debug */,
+				100000000000000000000B02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		100000000000000000000902 /* Build configuration list for PBXProject "Paytobe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000A01 /* Debug */,
+				100000000000000000000A02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		100000000000000000001903 /* Build configuration list for PBXNativeTarget "PaytobeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000001B01 /* Debug */,
+				100000000000000000001B02 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 100000000000000000000801 /* Project object */;
+}

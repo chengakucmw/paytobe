@@ -28,8 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 语气：对照 design tokens 的 status/risk 语义（safe/caution/danger/info）。
@@ -48,20 +48,20 @@ fun vpToneOf(value: String?): VpTone = when (value?.lowercase()) {
 
 @Composable
 internal fun toneAccent(tone: VpTone): Color = when (tone) {
-    VpTone.SAFE -> VelarumTheme.colors.success
-    VpTone.CAUTION -> VelarumTheme.colors.pending
-    VpTone.DANGER -> VelarumTheme.colors.failed
-    VpTone.INFO -> VelarumTheme.colors.info
-    VpTone.EXPIRED -> VelarumTheme.colors.textMuted
+    VpTone.SAFE -> PaytobeTheme.colors.success
+    VpTone.CAUTION -> PaytobeTheme.colors.pending
+    VpTone.DANGER -> PaytobeTheme.colors.failed
+    VpTone.INFO -> PaytobeTheme.colors.info
+    VpTone.EXPIRED -> PaytobeTheme.colors.textMuted
 }
 
 @Composable
 internal fun toneBackground(tone: VpTone): Color = when (tone) {
-    VpTone.SAFE -> VelarumTheme.colors.successBg
-    VpTone.CAUTION -> VelarumTheme.colors.pendingBg
-    VpTone.DANGER -> VelarumTheme.colors.failedBg
-    VpTone.INFO -> VelarumTheme.colors.infoBg
-    VpTone.EXPIRED -> VelarumTheme.colors.surfaceSunken
+    VpTone.SAFE -> PaytobeTheme.colors.successBg
+    VpTone.CAUTION -> PaytobeTheme.colors.pendingBg
+    VpTone.DANGER -> PaytobeTheme.colors.failedBg
+    VpTone.INFO -> PaytobeTheme.colors.infoBg
+    VpTone.EXPIRED -> PaytobeTheme.colors.surfaceSunken
 }
 
 private fun toneIcon(tone: VpTone): ImageVector = when (tone) {
@@ -78,7 +78,7 @@ fun VpEyebrow(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text.uppercase(),
         style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.5.sp),
-        color = VelarumTheme.colors.primary,
+        color = PaytobeTheme.colors.primary,
         modifier = modifier,
     )
 }
@@ -86,7 +86,7 @@ fun VpEyebrow(text: String, modifier: Modifier = Modifier) {
 /** 小药丸徽标（对照 web 的 badge）。 */
 @Composable
 fun VpBadge(text: String, tone: VpTone, modifier: Modifier = Modifier) {
-    Surface(shape = VelarumRadii.pill, color = toneBackground(tone), modifier = modifier) {
+    Surface(shape = PaytobeRadii.pill, color = toneBackground(tone), modifier = modifier) {
         Text(
             text = text,
             style = MaterialTheme.typography.labelMedium,
@@ -109,13 +109,13 @@ fun VpFactRow(label: String, value: String, modifier: Modifier = Modifier) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
-            color = VelarumTheme.colors.textMuted,
+            color = PaytobeTheme.colors.textMuted,
             modifier = Modifier.weight(1f),
         )
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
-            color = VelarumTheme.colors.textStrong,
+            color = PaytobeTheme.colors.textStrong,
             textAlign = TextAlign.End,
             modifier = Modifier.weight(2f),
         )
@@ -130,7 +130,7 @@ fun VpFactRow(label: String, badge: String, tone: VpTone, modifier: Modifier = M
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted, modifier = Modifier.weight(1f))
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted, modifier = Modifier.weight(1f))
         VpBadge(badge, tone)
     }
 }
@@ -138,12 +138,12 @@ fun VpFactRow(label: String, badge: String, tone: VpTone, modifier: Modifier = M
 /** 风险/状态横幅（对照 web 的 .risk safe/caution/danger）。 */
 @Composable
 fun VpRiskBanner(tone: VpTone, title: String, body: String, modifier: Modifier = Modifier) {
-    Surface(shape = VelarumRadii.lg, color = toneBackground(tone), modifier = modifier.fillMaxWidth()) {
+    Surface(shape = PaytobeRadii.lg, color = toneBackground(tone), modifier = modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(Spacing.s4), horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
             Icon(toneIcon(tone), contentDescription = null, tint = toneAccent(tone))
             Column {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                Text(body, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+                Text(body, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textBody)
             }
         }
     }
@@ -159,12 +159,12 @@ fun VpSubheader(eyebrow: String, title: String, modifier: Modifier = Modifier, o
     ) {
         if (onBack != null) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = VelarumTheme.colors.textStrong)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = PaytobeTheme.colors.textStrong)
             }
         }
         Column {
             VpEyebrow(eyebrow)
-            Text(title, style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
+            Text(title, style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
         }
     }
 }
@@ -173,15 +173,15 @@ fun VpSubheader(eyebrow: String, title: String, modifier: Modifier = Modifier, o
 @Composable
 fun VpChip(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
-        shape = VelarumRadii.pill,
-        color = if (active) VelarumTheme.colors.primary else VelarumTheme.colors.surfaceCard,
-        border = if (active) null else BorderStroke(1.dp, VelarumTheme.colors.borderDefault),
+        shape = PaytobeRadii.pill,
+        color = if (active) PaytobeTheme.colors.primary else PaytobeTheme.colors.surfaceCard,
+        border = if (active) null else BorderStroke(1.dp, PaytobeTheme.colors.borderDefault),
         modifier = modifier.clickable { onClick() },
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelLarge,
-            color = if (active) VelarumTheme.colors.onPrimary else VelarumTheme.colors.textStrong,
+            color = if (active) PaytobeTheme.colors.onPrimary else PaytobeTheme.colors.textStrong,
             modifier = Modifier.padding(horizontal = Spacing.s4, vertical = Spacing.s2),
         )
     }
@@ -204,9 +204,9 @@ fun VpMenuRow(
             horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                Text(title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                 if (subtitle.isNotBlank()) {
-                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
             }
             if (badgeText != null) VpBadge(badgeText, badgeTone)
@@ -221,10 +221,10 @@ fun VpSetupStep(number: String, title: String, body: String, modifier: Modifier 
         modifier = modifier.fillMaxWidth().padding(vertical = Spacing.s2),
         horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
     ) {
-        Text(number, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.primary)
+        Text(number, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.primary)
         Column {
-            Text(title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-            Text(body, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         }
     }
 }

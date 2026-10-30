@@ -37,14 +37,14 @@ import {
 } from "../src/application/webhooks/endpoint-service.js";
 
 const OFFICIAL_MERCHANT_ID = "merchant_agentfood_official";
-const OFFICIAL_DOMAIN = "agentfood.velarumai.com";
+const OFFICIAL_DOMAIN = "agentfood.Paytobe.com";
 const OFFICIAL_AGENT_NAME = "AgentFood Official Testnet";
 const OFFICIAL_AGENT_CLIENT_ID = "agentfood-service";
-const OFFICIAL_WEBHOOK_URL = "https://agentfood.velarumai.com/v1/webhooks/velarumpay";
+const OFFICIAL_WEBHOOK_URL = "https://agentfood.Paytobe.com/v1/webhooks/Paytobe";
 const STATE_PATH = process.env.AGENTFOOD_BOOTSTRAP_STATE_PATH
-  || "/var/backups/velarumpay/agentfood-bootstrap.json";
+  || "/var/backups/Paytobe/agentfood-bootstrap.json";
 const ENV_PATH = process.env.AGENTFOOD_BOOTSTRAP_ENV_PATH
-  || "/var/backups/velarumpay/agentfood-bootstrap.env";
+  || "/var/backups/Paytobe/agentfood-bootstrap.env";
 
 const [command = "status", ...args] = process.argv.slice(2);
 const recipientAddress = argument(args, "--recipient");
@@ -230,7 +230,7 @@ async function verifyDomainAndWebhook() {
     const webhook = new WebhookEndpointService({
       repository: new SqliteWebhookEndpointRepository(db),
       verifier: new WebhookEndpointVerifier(ports),
-      vault: createAes256GcmVault(state.webhookVaultKey, "velarumpay.webhook_secret.v1"),
+      vault: createAes256GcmVault(state.webhookVaultKey, "Paytobe.webhook_secret.v1"),
       clock,
       random,
       hash: tokenHash

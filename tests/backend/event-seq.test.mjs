@@ -12,7 +12,7 @@ import { Store } from "../../services/platform-api/src/store.js";
 // counter is now independent of the buffer size.
 
 function freshStore() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-store-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-store-"));
   const file = path.join(dir, "relay-store.json"); // .json => in-memory JSON driver
   const store = new Store(file);
   return { store, file, dir };
@@ -83,7 +83,7 @@ test("the seq counter persists across a restart", (t) => {
 });
 
 test("recovers a store already corrupted by the old length-based seq", (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-store-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-store-"));
   const file = path.join(dir, "relay-store.json");
   t.after(() => cleanup(dir));
 

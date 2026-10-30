@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-export const CONNECT_KEY_PATTERN = /velarumpay-connect:ck_[A-Za-z0-9_-]{43}/;
+export const CONNECT_KEY_PATTERN = /Paytobe-connect:ck_[A-Za-z0-9_-]{43}/;
 
 export const merchants = Object.freeze([
   {
@@ -113,7 +113,7 @@ export function recommendOrder(message, preferredMerchantId = "") {
   };
 }
 
-export function createVelarumArtifacts(order, options = {}) {
+export function createPaytobeArtifacts(order, options = {}) {
   const now = new Date();
   const createdAt = now.toISOString();
   const transactionId = `txn_${order.order_id}`;
@@ -134,7 +134,7 @@ export function createVelarumArtifacts(order, options = {}) {
   };
 
   const transactionContext = {
-    protocol: "velarum.transaction_context.v1",
+    protocol: "Paytobe.transaction_context.v1",
     transaction_id: transactionId,
     connection_id: connectionId,
     created_at: createdAt,

@@ -4,7 +4,7 @@
   "network_note": "Uses Base USDC identifiers for validation only. No mainnet funds are required for local request creation or status callbacks.",
   "idempotency_key": "base-usdc-dev-payment-1",
   "transaction_context": {
-    "protocol": "velarum.transaction_context.v1",
+    "protocol": "Paytobe.transaction_context.v1",
     "transaction_id": "txn_base_usdc_dev_4200",
     "connection_id": "conn_quickstart_placeholder",
     "created_at": "2026-06-17T10:00:00.000Z",
@@ -88,7 +88,7 @@
     "risk_findings": []
   },
   "payment_request": {
-    "protocol": "velarum.payment_request.v1",
+    "protocol": "Paytobe.payment_request.v1",
     "request_id": "prq_base_usdc_dev_4200",
     "connection_id": "conn_quickstart_placeholder",
     "transaction_id": "txn_base_usdc_dev_4200",
@@ -103,7 +103,7 @@
       "channel": "local_desktop"
     },
     "payee": {
-      "name": "VelarumPay Developer Test",
+      "name": "Paytobe Developer Test",
       "domain": "fixtures.example",
       "verified": false
     },

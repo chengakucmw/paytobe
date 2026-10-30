@@ -31,7 +31,7 @@ object ScanContract {
         val s = raw?.trim().orEmpty()
         if (s.isEmpty()) return ScanOutcome.Unknown
         val lower = s.lowercase(Locale.US)
-        if (lower.startsWith("velarumpay://pair") || lower.startsWith("velarumpay:pair")) {
+        if (lower.startsWith("paytobe://pair") || lower.startsWith("paytobe:pair")) {
             return ScanOutcome.Pairing(extractPairingCode(s))
         }
         val draft = try { ScannedPaymentRequestParser.parseDraft(s) } catch (e: Exception) { VpLog.d("ScanContract", "parse draft failed; not a payment request: $e"); null }

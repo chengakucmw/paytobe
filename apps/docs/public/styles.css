@@ -74,13 +74,17 @@
 }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
   -webkit-text-size-adjust: 100%;
 }
 
 body {
+  max-width: 100%;
   min-width: 320px;
   margin: 0;
+  overflow-x: hidden;
   color: var(--shi-grey-900);
   background: var(--shi-cream);
   font-family: var(--font-body);
@@ -141,6 +145,7 @@ button:focus-visible {
 
 .inner {
   display: flex;
+  min-width: 0;
   width: min(calc(100% - 48px), 1240px);
   min-height: 80px;
   align-items: center;
@@ -206,6 +211,7 @@ button:focus-visible {
 
 main {
   width: min(calc(100% - 48px), 940px);
+  min-width: 0;
   min-height: calc(100vh - 220px);
   margin: 48px auto 72px;
   padding: clamp(32px, 6vw, 72px);
@@ -515,7 +521,9 @@ li + li {
   }
 
   h1 {
-    font-size: clamp(2.7rem, 14vw, 4rem);
+    font-size: clamp(2.5rem, 13vw, 3.5rem);
+    overflow-wrap: anywhere;
+    text-wrap: wrap;
   }
 
   h2 {

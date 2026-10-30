@@ -103,7 +103,7 @@ export async function bindRecipientPaymentRequest({ recipientService, scope, inp
 
 export function recipientPaymentFactsHash(facts, hash = defaultHash) {
   return hash(JSON.stringify([
-    "velarum.recipient_payment_facts.v1",
+    "Paytobe.recipient_payment_facts.v1",
     facts.recipient_id,
     facts.recipient_version_id,
     facts.rail,

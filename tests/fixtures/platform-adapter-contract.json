@@ -1,5 +1,5 @@
 {
-  "version": "velarum.platform-adapter-contract.v1",
+  "version": "Paytobe.platform-adapter-contract.v1",
   "scenarios": {
     "health": {
       "express_sqlite": {"status": 200, "ok": true, "error_code": null, "has_request_id": false},

@@ -51,7 +51,7 @@ const cargo = spawnSync(
     "--format-version",
     "1",
     "--manifest-path",
-    "crates/velarum-wallet-core/Cargo.toml"
+    "crates/Paytobe-wallet-core/Cargo.toml"
   ],
   { cwd: repoRoot, encoding: "utf8" }
 );
@@ -74,13 +74,13 @@ if (cargo.error) {
 
 const uniqueFailures = [...new Set(failures)].sort();
 if (uniqueFailures.length) {
-  console.error("VelarumPay license policy check failed:");
+  console.error("Paytobe license policy check failed:");
   for (const failure of uniqueFailures) console.error(`- ${failure}`);
   console.error("No exception was created. Resolve or obtain an explicit owner decision consistent with Rule 0.");
   process.exit(1);
 }
 
-console.log("VelarumPay license policy check passed for Node lock metadata and the Rust dependency graph.");
+console.log("Paytobe license policy check passed for Node lock metadata and the Rust dependency graph.");
 
 function readJson(relativePath) {
   return JSON.parse(readFileSync(path.join(repoRoot, relativePath), "utf8"));

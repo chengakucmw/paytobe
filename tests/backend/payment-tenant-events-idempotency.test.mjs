@@ -136,7 +136,7 @@ function payment(requestId, merchantId, actorId, connectionId, key, requestHash)
 
 function edgePayment(requestId, key, amount) {
   return {
-    protocol: "velarum.payment_request.v1",
+    protocol: "Paytobe.payment_request.v1",
     request_id: requestId,
     idempotency_key: key,
     status: "pending",
@@ -200,7 +200,7 @@ function seedD1Connection(db, suffix) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-payment-tenant-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-payment-tenant-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

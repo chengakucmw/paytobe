@@ -4,7 +4,7 @@ import { PortalApiError } from "../public/modules/api-client.js";
 import { createWebhookAuditModel, renderMerchantAudit, renderWebhooks } from "../src/pages/webhooks/index.js";
 
 const secret = `whsec_${"S".repeat(43)}`;
-const endpoint = Object.freeze({ webhook_endpoint_id: "endpoint_one", url: "https://hooks.acme.com/velarumpay", event_types: ["payment_request.status_updated"], status: "active", verification_mode: "merchant_domain", secret_overlap_until: null, version: 1, secret_ciphertext: "MUST_NOT_RENDER" });
+const endpoint = Object.freeze({ webhook_endpoint_id: "endpoint_one", url: "https://hooks.acme.com/Paytobe", event_types: ["payment_request.status_updated"], status: "active", verification_mode: "merchant_domain", secret_overlap_until: null, version: 1, secret_ciphertext: "MUST_NOT_RENDER" });
 const retryable = Object.freeze({ delivery_id: "delivery_retry", event_id: "event_stable", webhook_endpoint_id: "endpoint_one", attempt: 2, status: "retryable_failed", response_status: 500, failure_code: "http_500", next_attempt_at: "2026-08-02T02:00:00Z", response_body: "FULL_RESPONSE_MUST_NOT_RENDER", authorization: "Bearer MUST_NOT_RENDER" });
 const terminal4xx = Object.freeze({ delivery_id: "delivery_400", event_id: "event_400", webhook_endpoint_id: "endpoint_one", attempt: 1, status: "failed", response_status: 400, failure_code: "http_400" });
 

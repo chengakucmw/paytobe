@@ -24,7 +24,7 @@ test("the hosted page exposes the conversation-first real Connect Key experience
 
   const app = await call("/app.js");
   assert.equal(app.response.status, 200);
-  assert.doesNotMatch(app.result, /\/v1\/integrations\/agentfood|velarumpay-connect-testnet/);
+  assert.doesNotMatch(app.result, /\/v1\/integrations\/agentfood|Paytobe-connect-testnet/);
   assert.match(app.result, /fetch\(path,/);
 
   for (const path of ["/assets/agentfood-dishes-v2.jpg", "/assets/agentfood-social-v3.png"]) {
@@ -69,7 +69,7 @@ test("hosted AgentFood uses an Ed25519 Agent Assertion and standard Platform con
   const keyPair = await crypto.subtle.generateKey("Ed25519", true, ["sign", "verify"]);
   const privateJwk = await crypto.subtle.exportKey("jwk", keyPair.privateKey);
   const env = {
-    VELARUMPAY_CONNECT_PLATFORM_URL: "https://platform.example",
+    Paytobe_CONNECT_PLATFORM_URL: "https://platform.example",
     AGENTFOOD_AGENT_ID: "agentfood-testnet",
     AGENTFOOD_AGENT_CLIENT_ID: "agentfood-cloud-demo",
     AGENTFOOD_AGENT_CREDENTIAL_KID: "agentfood-reference-key",
@@ -118,7 +118,7 @@ test("hosted AgentFood uses an Ed25519 Agent Assertion and standard Platform con
   };
   t.after(() => { globalThis.fetch = originalFetch; });
 
-  const claimed = await call("/api/chat", jsonBody({ message: `Use velarumpay-connect:ck_${"C".repeat(43)}` }), env);
+  const claimed = await call("/api/chat", jsonBody({ message: `Use Paytobe-connect:ck_${"C".repeat(43)}` }), env);
   assert.equal(claimed.response.status, 201);
   assert.equal(claimed.result.connect_invitation_id, "cinv_standard");
   assert.equal(claimed.result.connect_invitation.identity_assurance, "registered");
@@ -138,7 +138,7 @@ test("legacy hosted APIs are absent and standard routes fail closed without Agen
   assert.equal(legacy.response.status, 404);
   assert.equal(legacy.result.error.code, "not_found");
 
-  const claim = await call("/api/chat", jsonBody({ message: `Use velarumpay-connect:ck_${"E".repeat(43)}` }));
+  const claim = await call("/api/chat", jsonBody({ message: `Use Paytobe-connect:ck_${"E".repeat(43)}` }));
   assert.equal(claim.response.status, 503);
   assert.equal(claim.result.error.code, "agent_platform_unavailable");
 

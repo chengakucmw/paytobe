@@ -1,27 +1,27 @@
 # JavaScript SDK
 
 > **Last modified / 最后修改时间**
-> - **Taipei Time / 台北时间:** 2026-08-03 18:06:25 Asia/Taipei (UTC+08:00)
-> - **UTC / 协调世界时:** 2026-08-03 10:06:25 UTC
+> - **Taipei Time / 台北时间:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC / 协调世界时:** 2026-10-29 05:41:42 UTC
 
 
-Minimal JavaScript SDK for local agents and app developers using VelarumPay Platform API v0.1.
+Minimal JavaScript SDK for local agents and app developers using Paytobe Platform API v0.1.
 
-Package name: `@velarumpay/sdk-js`  
+Package name: `@Paytobe/sdk-js`
 Version: `0.1.0`  
 Entry point: `./src/index.js`  
 Types: `./src/index.d.ts`  
-Runtime dependency: `@velarumpay/protocol@0.1.0`
+Runtime dependency: `@Paytobe/protocol@0.1.0`
 
 ## Agent Auth Quickstart
 
 The SDK creates Agent Assertions locally and exchanges them for short-lived Agent tokens. The `signer` receives only canonical bytes and an opaque `keyHandle`; private-key access remains inside the caller's secure signer.
 
 ```js
-import { createVelarumPayClient } from "@velarumpay/sdk-js";
+import { createPaytobeClient } from "@Paytobe/sdk-js";
 
-const client = createVelarumPayClient({
-  baseUrl: "https://api.velarumai.com",
+const client = createPaytobeClient({
+  baseUrl: "https://api.Paytobe.com",
   agentAuth: {
     agentId: "agt_local_123",
     clientId: "client_local_123",
@@ -45,10 +45,10 @@ Agent tokens are held in memory, refreshed before expiry, and refreshed at most 
 Payment Request methods use a connection token, which is intentionally separate from Agent and merchant authentication.
 
 ```js
-import { createVelarumPayClient, validatePaymentRequest } from "@velarumpay/sdk-js";
+import { createPaytobeClient, validatePaymentRequest } from "@Paytobe/sdk-js";
 
-const client = createVelarumPayClient({
-  baseUrl: "https://api.velarumai.com",
+const client = createPaytobeClient({
+  baseUrl: "https://api.Paytobe.com",
   connectionToken
 });
 
@@ -88,33 +88,34 @@ This SDK does not store private keys, seed phrases, signing material, or automat
 
 ## Typed API Surface
 
-- `VelarumPayClientOptions`
+- `PaytobeClientOptions`
 - `AgentAuthOptions`
 - `AgentSignerInput`
 - `RequestOptions`
 - `ApiResult`
 - `ApiError`
-- `VelarumPayClient`
-- `createVelarumPayClient(options)`
+- `PaytobeClient`
+- `createPaytobeClient(options)`
 - `createPairingSession(payload, options)`
 - `createTransactionContext(payload, options)`
 - `createPaymentRequest(payload, options)`
 - `getPaymentRequest(requestId, options)`
 - `pollEvents(options)`
 - `claimConnectInvitation(connectKey, scopes, options)`
-- Agent, Recipient, and Webhook client methods on `VelarumPayClient`
+- Agent, Recipient, and Webhook client methods on `PaytobeClient`
 - `validatePaymentRequest(payload, options)`
 - `validateTransactionContext(payload, options)`
 
-Quickstart fixtures live in `/Users/yang/code/VelarumPay/code/examples/payment-request-quickstart`. Formal protocol explanations live in the document workspace:
+Quickstart fixtures live in `examples/payment-request-quickstart`. Public contract sources:
 
-- `/Users/yang/code/VelarumPay/docs/Chinese/Architecture/00056-00003-00013-1-velarumpay-platform-api-v0-1-engineering-contract-平台APIv0.1工程契约-2026-06-16.md`
-- `/Users/yang/code/VelarumPay/docs/Chinese/Architecture/00056-00003-00012-1-velarumpay-payment-request-v1-engineering-spec-PaymentRequestv1工程规格-2026-06-16.md`
+- `packages/protocol/schema/Paytobe.payment_request.v1.schema.json`
+- `packages/protocol/schema/Paytobe.transaction_context.v1.schema.json`
+- `services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json`
 
 ## Check
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/packages/sdk-js
+cd packages/sdk-js
 npm run check
 npm test
 npm run pack:dry

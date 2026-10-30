@@ -30,7 +30,7 @@ export function buildPaymentRequestPayload(body, connection, idempotencyKey, run
   const connectionId = connection?.connection_id || payload.connection_id || "";
   return {
     ...payload,
-    protocol: payload.protocol || "velarum.payment_request.v1",
+    protocol: payload.protocol || "Paytobe.payment_request.v1",
     request_id: payload.request_id || requestId || requiredRuntimeId(),
     connection_id: connectionId,
     created_at: payload.created_at || now.toISOString(),

@@ -23,7 +23,7 @@ const server = http.createServer((req, res) => {
 
   if (url.pathname === "/health") {
     res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
-    res.end(JSON.stringify({ ok: true, service: "VelarumPay-docs", time: new Date().toISOString() }));
+    res.end(JSON.stringify({ ok: true, service: "Paytobe-docs", time: new Date().toISOString() }));
     return;
   }
 
@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`VelarumPay docs listening on http://localhost:${port}`);
+  console.log(`Paytobe docs listening on http://localhost:${port}`);
 });
 
 function serveStatic(pathname, res) {

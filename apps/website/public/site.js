@@ -81,9 +81,9 @@ if (pilotForm) {
     const integration = String(data.get("integration") || "").trim();
     const notes = String(data.get("notes") || "").trim();
     const copy = (key, fallback) => pilotForm.dataset[key] || fallback;
-    const subject = `${copy("i18nSubject", "VelarumPay Official Testnet integration support")} — ${organization}`;
+    const subject = `${copy("i18nSubject", "Paytobe Official Testnet integration support")} — ${organization}`;
     const body = [
-      copy("i18nSubject", "VelarumPay Official Testnet integration support"),
+      copy("i18nSubject", "Paytobe Official Testnet integration support"),
       "",
       `${copy("i18nOrganization", "Organization")}: ${organization}`,
       `${copy("i18nContact", "Contact")}: ${email}`,
@@ -98,6 +98,6 @@ if (pilotForm) {
 
     const status = pilotForm.querySelector("[data-form-status]");
     if (status) status.textContent = copy("i18nStatus", "Opening your email app. This website has not stored your answers.");
-    window.location.href = `mailto:pilot@velarumai.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:pilot@paytobe.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   });
 }

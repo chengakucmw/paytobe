@@ -13,7 +13,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-CORE="$ROOT/crates/velarum-wallet-core"
+CORE="$ROOT/crates/Paytobe-wallet-core"
 
 step() { printf '\n\033[1;36m==> %s\033[0m\n' "$1"; }
 

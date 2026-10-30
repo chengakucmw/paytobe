@@ -26,8 +26,8 @@ import ai.agentwallet.hd.ui.components.VpRiskBanner
 import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumFonts
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeFonts
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 import kotlinx.coroutines.delay
 
 @Composable
@@ -70,7 +70,7 @@ fun ConnectKeyScreen(
             } else {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Connect Key", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                        Text("Connect Key", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                         VpBadge(invitation.status, when (invitation.status) {
                             "connected" -> VpTone.SAFE
                             "rejected", "cancelled", "expired" -> VpTone.DANGER
@@ -79,10 +79,10 @@ fun ConnectKeyScreen(
                     }
                     Text(
                         invitation.connectKey,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-                        color = VelarumTheme.colors.textBody,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+                        color = PaytobeTheme.colors.textBody,
                     )
-                    Text("Expires: ${invitation.expiresAt}", style = MaterialTheme.typography.bodySmall, color = VelarumTheme.colors.textMuted)
+                    Text("Expires: ${invitation.expiresAt}", style = MaterialTheme.typography.bodySmall, color = PaytobeTheme.colors.textMuted)
                 }
                 if (invitation.status == "waiting") {
                     VpPrimaryButton(
@@ -117,7 +117,7 @@ fun ConnectKeyScreen(
                         )
                         VpCard(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                Text("Merchant", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                                Text("Merchant", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                                 VpBadge(review.merchantStatus.ifBlank { review.state }, if (review.state == "verified") VpTone.SAFE else VpTone.CAUTION)
                             }
                             Text(
@@ -125,20 +125,20 @@ fun ConnectKeyScreen(
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.titleLarge,
-                                color = VelarumTheme.colors.textStrong,
+                                color = PaytobeTheme.colors.textStrong,
                             )
                             ReviewFact("Merchant ID", review.merchantId)
                             ReviewFact("Verified domain", review.verifiedDomain.ifBlank { "Not verified" })
                             ReviewFact("Verification", review.merchantVerificationState.ifBlank { review.reasonCode })
                         }
                         VpCard(modifier = Modifier.fillMaxWidth()) {
-                            Text("Registered Agent", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                            Text("Registered Agent", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                             Text(
                                 review.agentName.ifBlank { "Name unavailable" },
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.titleLarge,
-                                color = VelarumTheme.colors.textStrong,
+                                color = PaytobeTheme.colors.textStrong,
                             )
                             ReviewFact("Agent ID", review.agentId)
                             ReviewFact("Runtime", review.runtime)
@@ -149,14 +149,14 @@ fun ConnectKeyScreen(
                             ReviewFact("Invitation expires", review.expiresAt)
                         }
                         VpCard(modifier = Modifier.fillMaxWidth()) {
-                            Text("Requested permissions", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                            Text("Requested permissions", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                             review.requestedScopes.forEach { scope ->
-                                Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textBody)
+                                Text("· $scope", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textBody)
                             }
                             Text(
                                 "These scopes can create or read requests only. They never grant signing, recovery-phrase, private-key, approval, or automatic-payment authority.",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = VelarumTheme.colors.textMuted,
+                                color = PaytobeTheme.colors.textMuted,
                             )
                         }
                         VpPrimaryButton(
@@ -173,7 +173,7 @@ fun ConnectKeyScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 } else if (!invitation.terminal) {
-                    Text("Waiting for an Agent to claim this key…", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("Waiting for an Agent to claim this key…", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
 
                 if (!invitation.terminal) {
@@ -197,7 +197,7 @@ private fun ReviewFact(label: String, value: String) {
         "$label: ${value.ifBlank { "Unavailable" }}",
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
-        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-        color = VelarumTheme.colors.textBody,
+        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+        color = PaytobeTheme.colors.textBody,
     )
 }

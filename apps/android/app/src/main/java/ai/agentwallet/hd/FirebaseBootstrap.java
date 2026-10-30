@@ -55,7 +55,7 @@ final class FirebaseBootstrap {
             } catch (Exception error) {
                 VpLog.w("FirebaseBootstrap", "FCM token registration with relay failed", error);
             }
-        }, "velarumpay-fcm-register").start();
+        }, "Paytobe-fcm-register").start();
     }
 
     static boolean isConfigured() {

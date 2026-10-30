@@ -5,10 +5,10 @@ import androidx.compose.ui.graphics.Color
 
 /**
  * 原始色板，逐值来自 prototypes/html20260620/ds/tokens/colors.css（Velar Teal 设计系统）。
- * 注意：组件里不要直接引用这些「色阶」，应使用下面 [VelarumColors] 的「语义角色」，
+ * 注意：组件里不要直接引用这些「色阶」，应使用下面 [PaytobeColors] 的「语义角色」，
  * 这样以后调色只改一处。
  */
-internal object VelarumPalette {
+internal object PaytobePalette {
     // 品牌 · Velar Teal
     val teal50 = Color(0xFFE6F7F4)
     val teal400 = Color(0xFF2BB6A2)
@@ -44,7 +44,7 @@ internal object VelarumPalette {
  * 与 success/pending/failed 同值，直接复用即可，未重复列出。
  */
 @Immutable
-class VelarumColors(
+class PaytobeColors(
     val primary: Color,
     val primaryHover: Color,
     val primaryActive: Color,
@@ -76,33 +76,33 @@ class VelarumColors(
 )
 
 /** 浅色（也是目前唯一）主题的语义色映射。 */
-fun velarumLightColors(): VelarumColors = VelarumColors(
-    primary = VelarumPalette.teal500,
-    primaryHover = VelarumPalette.teal600,
-    primaryActive = VelarumPalette.teal700,
-    primarySoft = VelarumPalette.teal50,
-    onPrimary = VelarumPalette.white,
-    brandStrong = VelarumPalette.teal700,
-    mint = VelarumPalette.mint400,
-    emphasis = VelarumPalette.ink900,
-    onEmphasis = VelarumPalette.white,
-    textStrong = VelarumPalette.ink900,
-    textBody = VelarumPalette.ink600,
-    textMuted = VelarumPalette.ink400,
-    textFaint = VelarumPalette.ink300,
-    surfacePage = VelarumPalette.ink50,
-    surfaceCard = VelarumPalette.white,
-    surfaceSunken = VelarumPalette.ink100,
-    surfaceInverse = VelarumPalette.ink900,
-    borderSubtle = VelarumPalette.ink100,
-    borderDefault = VelarumPalette.ink200,
-    borderStrong = VelarumPalette.ink300,
-    success = VelarumPalette.green500,
-    successBg = VelarumPalette.green50,
-    pending = VelarumPalette.amber500,
-    pendingBg = VelarumPalette.amber50,
-    failed = VelarumPalette.red500,
-    failedBg = VelarumPalette.red50,
-    info = VelarumPalette.blue500,
-    infoBg = VelarumPalette.blue50,
+fun PaytobeLightColors(): PaytobeColors = PaytobeColors(
+    primary = PaytobePalette.teal500,
+    primaryHover = PaytobePalette.teal600,
+    primaryActive = PaytobePalette.teal700,
+    primarySoft = PaytobePalette.teal50,
+    onPrimary = PaytobePalette.white,
+    brandStrong = PaytobePalette.teal700,
+    mint = PaytobePalette.mint400,
+    emphasis = PaytobePalette.ink900,
+    onEmphasis = PaytobePalette.white,
+    textStrong = PaytobePalette.ink900,
+    textBody = PaytobePalette.ink600,
+    textMuted = PaytobePalette.ink400,
+    textFaint = PaytobePalette.ink300,
+    surfacePage = PaytobePalette.ink50,
+    surfaceCard = PaytobePalette.white,
+    surfaceSunken = PaytobePalette.ink100,
+    surfaceInverse = PaytobePalette.ink900,
+    borderSubtle = PaytobePalette.ink100,
+    borderDefault = PaytobePalette.ink200,
+    borderStrong = PaytobePalette.ink300,
+    success = PaytobePalette.green500,
+    successBg = PaytobePalette.green50,
+    pending = PaytobePalette.amber500,
+    pendingBg = PaytobePalette.amber50,
+    failed = PaytobePalette.red500,
+    failedBg = PaytobePalette.red50,
+    info = PaytobePalette.blue500,
+    infoBg = PaytobePalette.blue50,
 )

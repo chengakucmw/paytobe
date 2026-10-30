@@ -11,7 +11,7 @@ import {
   prepareHermesPaymentRequest
 } from "../connectors/hermes/src/index.js";
 import {
-  createVelarumPayClient,
+  createPaytobeClient,
   validatePaymentRequest,
   validateTransactionContext
 } from "../packages/sdk-js/src/index.js";
@@ -74,7 +74,7 @@ async function main() {
         token: `token_${results.run_id}`
       };
       await api(server.baseUrl, "POST", "/v1/devices/app", wallet);
-      const setupClient = createVelarumPayClient({ baseUrl: server.baseUrl });
+      const setupClient = createPaytobeClient({ baseUrl: server.baseUrl });
       const pairing = await unwrapApiResult(await setupClient.createPairingSession({
         agent: {
           agent_id: `agt_${results.run_id}`,
@@ -102,7 +102,7 @@ async function main() {
       };
     });
 
-    const client = createVelarumPayClient({
+    const client = createPaytobeClient({
       baseUrl: server.baseUrl,
       connectionToken: auth.connection.connection_token
     });
@@ -320,8 +320,8 @@ async function main() {
     await step(results, "observability.metrics_and_audit_guard", "api", async () => {
       const metrics = await request(server.baseUrl, "GET", "/metrics");
       assert(metrics.status === 200, "metrics endpoint did not return HTTP 200");
-      assert(metrics.text.includes("velarumpay_http_requests_total"), "metrics did not include HTTP request counter");
-      assert(metrics.text.includes("velarumpay_audit_events_total"), "metrics did not include audit event counter");
+      assert(metrics.text.includes("Paytobe_http_requests_total"), "metrics did not include HTTP request counter");
+      assert(metrics.text.includes("Paytobe_audit_events_total"), "metrics did not include audit event counter");
       assert(
         !metrics.text.includes(auth.connection.connection_token) && !metrics.text.includes(auth.wallet.token),
         "metrics exposed a sensitive token"
@@ -456,7 +456,7 @@ async function startOrUseServer(options) {
 
   const port = Number(process.env.CROSS_SMOKE_PORT || 18788);
   const baseUrl = `http://127.0.0.1:${port}`;
-  const tempDir = await mkdtemp(path.join(os.tmpdir(), "velarumpay-cross-platform-api-"));
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "Paytobe-cross-platform-api-"));
   let output = "";
   const child = spawn(process.execPath, [serverPath], {
     cwd: tempDir,
@@ -789,7 +789,7 @@ async function step(results, id, component, fn) {
 async function writeReports(results, options) {
   const reportDir = options.reportDir
     ? path.resolve(options.reportDir)
-    : await mkdtemp(path.join(os.tmpdir(), "velarumpay-cross-component-smoke-"));
+    : await mkdtemp(path.join(os.tmpdir(), "Paytobe-cross-component-smoke-"));
   await mkdir(reportDir, { recursive: true });
   const jsonPath = path.join(reportDir, "cross-component-smoke-result.json");
   const summaryPath = path.join(reportDir, "cross-component-smoke-summary.md");
@@ -805,7 +805,7 @@ async function writeReports(results, options) {
 
 function renderMarkdownSummary(results) {
   const lines = [
-    "# VelarumPay Cross Component Smoke Summary",
+    "# Paytobe Cross Component Smoke Summary",
     "",
     `- Result: ${results.ok ? "PASS" : "FAIL"}`,
     `- Run ID: ${results.run_id}`,
@@ -854,7 +854,7 @@ function summarizeStepNote(data = {}) {
 function printHumanSummary(results) {
   const passed = results.steps.filter((item) => item.status === "passed").length;
   const failed = results.steps.filter((item) => item.status === "failed").length;
-  console.log(`VelarumPay cross-component smoke ${results.ok ? "passed" : "failed"}`);
+  console.log(`Paytobe cross-component smoke ${results.ok ? "passed" : "failed"}`);
   console.log(`Steps: ${passed} passed, ${failed} failed`);
   console.log(`Requests created: ${results.requests.length}`);
   if (results.reports?.json) console.log(`Machine-readable result: ${results.reports.json}`);
@@ -904,7 +904,7 @@ function parseArgs(argv) {
 }
 
 function printHelp() {
-  console.log(`VelarumPay cross-component smoke harness
+  console.log(`Paytobe cross-component smoke harness
 
 Usage:
   node scripts/cross-component-smoke.mjs [options]

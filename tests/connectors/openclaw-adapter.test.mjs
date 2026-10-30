@@ -1,7 +1,7 @@
 // B15: the OpenClaw connector must not fall back to a demo connection/device identity.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildPaymentRequestPayload } from "../../connectors/openclaw-telegram/src/velarum_adapter.js";
+import { buildPaymentRequestPayload } from "../../connectors/openclaw-telegram/src/Paytobe_adapter.js";
 
 const basePayment = {
   rail: "base_usdc",
@@ -12,7 +12,7 @@ const basePayment = {
 };
 
 function clearIdentityEnv() {
-  delete process.env.VELARUMPAY_CONNECTION_ID;
+  delete process.env.Paytobe_CONNECTION_ID;
   delete process.env.OPENCLAW_CONNECTION_ID;
   delete process.env.OPENCLAW_DEVICE_ID;
 }
@@ -45,7 +45,7 @@ test("missing device_id fails fast (no demo fallback)", () => {
 
 test("env vars satisfy the identity requirement", () => {
   clearIdentityEnv();
-  process.env.VELARUMPAY_CONNECTION_ID = "conn_env";
+  process.env.Paytobe_CONNECTION_ID = "conn_env";
   process.env.OPENCLAW_DEVICE_ID = "device_env";
   try {
     const request = buildPaymentRequestPayload(basePayment, {});

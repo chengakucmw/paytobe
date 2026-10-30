@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createVelarumArtifacts,
+  createPaytobeArtifacts,
   extractConnectKey,
   recommendOrder
 } from "../src/agent.mjs";
 
 test("the Agent recognizes only the canonical versionless Connect Key shape", () => {
-  const key = `velarumpay-connect:ck_${"A".repeat(43)}`;
+  const key = `Paytobe-connect:ck_${"A".repeat(43)}`;
   assert.equal(extractConnectKey(`Please connect ${key} now`), key);
-  assert.equal(extractConnectKey(`velarumpay-connect:v1:ck_${"A".repeat(43)}`), null);
+  assert.equal(extractConnectKey(`Paytobe-connect:v1:ck_${"A".repeat(43)}`), null);
   assert.equal(extractConnectKey("connectkey:not-valid"), null);
 });
 
@@ -29,7 +29,7 @@ test("a merchant case route can anchor the recommendation", () => {
 
 test("generated context and payment facts agree and always require wallet approval", () => {
   const order = recommendOrder("healthy vegetarian meal under 15 XLM", "green-bowl");
-  const { transactionContext, paymentRequest } = createVelarumArtifacts(order, {
+  const { transactionContext, paymentRequest } = createPaytobeArtifacts(order, {
     connectionId: "conn_demo",
     demoBaseUrl: "http://127.0.0.1:8790"
   });

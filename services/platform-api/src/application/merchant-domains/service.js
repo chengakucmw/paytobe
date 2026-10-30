@@ -30,7 +30,7 @@ export class MerchantDomainService {
       updated_at: at
     });
     return domainRecord
-      ? { ok: true, merchant_domain: domainRecord, challenge, dns_name: `_velarumpay.${domain}`, https_url: verificationUrl(domain) }
+      ? { ok: true, merchant_domain: domainRecord, challenge, dns_name: `_Paytobe.${domain}`, https_url: verificationUrl(domain) }
       : conflict("domain_conflict", "Domain is already registered");
   }
 
@@ -42,7 +42,7 @@ export class MerchantDomainService {
       const before = await resolvePublic(this.resolver, record.domain);
       let proofHash = "";
       if (record.method === "dns_txt") {
-        const values = await this.resolver.resolveTxt(`_velarumpay.${record.domain}`);
+        const values = await this.resolver.resolveTxt(`_Paytobe.${record.domain}`);
         const proof = values.find((value) => this.hash(String(value).trim()) === record.challenge_hash);
         if (!proof) return failed("domain_challenge_mismatch", "Domain challenge was not found");
         proofHash = this.hash(proof);
@@ -235,7 +235,7 @@ function isPublicIpv4(value) {
 }
 function isIpAddress(value) { return /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value) || value.includes(":"); }
 function normalizeMethod(value) { const method = String(value || "dns_txt"); if (!["dns_txt", "https_well_known"].includes(method)) throw new TypeError("Domain method is invalid"); return method; }
-function verificationUrl(domain) { return `https://${domain}/.well-known/velarumpay-domain-verification`; }
+function verificationUrl(domain) { return `https://${domain}/.well-known/Paytobe-domain-verification`; }
 function assertScope(scope) { if (!scope || !Object.isFrozen(scope) || !scope.merchant_id) throw new TypeError("Immutable TenantScope is required"); }
 function rollbackNull(db) { db.exec("ROLLBACK"); return null; }
 function failed(code, message) { return { ok: false, status: 422, code, message }; }

@@ -59,7 +59,7 @@ export function evaluateIntent(intent, store, env = process.env) {
   }
 
   if (!intent.idempotency_key) warnings.push("No idempotency key was provided");
-  if (!intent.velarum?.request_id) warnings.push("No Velarum request id was provided");
+  if (!intent.Paytobe?.request_id) warnings.push("No Paytobe request id was provided");
   return { ok: errors.length === 0, errors, warnings };
 }
 

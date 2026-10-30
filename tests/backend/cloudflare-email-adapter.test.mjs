@@ -7,10 +7,10 @@ import { loadRuntimeConfig, validateRuntimeConfig } from "../../services/platfor
 const CONFIG = Object.freeze({
   account_id: "a".repeat(32),
   api_token: "cloudflare-email-token-with-sufficient-entropy",
-  from: "security@velarumai.com",
-  from_name: "VelarumPay",
-  reply_to: "support@velarumai.com",
-  portal_base_url: "https://portal.velarumai.com",
+  from: "security@Paytobe.com",
+  from_name: "Paytobe",
+  reply_to: "support@Paytobe.com",
+  portal_base_url: "https://portal.Paytobe.com",
   timeout_ms: 1_000
 });
 
@@ -37,9 +37,9 @@ test("Cloudflare verification email uses the REST endpoint and a one-time Portal
   assert.equal(calls[0].url, `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/email/sending/send`);
   assert.equal(calls[0].options.headers.authorization, "Bearer cloudflare-email-token-with-sufficient-entropy");
   assert.equal(calls[0].body.to, "owner@example.com");
-  assert.match(calls[0].body.text, /https:\/\/portal\.velarumai\.com\/verify-email\?token=mverify_/);
+  assert.match(calls[0].body.text, /https:\/\/portal\.Paytobe\.com\/verify-email\?token=mverify_/);
   assert.match(calls[0].body.html, /Verify email/);
-  assert.equal(calls[0].body.reply_to, "support@velarumai.com");
+  assert.equal(calls[0].body.reply_to, "support@Paytobe.com");
   assert.equal(calls[0].body.headers, undefined);
 });
 
@@ -115,14 +115,14 @@ test("production runtime requires a complete Cloudflare transactional email conf
   const base = {
     NODE_ENV: "production",
     RUNTIME_ENV: "production",
-    PUBLIC_BASE_URL: "https://api.velarumai.com",
+    PUBLIC_BASE_URL: "https://api.Paytobe.com",
     OFFICIAL_TESTNET_ONLY: "true",
     OPENCLAW_DEVICE_SECRET: "strong-openclaw-secret",
-    CORS_ALLOWED_ORIGINS: "https://portal.velarumai.com",
-    RELAY_STORE_PATH: "/var/lib/velarumpay/relay.sqlite",
+    CORS_ALLOWED_ORIGINS: "https://portal.Paytobe.com",
+    RELAY_STORE_PATH: "/var/lib/Paytobe/relay.sqlite",
     METRICS_TOKEN: "metrics-secret",
     FCM_ENABLED: "true",
-    FCM_PROJECT_ID: "velarumpay",
+    FCM_PROJECT_ID: "Paytobe",
     FCM_SERVICE_ACCOUNT_FILE: "/run/secrets/firebase.json",
     FCM_TOKEN_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64")
   };
@@ -135,8 +135,8 @@ test("production runtime requires a complete Cloudflare transactional email conf
     TRANSACTIONAL_EMAIL_PROVIDER: "cloudflare",
     CLOUDFLARE_EMAIL_ACCOUNT_ID: "a".repeat(32),
     CLOUDFLARE_EMAIL_API_TOKEN: "token-with-sufficient-entropy",
-    TRANSACTIONAL_EMAIL_FROM: "security@velarumai.com",
-    MERCHANT_PORTAL_PUBLIC_URL: "https://portal.velarumai.com"
+    TRANSACTIONAL_EMAIL_FROM: "security@Paytobe.com",
+    MERCHANT_PORTAL_PUBLIC_URL: "https://portal.Paytobe.com"
   }));
   assert.equal(complete.ok, true, complete.errors.join("\n"));
 });

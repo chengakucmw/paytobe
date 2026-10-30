@@ -4,7 +4,7 @@
   "network_note": "No funds are required. This fixture is expected to create a structured blocker risk.",
   "idempotency_key": "asset-network-mismatch-payment-1",
   "transaction_context": {
-    "protocol": "velarum.transaction_context.v1",
+    "protocol": "Paytobe.transaction_context.v1",
     "transaction_id": "txn_asset_network_mismatch_55",
     "connection_id": "conn_quickstart_placeholder",
     "created_at": "2026-06-17T10:00:00.000Z",
@@ -72,7 +72,7 @@
     "risk_findings": []
   },
   "payment_request": {
-    "protocol": "velarum.payment_request.v1",
+    "protocol": "Paytobe.payment_request.v1",
     "request_id": "prq_asset_network_mismatch_55",
     "connection_id": "conn_quickstart_placeholder",
     "transaction_id": "txn_asset_network_mismatch_55",

@@ -45,14 +45,14 @@ const safeInheritedEnvKeys = [
 ];
 
 const androidReleaseEnvKeys = [
-  "VELARUMPAY_ANDROID_KEYSTORE_PATH",
-  "VELARUMPAY_ANDROID_STORE_PASSWORD",
-  "VELARUMPAY_ANDROID_KEY_ALIAS",
-  "VELARUMPAY_ANDROID_KEY_PASSWORD",
-  "VELARUMPAY_FIREBASE_APPLICATION_ID",
-  "VELARUMPAY_FIREBASE_API_KEY",
-  "VELARUMPAY_FIREBASE_PROJECT_ID",
-  "VELARUMPAY_FIREBASE_SENDER_ID"
+  "Paytobe_ANDROID_KEYSTORE_PATH",
+  "Paytobe_ANDROID_STORE_PASSWORD",
+  "Paytobe_ANDROID_KEY_ALIAS",
+  "Paytobe_ANDROID_KEY_PASSWORD",
+  "Paytobe_FIREBASE_APPLICATION_ID",
+  "Paytobe_FIREBASE_API_KEY",
+  "Paytobe_FIREBASE_PROJECT_ID",
+  "Paytobe_FIREBASE_SENDER_ID"
 ];
 
 const args = new Set(process.argv.slice(2));
@@ -199,9 +199,9 @@ function iosTestArgs(destination) {
   return [
     "test",
     "-project",
-    path.join(repoRoot, "apps/ios/VelarumPay.xcodeproj"),
+    path.join(repoRoot, "apps/ios/Paytobe.xcodeproj"),
     "-scheme",
-    "VelarumPay",
+    "Paytobe",
     "-sdk",
     "iphonesimulator",
     "-destination",
@@ -287,16 +287,16 @@ function printEvidence() {
   console.log(`- git_commit: ${commit.status === 0 ? commit.stdout.trim() : "unavailable"}`);
   console.log(`- git_worktree_clean: ${dirty.status === 0 && dirty.stdout.trim() === ""}`);
   const artifacts = [
-    "services/platform-api/openapi/velarumpay-platform-api-v0.1.openapi.json",
-    "packages/protocol/schema/velarum.payment_request.v1.schema.json",
-    "packages/protocol/schema/velarum.transaction_context.v1.schema.json"
+    "services/platform-api/openapi/Paytobe-platform-api-v0.1.openapi.json",
+    "packages/protocol/schema/Paytobe.payment_request.v1.schema.json",
+    "packages/protocol/schema/Paytobe.transaction_context.v1.schema.json"
   ];
   if (!nodeOnly && !skipAndroid) {
     artifacts.push(
-      "tmp/release-gate/velarumpay-sbom.cdx.json",
-      "apps/android/app/build/outputs/apk/standard/debug/VelarumPay-standardDebug.apk",
-      "apps/android/app/build/outputs/apk/stellarTestnet/debug/VelarumPay-stellarTestnetDebug.apk",
-      "apps/android/app/build/outputs/apk/stellarTestnet/release/VelarumPay-stellarTestnetRelease.apk"
+      "tmp/release-gate/Paytobe-sbom.cdx.json",
+      "apps/android/app/build/outputs/apk/standard/debug/Paytobe-standardDebug.apk",
+      "apps/android/app/build/outputs/apk/stellarTestnet/debug/Paytobe-stellarTestnetDebug.apk",
+      "apps/android/app/build/outputs/apk/stellarTestnet/release/Paytobe-stellarTestnetRelease.apk"
     );
   }
   for (const relative of artifacts) {

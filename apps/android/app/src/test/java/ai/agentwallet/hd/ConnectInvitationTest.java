@@ -11,7 +11,7 @@ import org.junit.Test;
 public class ConnectInvitationTest {
     @Test
     public void parsesOneTimeKeyAndFiltersForbiddenScopes() throws Exception {
-        String key = "velarumpay-connect:ck_" + "A".repeat(43);
+        String key = "paytobe-connect:ck_" + "A".repeat(43);
         JSONObject response = new JSONObject()
                 .put("connect_key", key)
                 .put("connect_invitation", new JSONObject()

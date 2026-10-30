@@ -34,7 +34,7 @@ export function loadConfig(env = process.env) {
       agentId: String(env.AGENTFOOD_AGENT_ID || "agentfood-testnet").trim(),
       clientId: String(env.AGENTFOOD_AGENT_CLIENT_ID || "agentfood-service").trim(),
       credentialKid: String(env.AGENTFOOD_AGENT_CREDENTIAL_KID || "").trim(),
-      assertionAudience: String(env.AGENTFOOD_AGENT_ASSERTION_AUDIENCE || "https://api.velarumai.com/v1/agent-auth/token").trim(),
+      assertionAudience: String(env.AGENTFOOD_AGENT_ASSERTION_AUDIENCE || "https://api.Paytobe.com/v1/agent-auth/token").trim(),
       signerConfigured: Boolean(String(env.AGENTFOOD_AGENT_CREDENTIAL_PRIVATE_KEY_PKCS8_B64 || "").trim()),
       scopes: [
         "payment.requests.create",

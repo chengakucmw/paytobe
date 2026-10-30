@@ -1,10 +1,10 @@
 import {
   DEFAULT_BASE_URL,
-  createVelarumPayClient,
+  createPaytobeClient,
   normalizeError as normalizeApiError,
   validatePaymentRequest,
   validateTransactionContext
-} from "@velarumpay/sdk-js";
+} from "@Paytobe/sdk-js";
 
 export const HERMES_DEFAULT_SCOPES = Object.freeze([
   "payment.requests.create",
@@ -25,8 +25,8 @@ export const DEFAULT_HERMES_AGENT = Object.freeze({
   device_label: "local desktop"
 });
 
-const PAYMENT_REQUEST_PROTOCOL = "velarum.payment_request.v1";
-const TRANSACTION_CONTEXT_PROTOCOL = "velarum.transaction_context.v1";
+const PAYMENT_REQUEST_PROTOCOL = "Paytobe.payment_request.v1";
+const TRANSACTION_CONTEXT_PROTOCOL = "Paytobe.transaction_context.v1";
 const FORBIDDEN_FIELD_CODES = new Map([
   ["privatekey", "private_key_not_allowed"],
   ["walletprivatekey", "private_key_not_allowed"],
@@ -45,7 +45,7 @@ const FORBIDDEN_FIELD_CODES = new Map([
 ]);
 
 /**
- * Local Hermes adapter for VelarumPay Payment Request v1. It creates request
+ * Local Hermes adapter for Paytobe Payment Request v1. It creates request
  * payloads and reads status only; it never signs, approves, or submits payment.
  */
 export class HermesPaymentRequestAdapter {
@@ -55,7 +55,7 @@ export class HermesPaymentRequestAdapter {
     this.connectionId = options.connectionId || "";
     this.agent = normalizeAgent(options.agent);
     this.now = options.now;
-    this.client = options.client || createVelarumPayClient({
+    this.client = options.client || createPaytobeClient({
       baseUrl: this.baseUrl,
       connectionToken: this.connectionToken,
       fetch: options.fetch || globalThis.fetch

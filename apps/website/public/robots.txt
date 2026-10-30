@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://velarumai.com/sitemap.xml
+Sitemap: https://paytobe.com/sitemap.xml

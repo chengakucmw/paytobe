@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   createPaymentRequest,
-  createVelarumPayClient,
+  createPaytobeClient,
   validatePaymentRequest,
   validateTransactionContext
 } from "../src/index.js";
@@ -16,7 +16,7 @@ const quickstartFixturePath = path.resolve(here, "../../../examples/payment-requ
 test("SDK creates Transaction Context and Payment Request from quickstart fixture", async () => {
   const fixture = JSON.parse(await readFile(quickstartFixturePath, "utf8"));
   const calls = [];
-  const client = createVelarumPayClient({
+  const client = createPaytobeClient({
     baseUrl: "http://platform.test/",
     connectionToken: "conn_tok_test",
     fetch: mockFetch(calls, [
@@ -70,7 +70,7 @@ test("SDK creates Transaction Context and Payment Request from quickstart fixtur
 
 test("SDK creates pairing sessions, reads payment requests, and polls events", async () => {
   const calls = [];
-  const client = createVelarumPayClient({
+  const client = createPaytobeClient({
     baseUrl: "http://platform.test",
     connectionToken: "conn_tok_read",
     fetch: mockFetch(calls, [
@@ -81,7 +81,7 @@ test("SDK creates pairing sessions, reads payment requests, and polls events", a
           ok: true,
           pairing_session: {
             pairing_session_id: "pair_123",
-            pairing_uri: "velarumpay://pair?session=pair_123&code=482913",
+            pairing_uri: "Paytobe://pair?session=pair_123&code=482913",
             pairing_code: "482913",
             status: "pending"
           }
@@ -141,7 +141,7 @@ test("SDK creates pairing sessions, reads payment requests, and polls events", a
 
 test("SDK preserves structured API error code, field, and severity", async () => {
   const result = await createPaymentRequest({
-    protocol: "velarum.payment_request.v1",
+    protocol: "Paytobe.payment_request.v1",
     payment: {
       amount: "24.00"
     }

@@ -8,7 +8,7 @@ export function renderWebhooks(state, canManage) {
 }
 
 function createForm(busy) {
-  return `<form id="create-webhook-form" class="sub-form"><label for="webhook-url">HTTPS endpoint URL</label><input id="webhook-url" name="url" type="url" required placeholder="https://hooks.example.org/velarumpay">
+  return `<form id="create-webhook-form" class="sub-form"><label for="webhook-url">HTTPS endpoint URL</label><input id="webhook-url" name="url" type="url" required placeholder="https://hooks.example.org/Paytobe">
     <label for="webhook-events">Event types (comma separated)</label><input id="webhook-events" name="event_types" required value="payment_request.status_updated">
     <button type="submit" ${busy ? "disabled" : ""}>Create endpoint</button></form>`;
 }

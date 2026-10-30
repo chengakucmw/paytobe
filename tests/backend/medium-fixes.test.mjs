@@ -1,7 +1,7 @@
 // Regression tests for the 2026-06-18 backend Medium audit (M1–M7).
 //
 // Each test pins the SECURITY / CORRECTNESS contract a fix establishes, so the
-// original bug can never silently come back. Pure helpers (velarum, crypto,
+// original bug can never silently come back. Pure helpers (Paytobe, crypto,
 // risk, store) are exercised directly; the three server.js-internal fixes
 // (M1 socket routing, M3 confirmLater, M5 state machine) use the small set of
 // internals server.js now exports for testing.
@@ -12,14 +12,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { adaptVelarum } from "../../services/platform-api/src/velarum.js";
+import { adaptPaytobe } from "../../services/platform-api/src/Paytobe.js";
 import { randomNumericCode } from "../../services/platform-api/src/crypto.js";
 import { evaluatePaymentRequest } from "../../services/platform-api/src/risk.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
 // server.js instantiates a Store at import time, so point it at a throwaway
 // JSON store and disable the port bind BEFORE dynamically importing it.
-const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-medium-"));
+const storeDir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-medium-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_PATH = path.join(storeDir, "relay-store.json"); // .json => JSON driver
 const {
@@ -67,13 +67,13 @@ test("M1: notifyOpenClaw delivers only to the addressed connection, never 'defau
 test("M2: consistency check runs even when payload.asset is omitted", () => {
   const intent = {
     payment: { network: "base", asset: "USDC", amount: "5", to: "0xALICE" },
-    velarum: {
+    Paytobe: {
       request_id: "r1",
       // No `asset` key — this is exactly what used to bypass every check.
       payload: { amount: "5", recipient: { address: "0xATTACKER" } }
     }
   };
-  const result = adaptVelarum(intent, {});
+  const result = adaptPaytobe(intent, {});
   assert.equal(result.ok, false, "a recipient mismatch must be caught without payload.asset");
   assert.match(result.error, /recipient/i);
 });
@@ -81,24 +81,24 @@ test("M2: consistency check runs even when payload.asset is omitted", () => {
 test("M2: amounts are compared by value, so 24.0 === 24.00", () => {
   const intent = {
     payment: { network: "base", asset: "USDC", amount: "24.00", to: "0xA" },
-    velarum: {
+    Paytobe: {
       request_id: "r2",
       payload: { asset: { network: "base", symbol: "USDC" }, amount: "24.0", recipient: { address: "0xA" } }
     }
   };
-  const result = adaptVelarum(intent, {});
+  const result = adaptPaytobe(intent, {});
   assert.equal(result.ok, true, "'24.0' and '24.00' are the same amount, not a mismatch");
 });
 
 test("M2: a genuine amount mismatch is still rejected", () => {
   const intent = {
     payment: { network: "base", asset: "USDC", amount: "5", to: "0xA" },
-    velarum: {
+    Paytobe: {
       request_id: "r3",
       payload: { asset: { symbol: "USDC" }, amount: "50", recipient: { address: "0xA" } }
     }
   };
-  assert.equal(adaptVelarum(intent, {}).ok, false, "50 != 5 must be rejected");
+  assert.equal(adaptPaytobe(intent, {}).ok, false, "50 != 5 must be rejected");
 });
 
 // ---------------------------------------------------------------------------
@@ -169,7 +169,7 @@ test("M5: idempotent re-report of a non-terminal status is allowed", () => {
 // M6 — app device registration is first-create-only (no token takeover)
 // ---------------------------------------------------------------------------
 test("M6: re-registering an existing device_id is refused, token_hash untouched", () => {
-  const store = new Store(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "velarum-m6-")), "relay-store.json"));
+  const store = new Store(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-m6-")), "relay-store.json"));
   const first = store.registerDevice("dev-1", "owner-token");
   assert.ok(first && first.device_id === "dev-1", "first registration succeeds");
   const originalHash = store.device("dev-1").token_hash;

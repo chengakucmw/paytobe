@@ -23,8 +23,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.R
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 首页顶部栏：Logo + 品牌名 + 副标题 + 搜索/扫码（对照原型 04-home 的品牌头）。 */
 @Composable
@@ -43,24 +43,24 @@ fun VpHomeTopBar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Image(
-            painter = painterResource(R.drawable.velarum_logo_mark),
-            contentDescription = "VelarumPay",
+            painter = painterResource(R.drawable.paytobe_logo_mark),
+            contentDescription = "Paytobe",
             modifier = Modifier
                 .size(40.dp)
-                .clip(VelarumRadii.sm),
+                .clip(PaytobeRadii.sm),
         )
         Column(modifier = Modifier.weight(1f).padding(start = Spacing.s3)) {
-            Text("VelarumPay", style = MaterialTheme.typography.titleLarge, color = VelarumTheme.colors.textStrong)
-            Text("Self-custody wallet", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+            Text("Paytobe", style = MaterialTheme.typography.titleLarge, color = PaytobeTheme.colors.textStrong)
+            Text("Self-custody wallet", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
         }
         IconButton(onClick = onRefresh, enabled = !refreshing) {
-            Icon(Icons.Filled.Refresh, contentDescription = "Refresh balances", tint = VelarumTheme.colors.textStrong)
+            Icon(Icons.Filled.Refresh, contentDescription = "Refresh balances", tint = PaytobeTheme.colors.textStrong)
         }
         IconButton(onClick = onSearch) {
-            Icon(Icons.Filled.Search, contentDescription = "Search", tint = VelarumTheme.colors.textStrong)
+            Icon(Icons.Filled.Search, contentDescription = "Search", tint = PaytobeTheme.colors.textStrong)
         }
         IconButton(onClick = onScan) {
-            Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan", tint = VelarumTheme.colors.textStrong)
+            Icon(Icons.Filled.QrCodeScanner, contentDescription = "Scan", tint = PaytobeTheme.colors.textStrong)
         }
     }
 }

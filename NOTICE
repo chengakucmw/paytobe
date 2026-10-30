@@ -1,9 +1,9 @@
-VelarumPay
-Copyright 2026 VelarumPay contributors
+Paytobe
+Copyright 2026 Paytobe contributors
 
-This product includes software developed by VelarumPay contributors.
+This product includes software developed by Paytobe contributors.
 
-The VelarumPay name, logos, wordmarks, and other brand identifiers are not
+The Paytobe name, logos, wordmarks, and other brand identifiers are not
 licensed for trademark use by the Apache License, Version 2.0.
 
 Reviewed third-party dependency notices
@@ -23,7 +23,7 @@ third_party/licenses/unicode-ident-1.0.24-LICENSE-UNICODE
 
 The active BIP-39 dependency graph also includes reviewed CC0-1.0 code:
 bip39 2.2.2, bitcoin_hashes 0.14.2, and hex-conservative 0.2.2.
-These versions remain locked in crates/velarum-wallet-core/Cargo.lock.
+These versions remain locked in crates/Paytobe-wallet-core/Cargo.lock.
 
 The website, developer documentation site, merchant portal, and AgentFood
 reference demo bundle the following unmodified fonts from the official Google
@@ -41,5 +41,5 @@ copyright notices and license texts are distributed beside the font files in
 each application's public/fonts directory.
 
 The AgentFood social preview image `agentfood-social-v3.png` is first-party
-project artwork generated for VelarumPay. It is distributed as part of this
+project artwork generated for Paytobe. It is distributed as part of this
 Apache-2.0 source tree and does not include a third-party stock image license.

@@ -1,8 +1,8 @@
-import { buildPaymentRequestPayload, buildVelarumRequest } from "./velarum_adapter.js";
+import { buildPaymentRequestPayload, buildPaytobeRequest } from "./Paytobe_adapter.js";
 
 export function buildPaymentIntent(payment, source = {}) {
   const paymentRequest = buildPaymentRequest(payment, source);
-  const velarum = buildVelarumRequest(payment, source, { paymentRequest });
+  const Paytobe = buildPaytobeRequest(payment, source, { paymentRequest });
   const enrichedPayment = { ...paymentRequest.payment };
   if (paymentRequest.payment.rail === "base_usdc") {
     enrichedPayment.rpc_url = process.env.BASE_RPC_URL || "https://mainnet.base.org";
@@ -28,7 +28,7 @@ export function buildPaymentIntent(payment, source = {}) {
       runtime: paymentRequest.source.runtime,
       telegram_chat_id_hash: source.telegram_chat_id_hash || ""
     },
-    velarum,
+    Paytobe,
     payment_request: paymentRequest,
     payee: paymentRequest.payee,
     payment: enrichedPayment,

@@ -2,7 +2,7 @@
 // Request. Needs the store (to fetch the stored context), so it's produced by
 // a factory wired once at startup.
 
-import { createTransactionContextSnapshot } from "../velarum.js";
+import { createTransactionContextSnapshot } from "../Paytobe.js";
 import { apiWarning } from "../http/responses.js";
 
 export function createTransactionContext({ store }) {

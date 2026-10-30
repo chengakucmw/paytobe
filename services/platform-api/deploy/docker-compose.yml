@@ -9,11 +9,11 @@ services:
       NODE_ENV: production
       RUNTIME_ENV: production
       PORT: "8787"
-      PUBLIC_BASE_URL: https://api.velarumai.com
+      PUBLIC_BASE_URL: https://api.Paytobe.com
       OFFICIAL_TESTNET_ONLY: "true"
       RELAY_STORE_DRIVER: sqlite
-      RELAY_STORE_PATH: /var/lib/velarumpay/relay-store.sqlite
-      RELAY_STORE_LEGACY_JSON: /var/lib/velarumpay/relay-store.json
+      RELAY_STORE_PATH: /var/lib/Paytobe/relay-store.sqlite
+      RELAY_STORE_LEGACY_JSON: /var/lib/Paytobe/relay-store.json
       ALLOW_UNSIGNED_OPENCLAW: "false"
       ALLOW_UNSIGNED_OPENCLAW_LOCAL_ONLY: "true"
       STELLAR_PUBLIC_ENABLED: "false"
@@ -21,10 +21,10 @@ services:
     ports:
       - "8787:8787"
     volumes:
-      - velarumpay-data:/var/lib/velarumpay
-      - velarumpay-backups:/var/backups/velarumpay
+      - Paytobe-data:/var/lib/Paytobe
+      - Paytobe-backups:/var/backups/Paytobe
     restart: unless-stopped
 
 volumes:
-  velarumpay-data:
-  velarumpay-backups:
+  Paytobe-data:
+  Paytobe-backups:

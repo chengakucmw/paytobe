@@ -32,7 +32,7 @@ import ai.agentwallet.hd.ui.components.VpSubheader
 import ai.agentwallet.hd.ui.components.VpTone
 import ai.agentwallet.hd.ui.components.vpToneOf
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 付款请求详情（原生）。对照 web 的 renderDetail：付款额 + 事实 + 风险 + Truth Panel + 档案入口，
@@ -59,7 +59,7 @@ fun DetailScreen(
                 if (ui.loading) {
                     CircularProgressIndicator()
                 } else {
-                    Text("Request not found.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("Request not found.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
             }
         } else {
@@ -69,8 +69,8 @@ fun DetailScreen(
             ) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("You are paying", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
-                        Text("${d.amount} ${d.asset}", style = MaterialTheme.typography.displaySmall, color = VelarumTheme.colors.textStrong)
+                        Text("You are paying", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
+                        Text("${d.amount} ${d.asset}", style = MaterialTheme.typography.displaySmall, color = PaytobeTheme.colors.textStrong)
                         // 生命周期状态药丸：过期→灰+时钟(EXPIRED)、确认→绿、失败/拒绝→红等，独立于风险等级。
                         VpBadge(d.stateLabel, vpToneOf(d.stateTone), modifier = Modifier.padding(top = Spacing.s2))
                     }
@@ -94,13 +94,13 @@ fun DetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
-                        Text("Open transaction dossier", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                        Text("Open transaction dossier", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                         VpBadge(d.dossier.status.ifBlank { "Dossier" }, vpToneOf(d.dossier.tone))
                     }
                     Text(
                         "Intent, AI task trace, evidence, permission checks and on-chain mapping.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = VelarumTheme.colors.textMuted,
+                        color = PaytobeTheme.colors.textMuted,
                         modifier = Modifier.padding(top = Spacing.s1),
                     )
                 }
@@ -130,27 +130,27 @@ fun DetailScreen(
 @Composable
 private fun TruthPanel(sections: List<TruthSectionUi>) {
     VpCard(modifier = Modifier.fillMaxWidth()) {
-        Text("Truth Panel", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+        Text("Truth Panel", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
         sections.forEach { section ->
             Text(
                 section.title,
                 style = MaterialTheme.typography.titleMedium,
-                color = VelarumTheme.colors.textStrong,
+                color = PaytobeTheme.colors.textStrong,
                 modifier = Modifier.padding(top = Spacing.s3),
             )
             if (section.note.isNotBlank()) {
-                Text(section.note, style = MaterialTheme.typography.labelMedium, color = VelarumTheme.colors.textMuted)
+                Text(section.note, style = MaterialTheme.typography.labelMedium, color = PaytobeTheme.colors.textMuted)
             }
             section.rows.forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = Spacing.s2),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.s3),
                 ) {
-                    Text(row.field, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted, modifier = Modifier.weight(1f))
-                    Text(row.value, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textStrong, modifier = Modifier.weight(1f))
+                    Text(row.field, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted, modifier = Modifier.weight(1f))
+                    Text(row.value, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textStrong, modifier = Modifier.weight(1f))
                 }
                 if (row.evidence.isNotBlank()) {
-                    Text(row.evidence, style = MaterialTheme.typography.labelMedium, color = VelarumTheme.colors.textFaint)
+                    Text(row.evidence, style = MaterialTheme.typography.labelMedium, color = PaytobeTheme.colors.textFaint)
                 }
             }
         }

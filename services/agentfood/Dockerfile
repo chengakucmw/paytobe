@@ -12,8 +12,8 @@ COPY packages/sdk-js ./packages/sdk-js
 COPY services/agentfood/src ./services/agentfood/src
 COPY services/agentfood/public ./services/agentfood/public
 
-RUN mkdir -p /var/lib/agentfood /app/node_modules/@velarumpay \
-  && ln -s /app/packages/protocol /app/node_modules/@velarumpay/protocol \
+RUN mkdir -p /var/lib/agentfood /app/node_modules/@Paytobe \
+  && ln -s /app/packages/protocol /app/node_modules/@Paytobe/protocol \
   && chown -R node:node /app /var/lib/agentfood
 
 USER node

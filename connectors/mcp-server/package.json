@@ -1,7 +1,7 @@
 {
-  "name": "@velarumpay/mcp-server",
+  "name": "@Paytobe/mcp-server",
   "version": "0.1.0",
-  "description": "VelarumPay MCP stdio server for Payment Request v1 tools.",
+  "description": "Paytobe MCP stdio server for Payment Request v1 tools.",
   "type": "module",
   "main": "./src/tools.js",
   "types": "./src/tools.d.ts",
@@ -13,7 +13,7 @@
     "./server": "./src/index.js"
   },
   "bin": {
-    "velarumpay-mcp-server": "./src/index.js"
+    "Paytobe-mcp-server": "./src/index.js"
   },
   "files": [
     "src",
@@ -29,6 +29,6 @@
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@velarumpay/sdk-js": "0.1.0"
+    "@Paytobe/sdk-js": "0.1.0"
   }
 }

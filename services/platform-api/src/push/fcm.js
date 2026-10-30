@@ -49,7 +49,7 @@ export function buildFcmDataMessage(registrationToken, event = {}) {
   const eventId = String(event.event_id || "").trim();
   const eventSeq = Number(event.event_seq || 0);
   const data = {
-    type: "velarumpay.sync",
+    type: "Paytobe.sync",
     sync_required: "true"
   };
   if (eventId) data.event_id = eventId;
@@ -61,7 +61,7 @@ export function buildFcmDataMessage(registrationToken, event = {}) {
       data,
       android: {
         priority: "high",
-        collapse_key: "velarumpay-payment-sync",
+        collapse_key: "Paytobe-payment-sync",
         ttl: "300s"
       }
     }
@@ -253,7 +253,7 @@ function decodeAes256Key(value) {
 }
 
 function pushTokenAad(binding) {
-  return Buffer.from(`velarumpay:fcm-token:v1:${String(binding || "")}`, "utf8");
+  return Buffer.from(`Paytobe:fcm-token:v1:${String(binding || "")}`, "utf8");
 }
 
 async function responseTextAsJson(response) {

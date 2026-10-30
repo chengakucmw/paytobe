@@ -1,7 +1,7 @@
 // Transaction Context routes. Mounted at "/v1/transaction-contexts".
 
 import express from "express";
-import { normalizeTransactionContextV1 } from "../velarum.js";
+import { normalizeTransactionContextV1 } from "../Paytobe.js";
 import { buildTransactionContextPayload } from "../domain/payloads.js";
 
 export function createTransactionContextsRouter(deps) {

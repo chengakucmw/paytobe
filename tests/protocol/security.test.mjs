@@ -168,7 +168,7 @@ test("MemoryRateLimiter blocks requests over the configured window", () => {
 });
 
 test("Store hashes app and connection tokens and supports rotation", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-token-hardening-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-token-hardening-"));
   try {
     const store = new Store(path.join(dir, "store.json"));
     const device = store.registerDevice("device_hash", "device-token");
@@ -203,7 +203,7 @@ test("Store hashes app and connection tokens and supports rotation", () => {
 });
 
 test("idempotency replay never returns another wallet's payment intent", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-idem-intent-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-idem-intent-"));
   try {
     const store = new Store(path.join(dir, "store.json"));
     store.putIntent({
@@ -226,7 +226,7 @@ test("idempotency replay never returns another wallet's payment intent", () => {
 });
 
 test("idempotency replay never leaks a payment request across connections", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-idem-request-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-idem-request-"));
   try {
     const store = new Store(path.join(dir, "store.json"));
 
@@ -262,7 +262,7 @@ test("idempotency replay never leaks a payment request across connections", () =
 });
 
 test("a transaction context is only readable by the device that approved its connection", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-context-read-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-context-read-"));
   try {
     const store = new Store(path.join(dir, "store.json"));
 

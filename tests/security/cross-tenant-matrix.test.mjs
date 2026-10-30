@@ -258,7 +258,7 @@ function crossStatus(resource) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-cross-tenant-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-cross-tenant-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

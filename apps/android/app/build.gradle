@@ -39,10 +39,10 @@ def releaseSigningValue = { String propertyName, String environmentName ->
         ? environmentValue
         : (keystoreProperties[propertyName] ?: "").toString()
 }
-def releaseStorePath = releaseSigningValue("storeFile", "VELARUMPAY_ANDROID_KEYSTORE_PATH")
-def releaseStorePassword = releaseSigningValue("storePassword", "VELARUMPAY_ANDROID_STORE_PASSWORD")
-def releaseKeyAlias = releaseSigningValue("keyAlias", "VELARUMPAY_ANDROID_KEY_ALIAS")
-def releaseKeyPassword = releaseSigningValue("keyPassword", "VELARUMPAY_ANDROID_KEY_PASSWORD")
+def releaseStorePath = releaseSigningValue("storeFile", "Paytobe_ANDROID_KEYSTORE_PATH")
+def releaseStorePassword = releaseSigningValue("storePassword", "Paytobe_ANDROID_STORE_PASSWORD")
+def releaseKeyAlias = releaseSigningValue("keyAlias", "Paytobe_ANDROID_KEY_ALIAS")
+def releaseKeyPassword = releaseSigningValue("keyPassword", "Paytobe_ANDROID_KEY_PASSWORD")
 def hasReleaseKeystore = !releaseStorePath.isEmpty()
     && file(releaseStorePath).exists()
     && !releaseStorePassword.isEmpty()
@@ -54,21 +54,21 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.velarumpay.wallet"
+        applicationId "com.paytobe.wallet"
         minSdk 26
         targetSdk 35
         versionCode 23
-        versionName "0.2.3-velarumpay"
+        versionName "0.2.3-Paytobe"
         resourceConfigurations += ["en"]
-        buildConfigField "String", "FIREBASE_APPLICATION_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.applicationId", "VELARUMPAY_FIREBASE_APPLICATION_ID"))
-        buildConfigField "String", "FIREBASE_API_KEY", buildConfigString(firebaseConfigValue("velarumpay.firebase.apiKey", "VELARUMPAY_FIREBASE_API_KEY"))
-        buildConfigField "String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.projectId", "VELARUMPAY_FIREBASE_PROJECT_ID"))
-        buildConfigField "String", "FIREBASE_SENDER_ID", buildConfigString(firebaseConfigValue("velarumpay.firebase.senderId", "VELARUMPAY_FIREBASE_SENDER_ID"))
-        buildConfigField "boolean", "STELLAR_MAINNET_ENABLED", buildConfigBoolean(firebaseConfigValue("velarumpay.stellar.mainnetEnabled", "VELARUMPAY_STELLAR_MAINNET_ENABLED"))
-        buildConfigField "String", "STELLAR_MAINNET_MAX_XLM", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetMaxXlm", "VELARUMPAY_STELLAR_MAINNET_MAX_XLM") ?: "1")
-        buildConfigField "String", "STELLAR_MAINNET_HORIZON_URL", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetHorizonUrl", "VELARUMPAY_STELLAR_MAINNET_HORIZON_URL") ?: "https://horizon.stellar.org")
-        buildConfigField "String", "STELLAR_MAINNET_RECIPIENTS", buildConfigString(firebaseConfigValue("velarumpay.stellar.mainnetRecipients", "VELARUMPAY_STELLAR_MAINNET_RECIPIENTS"))
-        buildConfigField "String", "DEFAULT_PLATFORM_API_URL", '"https://api.velarumai.com"'
+        buildConfigField "String", "FIREBASE_APPLICATION_ID", buildConfigString(firebaseConfigValue("Paytobe.firebase.applicationId", "Paytobe_FIREBASE_APPLICATION_ID"))
+        buildConfigField "String", "FIREBASE_API_KEY", buildConfigString(firebaseConfigValue("Paytobe.firebase.apiKey", "Paytobe_FIREBASE_API_KEY"))
+        buildConfigField "String", "FIREBASE_PROJECT_ID", buildConfigString(firebaseConfigValue("Paytobe.firebase.projectId", "Paytobe_FIREBASE_PROJECT_ID"))
+        buildConfigField "String", "FIREBASE_SENDER_ID", buildConfigString(firebaseConfigValue("Paytobe.firebase.senderId", "Paytobe_FIREBASE_SENDER_ID"))
+        buildConfigField "boolean", "STELLAR_MAINNET_ENABLED", buildConfigBoolean(firebaseConfigValue("Paytobe.stellar.mainnetEnabled", "Paytobe_STELLAR_MAINNET_ENABLED"))
+        buildConfigField "String", "STELLAR_MAINNET_MAX_XLM", buildConfigString(firebaseConfigValue("Paytobe.stellar.mainnetMaxXlm", "Paytobe_STELLAR_MAINNET_MAX_XLM") ?: "1")
+        buildConfigField "String", "STELLAR_MAINNET_HORIZON_URL", buildConfigString(firebaseConfigValue("Paytobe.stellar.mainnetHorizonUrl", "Paytobe_STELLAR_MAINNET_HORIZON_URL") ?: "https://horizon.stellar.org")
+        buildConfigField "String", "STELLAR_MAINNET_RECIPIENTS", buildConfigString(firebaseConfigValue("Paytobe.stellar.mainnetRecipients", "Paytobe_STELLAR_MAINNET_RECIPIENTS"))
+        buildConfigField "String", "DEFAULT_PLATFORM_API_URL", '"https://api.paytobe.com"'
         buildConfigField "boolean", "MANAGED_PLATFORM_SERVICE", "true"
         buildConfigField "boolean", "PLATFORM_WEBSOCKET_ENABLED", "false"
         buildConfigField "boolean", "INTERNAL_PLATFORM_OVERRIDE_ENABLED", "false"
@@ -80,7 +80,7 @@ android {
         standard {
             dimension "network"
             buildConfigField "boolean", "TESTNET_ONLY", "true"
-            manifestPlaceholders = [appLabel: "VelarumPay"]
+            manifestPlaceholders = [appLabel: "Paytobe"]
         }
         stellarTestnet {
             dimension "network"
@@ -88,7 +88,7 @@ android {
             versionCode 30
             versionNameSuffix "-testnet"
             buildConfigField "boolean", "TESTNET_ONLY", "true"
-            manifestPlaceholders = [appLabel: "VelarumPay Testnet"]
+            manifestPlaceholders = [appLabel: "Paytobe Testnet"]
         }
     }
 
@@ -102,9 +102,9 @@ android {
         jvmTarget = "17"
     }
 
-    // --- VelarumPay shared Rust wallet core (stable C ABI) ---
+    // --- Paytobe shared Rust wallet core (stable C ABI) ---
     // WalletCoreBridge calls the native library through JNA. On device the core ships as
-    // src/main/jniLibs/*/libvelarum_wallet_core.so (built by build-android.sh);
+    // src/main/jniLibs/*/libPaytobe_wallet_core.so (built by build-android.sh);
     // JVM unit tests load the host build via jna.library.path below.
     testOptions {
         // Return defaults (not "not mocked" exceptions) for android.* stubs in plain JVM
@@ -113,7 +113,7 @@ android {
         // device is unaffected; this only changes the unit-test JVM stub behaviour.
         unitTests.returnDefaultValues = true
         unitTests.all {
-            systemProperty "jna.library.path", "${rootDir}/../../crates/velarum-wallet-core/target/release"
+            systemProperty "jna.library.path", "${rootDir}/../../crates/Paytobe-wallet-core/target/release"
         }
     }
 
@@ -164,7 +164,7 @@ android {
             buildConfigField "boolean", "MANAGED_PLATFORM_SERVICE", "false"
             buildConfigField "boolean", "PLATFORM_WEBSOCKET_ENABLED", "true"
             buildConfigField "boolean", "INTERNAL_PLATFORM_OVERRIDE_ENABLED", "true"
-            manifestPlaceholders = [appLabel: "VelarumPay Internal · Unofficial"]
+            manifestPlaceholders = [appLabel: "Paytobe Internal · Unofficial"]
         }
     }
 
@@ -189,7 +189,7 @@ android {
 
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach {
-            outputFileName = "VelarumPay-${variant.name}.apk"
+            outputFileName = "Paytobe-${variant.name}.apk"
         }
     }
 }
@@ -200,7 +200,7 @@ gradle.taskGraph.whenReady { graph ->
     }
     if (requestedReleaseArtifact && !hasReleaseKeystore) {
         throw new GradleException(
-            "Release signing is not configured. Provide the VELARUMPAY_ANDROID_* signing environment variables or apps/android/keystore.properties."
+            "Release signing is not configured. Provide the Paytobe_ANDROID_* signing environment variables or apps/android/keystore.properties."
         )
     }
 }
@@ -265,11 +265,11 @@ dependencies {
     coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.5"
 }
 
-// --- VelarumPay shared Rust wallet-core (stable C ABI) build wiring -----------
+// --- Paytobe shared Rust wallet-core (stable C ABI) build wiring -----------
 // The host library supports JVM conformance tests. Device libraries are rebuilt
 // for every Android ABI and checked for the complete version-1 symbol surface.
 
-ext.wcCrateDir = file("${rootDir}/../../crates/velarum-wallet-core")
+ext.wcCrateDir = file("${rootDir}/../../crates/Paytobe-wallet-core")
 ext.wcJniLibs  = file("${projectDir}/src/main/jniLibs")
 ext.wcAbis     = ["arm64-v8a", "armeabi-v7a", "x86_64", "x86"]
 
@@ -298,12 +298,12 @@ tasks.register("buildWalletCoreDeviceLibs", Exec) {
     commandLine "bash", "${wcCrateDir}/scripts/build-android.sh"
     inputs.dir("${wcCrateDir}/src")
     inputs.file("${wcCrateDir}/Cargo.toml")
-    wcAbis.each { abi -> outputs.file("${wcJniLibs}/${abi}/libvelarum_wallet_core.so") }
+    wcAbis.each { abi -> outputs.file("${wcJniLibs}/${abi}/libPaytobe_wallet_core.so") }
     onlyIf {
         def ok = wcHasExe("cargo") && wcHasExe("cargo-ndk")
         if (!ok) logger.warn("wallet-core: cargo/cargo-ndk not on PATH — skipping device .so rebuild. " +
             "The verify step will FAIL the build if the bundled .so is stale. " +
-            "Refresh manually: crates/velarum-wallet-core/scripts/build-android.sh")
+            "Refresh manually: crates/Paytobe-wallet-core/scripts/build-android.sh")
         ok
     }
 }
@@ -312,17 +312,17 @@ tasks.register("buildWalletCoreDeviceLibs", Exec) {
 tasks.register("verifyWalletCoreNativeLibs") {
     dependsOn "buildWalletCoreDeviceLibs"
     doLast {
-        def so = new File("${wcJniLibs}/arm64-v8a/libvelarum_wallet_core.so")   // real-device ABI
-        if (!so.exists()) so = wcAbis.collect { new File("${wcJniLibs}/${it}/libvelarum_wallet_core.so") }.find { it.exists() }
+        def so = new File("${wcJniLibs}/arm64-v8a/libPaytobe_wallet_core.so")   // real-device ABI
+        if (!so.exists()) so = wcAbis.collect { new File("${wcJniLibs}/${it}/libPaytobe_wallet_core.so") }.find { it.exists() }
         if (so == null)
-            throw new GradleException("wallet-core: no libvelarum_wallet_core.so in src/main/jniLibs. " +
-                "Build it (needs Android NDK + cargo-ndk): crates/velarum-wallet-core/scripts/build-android.sh")
+            throw new GradleException("wallet-core: no libPaytobe_wallet_core.so in src/main/jniLibs. " +
+                "Build it (needs Android NDK + cargo-ndk): crates/Paytobe-wallet-core/scripts/build-android.sh")
         def referenced = [
-            "velarum_wallet_core_abi_version",
-            "velarum_wallet_core_call",
-            "velarum_wallet_core_result_data",
-            "velarum_wallet_core_result_len",
-            "velarum_wallet_core_result_free",
+            "Paytobe_wallet_core_abi_version",
+            "Paytobe_wallet_core_call",
+            "Paytobe_wallet_core_result_data",
+            "Paytobe_wallet_core_result_len",
+            "Paytobe_wallet_core_result_free",
         ]
         def haystack = new String(so.bytes, "ISO-8859-1")
         def missing = referenced.findAll { !haystack.contains(it) }
@@ -330,7 +330,7 @@ tasks.register("verifyWalletCoreNativeLibs") {
             throw new GradleException("wallet-core: ${so.parentFile.name}/${so.name} is OUT OF SYNC with the " +
                 "stable C ABI — missing ${missing.size()} symbol(s), e.g.:\n  " + missing.take(6).join("\n  ") +
                 "\nThe app would crash at runtime with 'undefined symbol'. Rebuild the native libs:\n" +
-                "  crates/velarum-wallet-core/scripts/build-android.sh")
+                "  crates/Paytobe-wallet-core/scripts/build-android.sh")
         logger.lifecycle("wallet-core: verified ${referenced.size()} stable C ABI symbols present in ${so.parentFile.name}/${so.name} ✓")
     }
 }

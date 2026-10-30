@@ -1,7 +1,7 @@
 {
   "agent": {
     "agent_id": "agt_mcp_local",
-    "agent_name": "VelarumPay MCP Local Agent",
+    "agent_name": "Paytobe MCP Local Agent",
     "runtime": "mcp",
     "device_label": "local developer machine"
   },

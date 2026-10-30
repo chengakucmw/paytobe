@@ -1,4 +1,4 @@
-const CONNECT_KEY_PATTERN = /^velarumpay-connect:ck_[A-Za-z0-9_-]{43}$/;
+const CONNECT_KEY_PATTERN = /^Paytobe-connect:ck_[A-Za-z0-9_-]{43}$/;
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
 const ALLOWED_SCOPES = new Set([
   "payment.requests.create",
@@ -132,7 +132,7 @@ async function edgePaymentScope(connection, payload) {
 
 async function edgePaymentEvent(scope, type, payment, patch = {}, at = new Date().toISOString()) {
   const facts = {
-    version: "velarum.payment_event.v1",
+    version: "Paytobe.payment_event.v1",
     merchant_id: scope.merchant_id,
     type,
     request_id: payment.request_id,
@@ -555,7 +555,7 @@ function pairingView(invitation) {
   return {
     pairing_session_id: invitation.pairing_session_id,
     pairing_code: "",
-    pairing_uri: `velarumpay://pair?pairing_session_id=${encodeURIComponent(invitation.pairing_session_id)}`,
+    pairing_uri: `Paytobe://pair?pairing_session_id=${encodeURIComponent(invitation.pairing_session_id)}`,
     agent_identity: invitation.agent_identity,
     identity_assurance: invitation.identity_assurance,
     requested_scopes: invitation.requested_scopes || [],
@@ -594,7 +594,7 @@ async function controlledWebhookReceiver(request, env, route) {
   if (!config) return null;
   const url = new URL(request.url);
   const method = request.method.toUpperCase();
-  if (method === "GET" && url.searchParams.get("velarumpay_challenge") === "1") {
+  if (method === "GET" && url.searchParams.get("Paytobe_challenge") === "1") {
     const challenge = String(env?.[config.challenge] || "").trim();
     return challenge ? json(200, { challenge }) : apiError(503, "webhook_receiver_unconfigured", "Webhook receiver ownership challenge is not configured");
   }
@@ -605,7 +605,7 @@ async function controlledWebhookReceiver(request, env, route) {
   if (declaredLength > 256 * 1024) return apiError(413, "payload_too_large", "Webhook payload is too large");
   const rawBody = new Uint8Array(await request.arrayBuffer());
   if (rawBody.byteLength > 256 * 1024) return apiError(413, "payload_too_large", "Webhook payload is too large");
-  const signature = String(request.headers.get("x-velarumpay-signature") || "");
+  const signature = String(request.headers.get("x-Paytobe-signature") || "");
   const valid = await verifyControlledWebhookSignature(secret, rawBody, signature);
   let eventType = "";
   try { eventType = String(JSON.parse(new TextDecoder().decode(rawBody))?.type || "").slice(0, 120); } catch { /* signature result remains authoritative */ }
@@ -614,8 +614,8 @@ async function controlledWebhookReceiver(request, env, route) {
     event: "controlled_webhook.delivery",
     receiver: config.label,
     signature_valid: valid,
-    event_id: String(request.headers.get("x-velarumpay-event-id") || "").slice(0, 160),
-    delivery_id: String(request.headers.get("x-velarumpay-delivery-id") || "").slice(0, 160),
+    event_id: String(request.headers.get("x-Paytobe-event-id") || "").slice(0, 160),
+    delivery_id: String(request.headers.get("x-Paytobe-delivery-id") || "").slice(0, 160),
     event_type: eventType,
     payload_digest: await hash(rawBody),
     occurred_at: new Date().toISOString()
@@ -651,13 +651,13 @@ async function authenticateAgent(request, env, store) {
 
 function canonicalEdgeIdentity(client) {
   return {
-    binding_version: "velarum.connection_binding.v1",
+    binding_version: "Paytobe.connection_binding.v1",
     merchant_id: client.merchant_id || client.tenant_id,
     tenant_id: client.tenant_id,
     agent_id: client.agent_id || client.client_id,
     client_id: client.client_id,
     credential_id: client.credential_id || `registered_client:${client.client_id}`,
-    audience: "velarumpay-platform-api",
+    audience: "Paytobe-platform-api",
     agent_name: client.display_name,
     runtime: client.runtime,
     source: client.source_domain,
@@ -674,9 +674,9 @@ async function connectionAuth(store, request, requiredScope, fallback = "") {
   const connection = await store.connectionByTokenHash(await hash(token));
   if (!connection || connection.status !== "active") return { error: apiError(401, "unauthorized_connection", "Connection token is invalid or inactive") };
   const identity = connection.agent_identity || {};
-  if (identity.binding_version === "velarum.connection_binding.v1"
+  if (identity.binding_version === "Paytobe.connection_binding.v1"
       && (identity.merchant_id !== connection.tenant_id || identity.client_id !== connection.client_id
-        || !identity.agent_id || !identity.credential_id || identity.audience !== "velarumpay-platform-api"
+        || !identity.agent_id || !identity.credential_id || identity.audience !== "Paytobe-platform-api"
         || identity.approved_by_device_id !== connection.target_app_device_id
         || identity.connection_id !== connection.connection_id)) {
     return { error: apiError(401, "unauthorized_connection", "Connection token binding is invalid") };
@@ -691,8 +691,8 @@ async function handle(request, env, store) {
   const path = url.pathname;
   const method = request.method.toUpperCase();
 
-  if (method === "GET" && path === "/") return json(200, { ok: true, service: "VelarumPay Connect Platform", environment: "testnet", api: "/v1" });
-  if (method === "GET" && path === "/health") return json(200, { ok: true, service: "velarumpay-connect-platform", environment: "testnet", persistence: env.DB ? "d1" : "memory", multi_tenant: true, agent_identity: "registered" });
+  if (method === "GET" && path === "/") return json(200, { ok: true, service: "Paytobe Connect Platform", environment: "testnet", api: "/v1" });
+  if (method === "GET" && path === "/health") return json(200, { ok: true, service: "Paytobe-connect-platform", environment: "testnet", persistence: env.DB ? "d1" : "memory", multi_tenant: true, agent_identity: "registered" });
 
   const controlledReceiver = await controlledWebhookReceiver(request, env, path);
   if (controlledReceiver) return controlledReceiver;
@@ -737,7 +737,7 @@ async function handle(request, env, store) {
     if (!await verifyDevice(store, deviceId, payload.token)) return apiError(401, "invalid_app_device_token", "Invalid app device token");
     const ttl = Number(payload.expires_in_seconds || 300);
     if (!Number.isInteger(ttl) || ttl < 60 || ttl > 600) return apiError(400, "invalid_expiration", "expires_in_seconds must be between 60 and 600");
-    const key = `velarumpay-connect:${randomToken("ck")}`;
+    const key = `Paytobe-connect:${randomToken("ck")}`;
     const at = new Date().toISOString();
     const invitation = await store.createInvitation({ connect_invitation_id: id("cinv"), connect_key_hash: await hash(key), target_app_device_id: deviceId, created_at: at, updated_at: at, expires_at: new Date(Date.now() + ttl * 1000).toISOString() });
     return json(201, { ok: true, connect_key: key, connect_invitation: invitationView(invitation) });
@@ -851,7 +851,7 @@ async function handle(request, env, store) {
     const payload = await body(request);
     const auth = await connectionAuth(store, request, "transaction_contexts.create", String(payload.connection_token || ""));
     if (auth.error) return auth.error;
-    if (payload.protocol !== "velarum.transaction_context.v1" || !payload.transaction_id) return apiError(400, "invalid_transaction_context", "A valid velarum.transaction_context.v1 payload is required");
+    if (payload.protocol !== "Paytobe.transaction_context.v1" || !payload.transaction_id) return apiError(400, "invalid_transaction_context", "A valid Paytobe.transaction_context.v1 payload is required");
     payload.connection_id = auth.connection.connection_id;
     return json(201, { ok: true, context: await store.upsertContext(auth.connection, payload, new Date().toISOString()) });
   }
@@ -860,7 +860,7 @@ async function handle(request, env, store) {
     const payload = await body(request);
     const auth = await connectionAuth(store, request, "payment.requests.create", String(payload.connection_token || ""));
     if (auth.error) return auth.error;
-    if (payload.protocol !== "velarum.payment_request.v1" || !payload.request_id || !payload.idempotency_key || payload.policy?.requires_user_approval !== true) return apiError(400, "invalid_payment_request", "A valid user-approved velarum.payment_request.v1 payload is required");
+    if (payload.protocol !== "Paytobe.payment_request.v1" || !payload.request_id || !payload.idempotency_key || payload.policy?.requires_user_approval !== true) return apiError(400, "invalid_payment_request", "A valid user-approved Paytobe.payment_request.v1 payload is required");
     if (payload.payment?.network !== "stellar_testnet" || payload.payment?.rail !== "stellar_xlm" || payload.payment?.stellar_testnet !== true) return apiError(400, "testnet_only", "This Platform build accepts Stellar testnet Payment Requests only");
     if (!/^\d+(?:\.\d{1,7})?$/.test(String(payload.payment?.amount || "")) || Number(payload.payment.amount) <= 0) return apiError(400, "invalid_amount", "Payment amount must be a positive decimal");
     payload.connection_id = auth.connection.connection_id;

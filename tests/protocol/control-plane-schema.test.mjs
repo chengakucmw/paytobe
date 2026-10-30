@@ -32,11 +32,11 @@ const validators = {
 test("all control-plane JSON Schemas are versioned, closed, and publicly exported", () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(codeRoot, "packages/protocol/package.json"), "utf8"));
   const schemas = fs.readdirSync(path.join(codeRoot, "packages/protocol/schema"))
-    .filter((name) => /^velarum\.(merchant|agent|recipient|webhook)/.test(name));
+    .filter((name) => /^Paytobe\.(merchant|agent|recipient|webhook)/.test(name));
   assert.equal(schemas.length, 7);
   for (const name of schemas) {
     const schema = JSON.parse(fs.readFileSync(path.join(codeRoot, "packages/protocol/schema", name), "utf8"));
-    assert.equal(schema["x-velarumpay-contract-version"], CONTROL_PLANE_SCHEMA_VERSION);
+    assert.equal(schema["x-Paytobe-contract-version"], CONTROL_PLANE_SCHEMA_VERSION);
     assert.equal(schema.additionalProperties, false);
     assert.ok(schema.required.includes("merchant_id"));
     assert.ok(schema.required.includes("status"));

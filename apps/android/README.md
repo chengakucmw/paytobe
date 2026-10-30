@@ -1,8 +1,8 @@
-# VelarumPay Android Build and Test
+# Paytobe Android Build and Test
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-03 23:55:28 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-03 15:55:28 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
 This app is built with Android Gradle Plugin 8.7.3 and the Gradle wrapper pinned to Gradle 8.9.
 
@@ -18,7 +18,7 @@ export ANDROID_HOME="$HOME/Library/Android/sdk"
 Create `local.properties` in this directory when Gradle cannot discover the SDK:
 
 ```properties
-sdk.dir=/Users/yang/Library/Android/sdk
+sdk.dir=/absolute/path/to/your/Android/sdk
 ```
 
 `local.properties` is ignored by git because it is machine-specific.
@@ -39,10 +39,10 @@ Both product flavors must pass their Debug unit tests and builds before marking 
 Firebase is initialized from build-time values; the app does not require a committed `google-services.json`. Supply these values through Gradle properties or environment variables when producing the real device build:
 
 ```sh
-export VELARUMPAY_FIREBASE_APPLICATION_ID='1:...:android:...'
-export VELARUMPAY_FIREBASE_API_KEY='...'
-export VELARUMPAY_FIREBASE_PROJECT_ID='...'
-export VELARUMPAY_FIREBASE_SENDER_ID='...'
+export Paytobe_FIREBASE_APPLICATION_ID='1:...:android:...'
+export Paytobe_FIREBASE_API_KEY='...'
+export Paytobe_FIREBASE_PROJECT_ID='...'
+export Paytobe_FIREBASE_SENDER_ID='...'
 ```
 
 FCM is only a wake-up signal and contains opaque synchronization coordinates. After every push, and when the app resumes, the wallet uses authenticated REST synchronization to fetch the complete Payment Request. The REST cursor advances only after a successful sync and performs a full inbox refresh when the server reports that retained events no longer cover the cursor.
@@ -52,10 +52,10 @@ FCM is only a wake-up signal and contains opaque synchronization coordinates. Af
 Official release artifacts require a persistent release key and never fall back to the Android debug key. Supply the signing material through an ignored `keystore.properties` file or through these environment variables:
 
 ```sh
-export VELARUMPAY_ANDROID_KEYSTORE_PATH=/absolute/path/to/velarumpay-release.jks
-export VELARUMPAY_ANDROID_STORE_PASSWORD='...'
-export VELARUMPAY_ANDROID_KEY_ALIAS=velarumpay
-export VELARUMPAY_ANDROID_KEY_PASSWORD='...'
+export Paytobe_ANDROID_KEYSTORE_PATH=/absolute/path/to/Paytobe-release.jks
+export Paytobe_ANDROID_STORE_PASSWORD='...'
+export Paytobe_ANDROID_KEY_ALIAS=Paytobe
+export Paytobe_ANDROID_KEY_PASSWORD='...'
 ```
 
 The keystore and passwords must remain outside Git, be backed up in an access-controlled secret store, and be recoverable before an APK is published. Gradle fails `assemble*Release` and `bundle*Release` tasks when this configuration is absent or incomplete.
@@ -65,10 +65,10 @@ The keystore and passwords must remain outside Git, be backed up in an access-co
 Stellar public-network signing is disabled in builds by default. An explicitly authorized small-mainnet build must set all four controls:
 
 ```sh
-export VELARUMPAY_STELLAR_MAINNET_ENABLED=true
-export VELARUMPAY_STELLAR_MAINNET_MAX_XLM=1
-export VELARUMPAY_STELLAR_MAINNET_HORIZON_URL=https://horizon.stellar.org
-export VELARUMPAY_STELLAR_MAINNET_RECIPIENTS=G...verified-recipient
+export Paytobe_STELLAR_MAINNET_ENABLED=true
+export Paytobe_STELLAR_MAINNET_MAX_XLM=1
+export Paytobe_STELLAR_MAINNET_HORIZON_URL=https://horizon.stellar.org
+export Paytobe_STELLAR_MAINNET_RECIPIENTS=G...verified-recipient
 ```
 
 The comma-separated recipient list is compiled into the build. The app checks the network, positive amount, single-payment cap, exact HTTPS Horizon endpoint, and recipient allowlist during review and again immediately before sequence lookup, signing, and broadcast. Testnet remains available without enabling this production gate. The Platform API has an independent server-side gate and must be configured consistently.

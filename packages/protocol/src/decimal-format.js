@@ -3,7 +3,7 @@
 // imports it) so the one pattern can never drift between layers (F4). It lives in
 // the protocol package because that is the lowest layer both sides already depend
 // on; the openclaw-telegram connector keeps its own copy on purpose (it ships as a
-// self-contained skill with no workspace dependency — see its velarum_adapter.js).
+// self-contained skill with no workspace dependency — see its Paytobe_adapter.js).
 
 // A canonical, non-negative base-10 amount: no sign, no leading zeros (except a
 // bare "0"), optional fractional part. e.g. "0", "0.1", "24.00", "1000".

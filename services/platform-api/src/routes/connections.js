@@ -42,7 +42,7 @@ export function createConnectionsRouter(deps) {
         pairing_session_id: updated.pairing_session_id
       }
     });
-    observability.incrementCounter("velarumpay_connection_status_updates_total", { status: updated.status });
+    observability.incrementCounter("Paytobe_connection_status_updates_total", { status: updated.status });
     res.json({ ok: true, connection: connectionPublicResponse(updated) });
   });
 
@@ -74,7 +74,7 @@ export function createConnectionsRouter(deps) {
         pairing_session_id: updated.pairing_session_id
       }
     });
-    observability.incrementCounter("velarumpay_connection_status_updates_total", { status: updated.status });
+    observability.incrementCounter("Paytobe_connection_status_updates_total", { status: updated.status });
     res.json({ ok: true, connection: connectionPublicResponse(updated) });
   });
 

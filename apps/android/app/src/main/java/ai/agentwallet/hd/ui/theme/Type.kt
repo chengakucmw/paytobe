@@ -12,7 +12,7 @@ import ai.agentwallet.hd.R
  * 字体家族（已打包进 res/font/，来自原型 ds/tokens/fonts.css 指定的三款 OFL 开源字体）：
  * Display: Space Grotesk，UI/正文: Manrope，等宽（地址/金额）: JetBrains Mono。
  */
-object VelarumFonts {
+object PaytobeFonts {
     val display: FontFamily = FontFamily(
         Font(R.font.space_grotesk_medium, FontWeight.Medium),
         Font(R.font.space_grotesk_semibold, FontWeight.SemiBold),
@@ -35,14 +35,14 @@ object VelarumFonts {
  * 字号来自 ds/tokens/typography.css 的 type scale（16px 为基准正文）：
  * 2xs11 / xs12 / sm14 / md16(base) / lg18 / xl20 / 2xl24 / 3xl30 / 4xl38 / 5xl48
  */
-val VelarumTypography = Typography(
-    displaySmall = TextStyle(fontFamily = VelarumFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 38.sp, lineHeight = 42.sp),
-    headlineMedium = TextStyle(fontFamily = VelarumFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp),
-    headlineSmall = TextStyle(fontFamily = VelarumFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
-    titleLarge = TextStyle(fontFamily = VelarumFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
-    titleMedium = TextStyle(fontFamily = VelarumFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
-    bodyLarge = TextStyle(fontFamily = VelarumFonts.sans, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = TextStyle(fontFamily = VelarumFonts.sans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
-    labelLarge = TextStyle(fontFamily = VelarumFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp),
-    labelMedium = TextStyle(fontFamily = VelarumFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, lineHeight = 16.sp),
+val PaytobeTypography = Typography(
+    displaySmall = TextStyle(fontFamily = PaytobeFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 38.sp, lineHeight = 42.sp),
+    headlineMedium = TextStyle(fontFamily = PaytobeFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 30.sp, lineHeight = 36.sp),
+    headlineSmall = TextStyle(fontFamily = PaytobeFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontFamily = PaytobeFonts.display, fontWeight = FontWeight.SemiBold, fontSize = 20.sp, lineHeight = 26.sp),
+    titleMedium = TextStyle(fontFamily = PaytobeFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 22.sp),
+    bodyLarge = TextStyle(fontFamily = PaytobeFonts.sans, fontWeight = FontWeight.Normal, fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium = TextStyle(fontFamily = PaytobeFonts.sans, fontWeight = FontWeight.Normal, fontSize = 14.sp, lineHeight = 20.sp),
+    labelLarge = TextStyle(fontFamily = PaytobeFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, lineHeight = 18.sp),
+    labelMedium = TextStyle(fontFamily = PaytobeFonts.sans, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, lineHeight = 16.sp),
 )

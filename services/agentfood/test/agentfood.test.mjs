@@ -62,10 +62,10 @@ test("production site-only mode starts without pretending payments are ready", (
   const config = loadConfig({
     AGENTFOOD_RUNTIME_ENV: "production",
     AGENTFOOD_SITE_ONLY: "true",
-    AGENTFOOD_PUBLIC_BASE_URL: "https://agentfood.velarumai.com",
+    AGENTFOOD_PUBLIC_BASE_URL: "https://agentfood.Paytobe.com",
     AGENTFOOD_API_KEY: API_KEY,
     AGENTFOOD_STORE_PATH: "/var/lib/agentfood/agentfood-store.json",
-    PLATFORM_API_URL: "https://api.velarumai.com"
+    PLATFORM_API_URL: "https://api.Paytobe.com"
   });
   assert.deepEqual(validateConfig(config), { ok: true, errors: [] });
   const health = configHealth(config);
@@ -196,7 +196,7 @@ test("HTTP flow creates a mock order then a real testnet Payment Request", {
   let response = await fetch(`${base}/v1/connect`, {
     method: "POST",
     headers: { "content-type": "application/json", "x-agentfood-api-key": API_KEY },
-    body: JSON.stringify({ connect_key: `velarumpay-connect:ck_${"A".repeat(43)}` })
+    body: JSON.stringify({ connect_key: `Paytobe-connect:ck_${"A".repeat(43)}` })
   });
   assert.equal(response.status, 201);
   const connected = await response.json();
@@ -231,7 +231,7 @@ test("HTTP flow creates a mock order then a real testnet Payment Request", {
   response = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: `velarumpay-connect:ck_${"C".repeat(43)}` })
+    body: JSON.stringify({ message: `Paytobe-connect:ck_${"C".repeat(43)}` })
   });
   assert.equal(response.status, 201);
   const publicConnect = await response.json();
@@ -267,9 +267,9 @@ test("HTTP flow creates a mock order then a real testnet Payment Request", {
 
   const rawEvent = Buffer.from(JSON.stringify({ event_id: "event_agentfood_1", type: "payment_request.status_updated", data: {} }));
   const signature = signWebhookPayload(WEBHOOK_SECRET, String(Math.floor(Date.now() / 1000)), rawEvent);
-  response = await fetch(`${base}/v1/webhooks/velarumpay`, {
+  response = await fetch(`${base}/v1/webhooks/Paytobe`, {
     method: "POST",
-    headers: { "content-type": "application/json", "x-velarumpay-signature": signature },
+    headers: { "content-type": "application/json", "x-Paytobe-signature": signature },
     body: rawEvent
   });
   assert.equal(response.status, 200);
@@ -326,7 +326,7 @@ test("site-only HTTP surface serves the production UI and mock recommendations",
   response = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ message: `velarumpay-connect:ck_${"B".repeat(43)}` })
+    body: JSON.stringify({ message: `Paytobe-connect:ck_${"B".repeat(43)}` })
   });
   assert.equal(response.status, 503);
   assert.equal((await response.json()).error.code, "wallet_connection_unavailable");

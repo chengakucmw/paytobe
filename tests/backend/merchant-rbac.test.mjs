@@ -18,7 +18,7 @@ import { createTenantScope } from "../../services/platform-api/src/ports/tenant-
 import { createConnectKey, id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-merchant-rbac-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-merchant-rbac-"));
 const store = new Store(path.join(directory, "platform.sqlite"));
 new SqliteMerchantAccountRepository(store.db);
 new SqliteMerchantSessionRepository(store.db);

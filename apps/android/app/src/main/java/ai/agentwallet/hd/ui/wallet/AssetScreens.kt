@@ -49,8 +49,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumFonts
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeFonts
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 资产详情（原生）。对照 web 的 renderAssetDetail：余额/法币 + Send(预填)/Receive + 事实 + 历史入口。 */
 @Composable
@@ -68,7 +68,7 @@ fun AssetDetailScreen(
         VpSubheader(eyebrow = "Asset details", title = asset?.let { "${it.symbol} · ${it.chain}" } ?: "Asset", onBack = onBack)
         if (asset == null) {
             Box(Modifier.fillMaxWidth().padding(Spacing.s8), contentAlignment = Alignment.Center) {
-                Text("Asset not found.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                Text("Asset not found.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             }
         } else {
             val wallet = ui.wallet
@@ -89,7 +89,7 @@ fun AssetDetailScreen(
             ) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("$balance ${asset.symbol}", style = MaterialTheme.typography.displaySmall, color = VelarumTheme.colors.textStrong)
+                        Text("$balance ${asset.symbol}", style = MaterialTheme.typography.displaySmall, color = PaytobeTheme.colors.textStrong)
                         Text(
                             if (condition in setOf(BalanceCondition.AVAILABLE, BalanceCondition.ZERO)) {
                                 "≈ $${formatUsd(fiatUsd(asset.symbol, balance))}"
@@ -99,7 +99,7 @@ fun AssetDetailScreen(
                                 balanceStatusLabel(assetBalance)
                             },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = VelarumTheme.colors.textMuted,
+                            color = PaytobeTheme.colors.textMuted,
                         )
                     }
                 }
@@ -144,11 +144,11 @@ fun AssetDetailScreen(
                     VpFactRow("Signing", "Local approval required")
                 }
                 VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("Full address", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                    Text("Full address", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                     Text(
                         address ?: "—",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = VelarumFonts.mono),
-                        color = VelarumTheme.colors.textBody,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontFamily = PaytobeFonts.mono),
+                        color = PaytobeTheme.colors.textBody,
                         modifier = Modifier.padding(top = Spacing.s2),
                     )
                 }
@@ -175,7 +175,7 @@ private fun PriceChartCard(symbol: String) {
             when {
                 points.size >= 2 -> Sparkline(points = points, modifier = Modifier.fillMaxWidth().height(72.dp))
                 loading -> CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                else -> Text("Price chart unavailable", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                else -> Text("Price chart unavailable", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
             }
         }
         Spacer(Modifier.height(Spacing.s3))
@@ -192,7 +192,7 @@ private fun PriceChartCard(symbol: String) {
 
 @Composable
 private fun Sparkline(points: List<Float>, modifier: Modifier = Modifier) {
-    val line = VelarumTheme.colors.primary
+    val line = PaytobeTheme.colors.primary
     Canvas(modifier = modifier) {
         if (points.size < 2) return@Canvas
         val min = points.minOrNull() ?: return@Canvas
@@ -224,8 +224,8 @@ fun AssetSearchScreen(onBack: () -> Unit, onOpen: (String) -> Unit) {
             ai.agentwallet.hd.ui.components.VpTextField(value = query, onValueChange = { query = it }, label = "Search token or network")
             if (results.isEmpty()) {
                 VpCard(modifier = Modifier.fillMaxWidth()) {
-                    Text("No asset found", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                    Text("Try XLM, SOL, ETH, USDC, or a network like Base.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("No asset found", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+                    Text("Try XLM, SOL, ETH, USDC, or a network like Base.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
             } else {
                 results.forEach { a -> VpMenuRow("${a.symbol} · ${a.chain}", "View details", onClick = { onOpen(a.balanceKey) }) }
@@ -253,8 +253,8 @@ fun AssetCustomizeScreen(vm: WalletViewModel, onBack: () -> Unit) {
             VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
                 Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("${a.symbol} · ${a.chain}", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                        Text(if (on) "Shown on Home" else "Hidden", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                        Text("${a.symbol} · ${a.chain}", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+                        Text(if (on) "Shown on Home" else "Hidden", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                     }
                     VpChip(if (on) "Shown" else "Add", on) {
                         val next = if (on) displayed - a.balanceKey else displayed + a.balanceKey
@@ -285,8 +285,8 @@ fun AssetHistoryScreen(vm: ActivityViewModel, symbol: String, onBack: () -> Unit
         if (rows.isEmpty()) {
             item {
                 VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
-                    Text("No activity yet", style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
-                    Text("Transfers of $symbol you sign on this device will appear here.", style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                    Text("No activity yet", style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
+                    Text("Transfers of $symbol you sign on this device will appear here.", style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                 }
             }
         } else {
@@ -294,9 +294,9 @@ fun AssetHistoryScreen(vm: ActivityViewModel, symbol: String, onBack: () -> Unit
                 VpCard(modifier = Modifier.fillMaxWidth().padding(horizontal = Spacing.s5)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s3)) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(item.title, style = MaterialTheme.typography.titleMedium, color = VelarumTheme.colors.textStrong)
+                            Text(item.title, style = MaterialTheme.typography.titleMedium, color = PaytobeTheme.colors.textStrong)
                             if (item.subtitle.isNotBlank()) {
-                                Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = VelarumTheme.colors.textMuted)
+                                Text(item.subtitle, style = MaterialTheme.typography.bodyMedium, color = PaytobeTheme.colors.textMuted)
                             }
                         }
                         VpBadge(item.amount.ifBlank { "—" }, vpToneOf(item.tone))

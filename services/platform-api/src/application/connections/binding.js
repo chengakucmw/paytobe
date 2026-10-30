@@ -1,5 +1,5 @@
-export const CONNECTION_BINDING_VERSION = "velarum.connection_binding.v1";
-export const CONNECTION_TOKEN_AUDIENCE = "velarumpay-platform-api";
+export const CONNECTION_BINDING_VERSION = "Paytobe.connection_binding.v1";
+export const CONNECTION_TOKEN_AUDIENCE = "Paytobe-platform-api";
 
 const DIMENSIONS = Object.freeze([
   "merchant_id", "agent_id", "client_id", "credential_id", "approved_by_device_id", "connection_id", "audience"

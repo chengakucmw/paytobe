@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>REST API · VelarumPay Docs</title>
+  <title>REST API · Paytobe Docs</title>
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar">
     <div class="inner">
-      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
       <nav class="nav">
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
@@ -19,7 +19,7 @@
         <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
-        <a href="https://velarumai.com/business">Business</a>
+        <a href="https://paytobe.com/business">Business</a>
       </nav>
     </div>
   </header>
@@ -27,8 +27,8 @@
   <main>
     <span class="pill">REST API v1</span>
     <h1>REST API reference</h1>
-    <p class="lead">The official testnet origin is <code>https://api.velarumai.com</code>; local contract tests may use <code>http://127.0.0.1:8787</code>. All API paths below are prefixed with <code>/v1</code>.</p>
-    <div class="note">Download the canonical <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1 document</a>. Legacy <code>/v1/payment-intents</code> and OpenClaw-specific routes are migration-only and are not part of this public contract.</div>
+    <p class="lead">The official testnet origin is <code>https://api.paytobe.com</code>; local contract tests may use <code>http://127.0.0.1:8787</code>. All API paths below are prefixed with <code>/v1</code>.</p>
+    <div class="note">Download the canonical <a href="/contracts/Paytobe-platform-api-v0.1.openapi.json">OpenAPI 3.1 document</a>. Legacy <code>/v1/payment-intents</code> and OpenClaw-specific routes are migration-only and are not part of this public contract.</div>
 
     <h2>Authentication</h2>
     <p>Credentials are separated by caller and purpose:</p>
@@ -46,7 +46,7 @@
     <h2>Pairing &amp; connections</h2>
     <table>
       <tr><th>Method</th><th>Path</th><th>Who</th><th>Purpose</th></tr>
-      <tr><td>POST</td><td><code>/v1/pairing/sessions</code></td><td>Agent</td><td>Start a pairing session; returns a short code + <code>velarumpay://pair?...</code> URI.</td></tr>
+      <tr><td>POST</td><td><code>/v1/pairing/sessions</code></td><td>Agent</td><td>Start a pairing session; returns a short code + <code>Paytobe://pair?...</code> URI.</td></tr>
       <tr><td>GET</td><td><code>/v1/pairing/sessions/:id</code></td><td>Agent</td><td>Check pairing status (pass <code>?code=</code>).</td></tr>
       <tr><td>POST</td><td><code>/v1/pairing/sessions/:id/approve</code></td><td>Wallet</td><td>Approve scopes; returns the <code>connection token</code>.</td></tr>
       <tr><td>POST</td><td><code>/v1/pairing/sessions/:id/reject</code></td><td>Wallet</td><td>Reject the pairing request.</td></tr>
@@ -99,8 +99,8 @@
     </table>
 
     <h2>Example: create a payment request</h2>
-    <pre><code>curl -X POST https://api.velarumai.com/v1/payment-requests \
-  -H "Authorization: Bearer $VELARUMPAY_CONNECTION_TOKEN" \
+    <pre><code>curl -X POST https://api.paytobe.com/v1/payment-requests \
+  -H "Authorization: Bearer $PAYTOBE_CONNECTION_TOKEN" \
   -H "X-Idempotency-Key: demo-payment-1" \
   -H "Content-Type: application/json" \
   -d '{
@@ -117,6 +117,6 @@
     <p>Failures return <code>ok: false</code> with a structured <code>error</code> object (<code>code</code>, a human message, <code>request_id</code>, and <code>field</code> when relevant). Risk and validation problems list every issue so you can fix them in one pass. A retry must retain the same idempotency key and request intent.</p>
   </main>
 
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

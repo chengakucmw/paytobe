@@ -18,7 +18,7 @@ import { evaluatePaymentRequest, stellarConfirmationResult } from "../../service
 import { Store } from "../../services/platform-api/src/store.js";
 
 function freshStore() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-tr-store-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-tr-store-"));
   return { store: new Store(path.join(dir, "relay-store.json")), dir };
 }
 

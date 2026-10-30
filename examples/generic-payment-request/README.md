@@ -1,14 +1,14 @@
 # Generic Payment Request Example
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-02 02:05:41 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-01 18:05:41 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
 This example will show the smallest possible local-agent flow:
 
-1. Create a `velarum.payment_request.v1` payload.
+1. Create a `Paytobe.payment_request.v1` payload.
 2. Send it to the platform API.
-3. Receive it in VelarumPay.
+3. Receive it in Paytobe.
 4. Approve, sign, and broadcast from the wallet.
 
 Run the complete merchant onboarding order against deterministic offline mocks:

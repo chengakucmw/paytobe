@@ -30,7 +30,7 @@ final class StellarTransfer {
 
     /**
      * When true (default), the transaction is built + signed by the shared Rust
-     * core (crates/velarum-wallet-core) via WalletCoreBridge; when false, by the
+     * core (crates/Paytobe-wallet-core) via WalletCoreBridge; when false, by the
      * native path below. A cross-check test asserts identical transaction hashes,
      * so this preserves behaviour. Network I/O stays native. Set false to revert.
      */

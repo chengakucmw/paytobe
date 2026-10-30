@@ -4,11 +4,11 @@ import android.content.Context
 import android.net.Uri
 import org.json.JSONObject
 
-private const val IDENTITY_PREFS = "velarum_identity_prefs"
+private const val IDENTITY_PREFS = "Paytobe_identity_prefs"
 private const val KEY_NICKNAME = "nickname"
 private const val KEY_AVATAR = "avatar"
 
-/** 本地身份偏好（昵称/头像）——纯 UI 偏好，不涉及私钥/业务逻辑（类似 web 的 VelarumPrototypePrefs）。 */
+/** 本地身份偏好（昵称/头像）——纯 UI 偏好，不涉及私钥/业务逻辑（类似 web 的 PaytobePrototypePrefs）。 */
 internal object IdentityStore {
     private fun prefs(context: Context) = context.getSharedPreferences(IDENTITY_PREFS, Context.MODE_PRIVATE)
     fun nickname(context: Context): String = prefs(context).getString(KEY_NICKNAME, "").orEmpty().ifBlank { "My Wallet" }

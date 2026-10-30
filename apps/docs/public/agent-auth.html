@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Agent Auth · VelarumPay Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
+  <title>Agent Auth · Paytobe Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar"><div class="inner">
-    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
     <nav class="nav"><a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a><a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a></nav>
   </div></header>
   <main>
     <span class="pill">Agent Assertion · Ed25519</span>
     <h1>Authenticate an Agent without exporting its signing key</h1>
-    <p class="lead">The registered Agent signs a short-lived assertion locally, then sends only the compact assertion to <code>POST https://api.velarumai.com/v1/agent-auth/token</code>.</p>
+    <p class="lead">The registered Agent signs a short-lived assertion locally, then sends only the compact assertion to <code>POST https://api.paytobe.com/v1/agent-auth/token</code>.</p>
 
     <h2>Protected header and claims</h2>
     <table>
@@ -23,15 +23,15 @@
       <tr><td><code>kid</code></td><td>The active registered credential identifier.</td></tr>
       <tr><td><code>iss</code></td><td>Registered Agent ID.</td></tr>
       <tr><td><code>sub</code></td><td>Stable local client ID, recorded into the issued AuthContext.</td></tr>
-      <tr><td><code>aud</code></td><td><code>https://api.velarumai.com/v1/agent-auth/token</code>.</td></tr>
+      <tr><td><code>aud</code></td><td><code>https://api.paytobe.com/v1/agent-auth/token</code>.</td></tr>
       <tr><td><code>iat</code>, <code>exp</code></td><td>Integer Unix seconds; lifetime is at most five minutes.</td></tr>
       <tr><td><code>jti</code></td><td>Unique per assertion; replay is rejected.</td></tr>
       <tr><td><code>scope</code></td><td>A subset of Agent, credential, and client policy.</td></tr>
     </table>
 
     <h2>Local signer boundary</h2>
-    <pre><code>const client = createVelarumPayClient({
-  baseUrl: "https://api.velarumai.com",
+    <pre><code>const client = createPaytobeClient({
+  baseUrl: "https://api.paytobe.com",
   agentAuth: {
     agentId, clientId, kid, scopes,
     keyHandle: secureKeyHandle,
@@ -46,6 +46,6 @@
     <h2>Failure behavior</h2>
     <p><code>401</code> may trigger one coordinated refresh. <code>403</code>, revoked/expired credentials, invalid audience, clock skew, malformed signatures, and duplicate JTI fail closed. SDK errors and retries redact the compact assertion and returned token.</p>
   </main>
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

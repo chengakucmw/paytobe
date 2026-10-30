@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-PROJECT="$ROOT/apps/ios/VelarumPay.xcodeproj"
-SCHEME="VelarumPay"
+PROJECT="$ROOT/apps/ios/Paytobe.xcodeproj"
+SCHEME="Paytobe"
 SIMULATOR_NAME="${SIMULATOR_NAME:-iPhone 17}"
 DEVICE_DESTINATION="${DEVICE_DESTINATION:-}"
 PREFLIGHT_ONLY=0
@@ -12,7 +12,7 @@ if [[ "${1:-}" == "--preflight" ]]; then
   PREFLIGHT_ONLY=1
 fi
 
-echo "== VelarumPay iOS QA =="
+echo "== Paytobe iOS QA =="
 echo "Project: $PROJECT"
 echo "Scheme: $SCHEME"
 echo "Simulator: $SIMULATOR_NAME"
@@ -37,7 +37,7 @@ cat <<'CHECKLIST'
 
 [ ] Connect an unlocked, trusted iPhone and rerun without --preflight.
 [ ] Register or configure the relay URL on the device.
-[ ] Scan a velarumpay://pair QR code and confirm agent identity/scopes.
+[ ] Scan a Paytobe://pair QR code and confirm agent identity/scopes.
 [ ] Reject a pairing session and confirm it cannot create requests.
 [ ] Approve only non-signing scopes; confirm wallet.sign/seed/private scopes are absent.
 [ ] Sync inbox after creating Stellar XLM and Base USDC quickstart requests.

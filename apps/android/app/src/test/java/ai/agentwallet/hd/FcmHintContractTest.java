@@ -13,14 +13,14 @@ public class FcmHintContractTest {
     @Test
     public void opaqueHintOnlyWakesAuthenticatedRestSync() {
         Map<String, String> data = new HashMap<>();
-        data.put("type", "velarumpay.sync");
+        data.put("type", "Paytobe.sync");
         data.put("sync_required", "true");
         data.put("event_id", "evt_opaque_1");
         data.put("request_id", "prq_opaque_1");
         data.put("event_seq", "42");
 
-        VelarumFirebaseMessagingService.PushHintDecision decision =
-                VelarumFirebaseMessagingService.evaluateData(data);
+        PaytobeFirebaseMessagingService.PushHintDecision decision =
+                PaytobeFirebaseMessagingService.evaluateData(data);
 
         assertTrue(decision.syncRequired);
         assertFalse(decision.ignoredFields);
@@ -33,7 +33,7 @@ public class FcmHintContractTest {
     @Test
     public void paymentFactsAndSecretsAreIgnoredButCannotSuppressRecoverySync() {
         Map<String, String> data = new HashMap<>();
-        data.put("type", "velarumpay.sync");
+        data.put("type", "Paytobe.sync");
         data.put("sync_required", "true");
         data.put("request_id", "prq_opaque_2");
         data.put("amount", "999");
@@ -43,8 +43,8 @@ public class FcmHintContractTest {
         data.put("token", "bearer-secret");
         data.put("signature", "signed-material");
 
-        VelarumFirebaseMessagingService.PushHintDecision decision =
-                VelarumFirebaseMessagingService.evaluateData(data);
+        PaytobeFirebaseMessagingService.PushHintDecision decision =
+                PaytobeFirebaseMessagingService.evaluateData(data);
 
         assertTrue(decision.syncRequired);
         assertTrue(decision.ignoredFields);
@@ -54,19 +54,19 @@ public class FcmHintContractTest {
     @Test
     public void malformedCoordinatesAreDiscardedAndNonSyncMessagesDoNothing() {
         Map<String, String> malformed = new HashMap<>();
-        malformed.put("type", "velarumpay.sync");
+        malformed.put("type", "Paytobe.sync");
         malformed.put("sync_required", "true");
         malformed.put("event_id", "line\nbreak");
         malformed.put("event_seq", "0");
-        VelarumFirebaseMessagingService.PushHintDecision first =
-                VelarumFirebaseMessagingService.evaluateData(malformed);
+        PaytobeFirebaseMessagingService.PushHintDecision first =
+                PaytobeFirebaseMessagingService.evaluateData(malformed);
         assertTrue(first.syncRequired);
         assertTrue(first.malformedCoordinates);
         assertEquals("", first.eventId);
         assertEquals("", first.eventSeq);
 
-        VelarumFirebaseMessagingService.PushHintDecision second =
-                VelarumFirebaseMessagingService.evaluateData(Map.of("type", "marketing", "sync_required", "true"));
+        PaytobeFirebaseMessagingService.PushHintDecision second =
+                PaytobeFirebaseMessagingService.evaluateData(Map.of("type", "marketing", "sync_required", "true"));
         assertFalse(second.syncRequired);
     }
 }

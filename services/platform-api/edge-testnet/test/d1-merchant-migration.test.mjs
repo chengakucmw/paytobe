@@ -17,7 +17,7 @@ const migrationNames = [
 ];
 
 function database(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-d1-migration-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-d1-migration-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const db = new DatabaseSync(path.join(directory, "d1.sqlite"));
   db.exec("PRAGMA foreign_keys = ON");

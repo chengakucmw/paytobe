@@ -6,7 +6,7 @@ import test from "node:test";
 
 import { opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-webhook-portal-routes-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-webhook-portal-routes-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");
@@ -111,7 +111,7 @@ function seedWebhookData() {
     store.db.prepare(`INSERT INTO webhook_endpoints
       (webhook_endpoint_id, merchant_id, url, event_types_json, status, secret_ciphertext, version, created_at, updated_at)
       VALUES (?, ?, ?, '["payment_request.status_updated"]', 'active', '{}', 1, ?, ?)`)
-      .run(`endpoint_${suffix}`, merchantId, `https://hooks-${suffix}.example.invalid/velarumpay`, now, now);
+      .run(`endpoint_${suffix}`, merchantId, `https://hooks-${suffix}.example.invalid/Paytobe`, now, now);
     store.db.prepare(`INSERT INTO webhook_events
       (event_id, merchant_id, type, aggregate_id, payload_json, occurred_at, created_at)
       VALUES (?, ?, 'payment_request.status_updated', ?, ?, ?, ?)`)

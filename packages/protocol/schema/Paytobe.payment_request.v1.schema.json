@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.paytobe.dev/Paytobe.payment_request.v1.schema.json",
+  "title": "Paytobe Payment Request v1",
+  "description": "Canonical, user-approved payment request. Display, metadata, and context cannot override payment facts.",
+  "type": "object",
+  "required": [
+    "protocol",
+    "request_id",
+    "connection_id",
+    "created_at",
+    "expires_at",
+    "status",
+    "source",
+    "payee",
+    "payment",
+    "policy"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "Paytobe.payment_request.v1"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "connection_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "transaction_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "maxLength": 256
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "signed",
+        "broadcasted",
+        "confirmed",
+        "failed",
+        "expired",
+        "rejected"
+      ]
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "payee": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "payment": {
+      "type": "object",
+      "required": ["rail", "network", "asset", "amount", "to"],
+      "properties": {
+        "rail": {
+          "type": "string",
+          "enum": [
+            "stellar_xlm",
+            "solana_sol",
+            "ethereum_eth",
+            "base_usdc",
+            "bitcoin_btc",
+            "bsc_bnb",
+            "xrpl_xrp",
+            "arbitrum_eth",
+            "polygon_pol",
+            "avalanche_avax",
+            "optimism_eth",
+            "sui_sui",
+            "aptos_apt",
+            "ton_ton",
+            "cardano_ada",
+            "cosmos_atom",
+            "polkadot_dot",
+            "hedera_hbar",
+            "cronos_cro",
+            "mantle_mnt",
+            "starknet_strk",
+            "zksync_eth",
+            "linea_eth",
+            "algorand_algo",
+            "tezos_xtz",
+            "internet_computer_icp",
+            "filecoin_fil",
+            "litecoin_ltc",
+            "bitcoin_cash_bch",
+            "dogecoin_doge",
+            "evm_erc20"
+          ]
+        },
+        "network": {
+          "type": "string",
+          "enum": [
+            "stellar_public",
+            "solana_mainnet",
+            "ethereum_mainnet",
+            "base_mainnet",
+            "bitcoin_mainnet",
+            "bsc_mainnet",
+            "xrpl_mainnet",
+            "arbitrum_one",
+            "polygon_pos",
+            "avalanche_c_chain",
+            "optimism_mainnet",
+            "sui_mainnet",
+            "aptos_mainnet",
+            "ton_mainnet",
+            "cardano_mainnet",
+            "cosmos_hub",
+            "polkadot_mainnet",
+            "hedera_mainnet",
+            "cronos_mainnet",
+            "mantle_mainnet",
+            "starknet_mainnet",
+            "zksync_era",
+            "linea_mainnet",
+            "algorand_mainnet",
+            "tezos_mainnet",
+            "internet_computer",
+            "filecoin_mainnet",
+            "litecoin_mainnet",
+            "bitcoin_cash_mainnet",
+            "dogecoin_mainnet",
+            "stellar_testnet"
+          ]
+        },
+        "asset": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^(?=.*[1-9])(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract": {
+          "type": "string"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255
+        },
+        "chain_id": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "memo": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "policy": {
+      "type": "object",
+      "required": ["requires_user_approval"],
+      "properties": {
+        "requires_user_approval": {
+          "const": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "display": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

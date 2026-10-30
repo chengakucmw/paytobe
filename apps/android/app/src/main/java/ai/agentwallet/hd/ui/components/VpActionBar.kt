@@ -11,7 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /**
  * 底部主操作栏（对照 web 的 .actionbar，--action-h: 92dp）。用于「发送/确认」等单屏主操作，
@@ -20,7 +20,7 @@ import ai.agentwallet.hd.ui.theme.VelarumTheme
 @Composable
 fun VpActionBar(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
     Surface(
-        color = VelarumTheme.colors.surfaceCard,
+        color = PaytobeTheme.colors.surfaceCard,
         shadowElevation = 12.dp,
         modifier = modifier.fillMaxWidth(),
     ) {

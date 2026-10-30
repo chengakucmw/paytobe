@@ -1,0 +1,23 @@
+# Reviewed false positives from the pre-publication history scan.
+# Each entry is pinned to one commit, path, rule, and line. New findings still fail.
+119ab3c72864d82f9cd0d088b85b36c843678989:examples/payment-request-quickstart/fixtures/expired.json:generic-api-key:132
+1f97d75160cfdbe9ce975d3fd9980166cee982cd:connectors/openclaw-telegram/README.md:curl-auth-header:191
+1f97d75160cfdbe9ce975d3fd9980166cee982cd:connectors/openclaw-telegram/README.md:generic-api-key:125
+1f97d75160cfdbe9ce975d3fd9980166cee982cd:connectors/openclaw-telegram/README.md:generic-api-key:64
+1fb3dae5d658d3159473ca84c0526353c7420834:apps/docs/public/api.html:generic-api-key:82
+342891e9c793bcfc977c548c28da3048bbc9158d:apps/ios/Paytobe/Views/WalletViews.swift:generic-api-key:757
+342891e9c793bcfc977c548c28da3048bbc9158d:services/platform-api/src/server.js:generic-api-key:20
+342891e9c793bcfc977c548c28da3048bbc9158d:tests/backend/webhook-outbox-signature.test.mjs:generic-api-key:21
+4d38b8a09347020f6621e9c97ad1d16f1486a9ab:services/platform-api/scripts/bootstrap-agentfood.mjs:generic-api-key:11
+b10bc7a266621022668733ec2d57400df336f4da:connectors/openclaw-telegram/src/parser.js:generic-api-key:18
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/README.md:curl-auth-header:68
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/fixtures/ai_only.json:generic-api-key:132
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/fixtures/asset_network_mismatch.json:generic-api-key:100
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/fixtures/mismatch.json:generic-api-key:115
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/fixtures/missing_context.json:generic-api-key:107
+b10bc7a266621022668733ec2d57400df336f4da:examples/payment-request-quickstart/fixtures/normal.json:generic-api-key:153
+e622415476aae5d327959ee9911e46fb327c45e3:connectors/mcp-server/README.md:generic-api-key:120
+e622415476aae5d327959ee9911e46fb327c45e3:connectors/mcp-server/fixtures/base-usdc-payment-request-tool-input.json:generic-api-key:29
+f3eba927586b11f8c75fc7e6fcfd3230e672b9ab:examples/payment-request-quickstart/fixtures/base_usdc.json:generic-api-key:116
+f9f0b7f894f7392dba59f0469ba9ae9c02f4666c:connectors/hermes/fixtures/base-usdc-payment-request.json:generic-api-key:116
+f9f0b7f894f7392dba59f0469ba9ae9c02f4666c:connectors/hermes/test/adapter.test.mjs:generic-api-key:71

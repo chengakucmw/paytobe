@@ -6,7 +6,7 @@ import test from "node:test";
 import { merchantCapabilityAllowed } from "../../services/platform-api/src/application/merchants/service.js";
 import { createTenantScope } from "../../services/platform-api/src/ports/tenant-repository.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-merchant-lifecycle-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-merchant-lifecycle-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

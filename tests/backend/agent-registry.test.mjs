@@ -7,7 +7,7 @@ import test from "node:test";
 import { AGENT_ALLOWED_SCOPES, agentCanIssueToken } from "../../services/platform-api/src/application/agents/service.js";
 import { id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-agent-registry-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-agent-registry-"));
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(directory, "platform.sqlite");

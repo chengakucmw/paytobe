@@ -13,7 +13,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 一个弹窗的数据（对照 web 的 renderModal：标题 + 文案 + 确认/取消）。 */
 data class VpModalData(
@@ -46,9 +46,9 @@ fun VpModalHost(controller: ModalController) {
     val data = controller.current ?: return
     Dialog(onDismissRequest = { controller.dismiss() }) {
         VpCard(modifier = Modifier.fillMaxWidth()) {
-            Text(data.title, style = MaterialTheme.typography.headlineSmall, color = VelarumTheme.colors.textStrong)
+            Text(data.title, style = MaterialTheme.typography.headlineSmall, color = PaytobeTheme.colors.textStrong)
             Spacer(Modifier.height(Spacing.s2))
-            Text(data.message, style = MaterialTheme.typography.bodyLarge, color = VelarumTheme.colors.textBody)
+            Text(data.message, style = MaterialTheme.typography.bodyLarge, color = PaytobeTheme.colors.textBody)
             Spacer(Modifier.height(Spacing.s5))
             VpPrimaryButton(
                 text = data.confirmLabel,

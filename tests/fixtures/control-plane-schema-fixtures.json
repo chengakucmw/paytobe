@@ -1,5 +1,5 @@
 {
-  "version": "velarum.control-plane.v1",
+  "version": "Paytobe.control-plane.v1",
   "at": "2026-08-01T00:00:00.000Z",
   "valid": {
     "merchant": {"merchant_id": "merchant-a", "display_name": "Merchant A", "verification_state": "pending", "status": "pending_verification", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"},
@@ -8,6 +8,6 @@
     "agent": {"agent_id": "agent-a", "merchant_id": "merchant-a", "name": "Agent A", "runtime": "node", "environment": "testnet", "allowed_scopes": ["payment.requests.read"], "token_revocation_version": 0, "status": "draft", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"},
     "credential": {"credential_id": "credential-a", "merchant_id": "merchant-a", "agent_id": "agent-a", "kid": "kid-a", "alg": "Ed25519", "public_key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "not_before": "2026-08-01T00:00:00.000Z", "expires_at": "2026-09-01T00:00:00.000Z", "revocation_version": 0, "status": "pending_proof", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"},
     "recipient": {"recipient_id": "recipient-a", "merchant_id": "merchant-a", "name": "Recipient A", "status": "draft", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"},
-    "webhook": {"webhook_endpoint_id": "webhook-a", "merchant_id": "merchant-a", "url": "https://merchant.example/webhooks/velarumpay", "event_types": ["payment_request.confirmed"], "status": "draft", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"}
+    "webhook": {"webhook_endpoint_id": "webhook-a", "merchant_id": "merchant-a", "url": "https://merchant.example/webhooks/Paytobe", "event_types": ["payment_request.confirmed"], "status": "draft", "version": 1, "created_at": "2026-08-01T00:00:00.000Z", "updated_at": "2026-08-01T00:00:00.000Z"}
   }
 }

@@ -1,7 +1,7 @@
 {
-  "name": "@velarumpay/protocol",
+  "name": "@Paytobe/protocol",
   "version": "0.1.0",
-  "description": "VelarumPay Payment Request and Transaction Context protocol validators.",
+  "description": "Paytobe Payment Request and Transaction Context protocol validators.",
   "type": "module",
   "main": "./src/index.js",
   "types": "./src/index.d.ts",
@@ -15,40 +15,40 @@
       "import": "./src/fixtures.js"
     },
     "./schema/payment-request-v1": {
-      "default": "./schema/velarum.payment_request.v1.schema.json"
+      "default": "./schema/Paytobe.payment_request.v1.schema.json"
     },
     "./schema/transaction-context-v1": {
-      "default": "./schema/velarum.transaction_context.v1.schema.json"
+      "default": "./schema/Paytobe.transaction_context.v1.schema.json"
     },
     "./schema/platform-api-error-v1": {
-      "default": "./schema/velarum.platform_api.error.v1.schema.json"
+      "default": "./schema/Paytobe.platform_api.error.v1.schema.json"
     },
     "./schema/auth-context-v1": {
-      "default": "./schema/velarum.auth_context.v1.schema.json"
+      "default": "./schema/Paytobe.auth_context.v1.schema.json"
     },
     "./schema/idempotency-scope-v1": {
-      "default": "./schema/velarum.idempotency_scope.v1.schema.json"
+      "default": "./schema/Paytobe.idempotency_scope.v1.schema.json"
     },
     "./schema/merchant-v1": {
-      "default": "./schema/velarum.merchant.v1.schema.json"
+      "default": "./schema/Paytobe.merchant.v1.schema.json"
     },
     "./schema/merchant-membership-v1": {
-      "default": "./schema/velarum.merchant_membership.v1.schema.json"
+      "default": "./schema/Paytobe.merchant_membership.v1.schema.json"
     },
     "./schema/merchant-domain-v1": {
-      "default": "./schema/velarum.merchant_domain.v1.schema.json"
+      "default": "./schema/Paytobe.merchant_domain.v1.schema.json"
     },
     "./schema/agent-v1": {
-      "default": "./schema/velarum.agent.v1.schema.json"
+      "default": "./schema/Paytobe.agent.v1.schema.json"
     },
     "./schema/agent-credential-v1": {
-      "default": "./schema/velarum.agent_credential.v1.schema.json"
+      "default": "./schema/Paytobe.agent_credential.v1.schema.json"
     },
     "./schema/recipient-v1": {
-      "default": "./schema/velarum.recipient.v1.schema.json"
+      "default": "./schema/Paytobe.recipient.v1.schema.json"
     },
     "./schema/webhook-endpoint-v1": {
-      "default": "./schema/velarum.webhook_endpoint.v1.schema.json"
+      "default": "./schema/Paytobe.webhook_endpoint.v1.schema.json"
     }
   },
   "files": [

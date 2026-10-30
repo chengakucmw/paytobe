@@ -29,10 +29,10 @@ export const pageRoutes = Object.freeze({
   preview: "preview.html"
 });
 
-const origin = "https://velarumai.com";
+const origin = "https://paytobe.com";
 const neutralStrings = new Set([
-  "V",
-  "VelarumPay",
+  "P",
+  "Paytobe",
   "REST API",
   "JavaScript",
   "JavaScript SDK",
@@ -164,7 +164,7 @@ function isTranslatable(value) {
   if (/^(?:https?:|mailto:|__SITE_ORIGIN__|#[0-9A-F]{3,8}$)/i.test(value)) return false;
   if (/^0x[0-9a-f…]+$/i.test(value) || /^[A-Z0-9.-]{2,10}$/.test(value)) return false;
   if (/^[\d\s.,:·→&+/-]+$/u.test(value)) return false;
-  if (/^(?:velarum\.|pilot@|support@|security@)/i.test(value)) return false;
+  if (/^(?:Paytobe\.|pilot@|support@|security@)/i.test(value)) return false;
   return /[A-Za-z]/.test(value);
 }
 

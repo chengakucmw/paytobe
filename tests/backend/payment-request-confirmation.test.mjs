@@ -48,7 +48,7 @@ test("formal Stellar confirmation rejects a successful transaction whose immutab
     successful: true,
     operation_count: 1,
     memo_type: "none",
-    _velarum_operations: [{ type: "payment", asset_type: "native", to: "GATTACKER", amount: "0.0100000" }]
+    _Paytobe_operations: [{ type: "payment", asset_type: "native", to: "GATTACKER", amount: "0.0100000" }]
   };
   assert.deepEqual(validateStellarPaymentConfirmation(request, transaction), {
     ok: false,
@@ -65,7 +65,7 @@ test("one-time recovery accepts the affected legacy null-text memo only with mat
     operation_count: 1,
     memo_type: "text",
     memo: "null",
-    _velarum_operations: [{ type: "payment", asset_type: "native", to: "GDEST", amount: "0.0100000" }]
+    _Paytobe_operations: [{ type: "payment", asset_type: "native", to: "GDEST", amount: "0.0100000" }]
   });
   assert.deepEqual(result, { ok: true });
 });

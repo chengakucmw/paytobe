@@ -86,7 +86,7 @@ test("independent endpoint ownership challenge must verify before activation and
   runtime.seedMerchant("merchant_a");
   const tenant = scope("merchant_a");
   const created = await runtime.service.create(tenant, {
-    url: "https://callbacks.vendor.co/velarumpay",
+    url: "https://callbacks.vendor.co/Paytobe",
     event_types: ["payment_request.updated"]
   });
   assert.equal(created.webhook_endpoint.status, "pending_verification");
@@ -105,14 +105,14 @@ test("independent endpoint ownership challenge must verify before activation and
 });
 
 function setup(t, options = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-webhook-secret-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-webhook-secret-"));
   const store = new Store(path.join(directory, "platform.sqlite"));
   t.after(() => {
     store.close();
     fs.rmSync(directory, { recursive: true, force: true });
   });
   const clock = controlledClock(start);
-  const vault = createAes256GcmVault(Buffer.alloc(32, 7).toString("base64url"), "velarumpay.webhook_secret.v1");
+  const vault = createAes256GcmVault(Buffer.alloc(32, 7).toString("base64url"), "Paytobe.webhook_secret.v1");
   const resolver = options.resolver || { resolve: async () => ["8.8.8.8"] };
   const fetcher = { fetch: options.fetch || (async () => new Response("{}", { status: 200 })) };
   let counter = 0;

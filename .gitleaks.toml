@@ -1,0 +1,50 @@
+title = "Paytobe secret scanning configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
+  description = "Public EVM token contract addresses in validated source, fixtures, and examples"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''(?i)token[_ ]?contract''']
+  paths = [
+    '''(?:^|/)apps/docs/public/api\.html$''',
+    '''(?:^|/)apps/ios/Paytobe/Views/WalletViews\.swift$''',
+    '''(?:^|/)connectors/(?:hermes|mcp-server|openclaw-telegram)/''',
+    '''(?:^|/)examples/payment-request-quickstart/'''
+  ]
+
+  [[rules.allowlists]]
+  description = "Imported token hashing helper, not a credential"
+  condition = "AND"
+  regexTarget = "match"
+  regexes = ['''tokenHash,\s*\n\s*verifyEd25519Signature''']
+  paths = [
+    '''(?:^|/)services/platform-api/src/server\.js$''',
+    '''(?:^|/)services/platform-api/scripts/bootstrap-agentfood\.mjs$'''
+  ]
+
+  [[rules.allowlists]]
+  description = "Fixed synthetic webhook signing vector"
+  condition = "AND"
+  regexTarget = "line"
+  regexes = ['''whsec_test_vector_[0-9]+''']
+  paths = ['''(?:^|/)tests/backend/webhook-outbox-signature\.test\.mjs$''']
+
+[[rules]]
+id = "curl-auth-header"
+
+  [[rules.allowlists]]
+  description = "Documentation commands reference shell variables, not literal credentials"
+  condition = "AND"
+  regexTarget = "match"
+  regexes = ['''(?i)authorization:\s*bearer\s*\$(?:Paytobe_)?CONNECTION_TOKEN''']
+  paths = [
+    '''(?:^|/)apps/docs/public/api\.html$''',
+    '''(?:^|/)connectors/openclaw-telegram/README\.md$''',
+    '''(?:^|/)examples/payment-request-quickstart/README\.md$'''
+  ]

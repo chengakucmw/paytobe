@@ -153,7 +153,7 @@ function pickFacts(value) {
 }
 
 function temporaryDirectory(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-recipient-registry-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-recipient-registry-"));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   return directory;
 }

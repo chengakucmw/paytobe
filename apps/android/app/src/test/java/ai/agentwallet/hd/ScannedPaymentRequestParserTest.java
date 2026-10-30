@@ -11,11 +11,11 @@ import org.junit.Test;
 
 public final class ScannedPaymentRequestParserTest {
     @Test
-    public void velarumPayQrBecomesSignableBaseUsdcPaymentRequest() throws Exception {
+    public void PaytobeQrBecomesSignableBaseUsdcPaymentRequest() throws Exception {
         assumeFalse(BuildConfig.TESTNET_ONLY);
 
         PaymentIntent intent = ScannedPaymentRequestParser.parseIntent(
-                "velarumpay://pay?to=0x71d8B0d47f3c9d0bA9F1d2a6168A5F80f20356d0"
+                "paytobe://pay?to=0x71d8B0d47f3c9d0bA9F1d2a6168A5F80f20356d0"
                         + "&amount=18.75"
                         + "&asset=USDC"
                         + "&network=Base"

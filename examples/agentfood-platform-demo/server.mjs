@@ -4,17 +4,17 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  createVelarumArtifacts,
+  createPaytobeArtifacts,
   extractConnectKey,
   merchants,
   recommendOrder
 } from "./src/agent.mjs";
-import { VelarumPayClient } from "../../packages/sdk-js/src/index.js";
+import { PaytobeClient } from "../../packages/sdk-js/src/index.js";
 import { createAgentCredentialSigner } from "../../services/agentfood/src/platform-client.mjs";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const publicDirectory = path.join(directory, "public");
-const platformBaseUrl = String(process.env.VELARUMPAY_API_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
+const platformBaseUrl = String(process.env.Paytobe_API_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
 const port = Number(process.env.PORT || 8790);
 const sessions = new Map();
 
@@ -90,7 +90,7 @@ async function createPaymentRequest(state, message, preferredMerchantId, req, pl
   if (!state.connection_token) throw Object.assign(new Error("Connect Invitation is not approved yet"), { status: 409, code: "connection_required" });
   const order = recommendOrder(message, preferredMerchantId);
   const origin = `http://${req.headers.host || `127.0.0.1:${port}`}`;
-  const artifacts = createVelarumArtifacts(order, {
+  const artifacts = createPaytobeArtifacts(order, {
     connectionId: state.connection_id,
     demoBaseUrl: origin,
     recipientId: process.env.AGENTFOOD_RECIPIENT_ID || "agentfood-reference-recipient",
@@ -105,7 +105,7 @@ async function createPaymentRequest(state, message, preferredMerchantId, req, pl
   }));
   return {
     type: "payment_request_created",
-    message: `I prepared a ${order.total} XLM testnet demo order from ${order.merchant.name} and sent it to VelarumPay for review.`,
+    message: `I prepared a ${order.total} XLM testnet demo order from ${order.merchant.name} and sent it to Paytobe for review.`,
     order,
     transaction_context: context.context,
     payment_request: payment.payment_request,
@@ -162,7 +162,7 @@ export function createDemoServer(options = {}) {
           return sendJson(res, 201, {
             ok: true,
             type: "connect_invitation_claimed",
-            message: "Connect Key recognized. Review the Agent identity and requested scopes in VelarumPay, then approve or reject the invitation.",
+            message: "Connect Key recognized. Review the Agent identity and requested scopes in Paytobe, then approve or reject the invitation.",
             ...claimed
           });
         }
@@ -197,7 +197,7 @@ export function createDemoServer(options = {}) {
 }
 
 function defaultPlatformClient() {
-  return new VelarumPayClient({
+  return new PaytobeClient({
     baseUrl: platformBaseUrl,
     agentAuth: {
       agentId: process.env.AGENTFOOD_AGENT_ID || "agentfood-testnet",

@@ -83,7 +83,7 @@ final class TransferAssetRegistry {
         String joined = (clean(rail) + " " + clean(network) + " " + clean(asset)).trim();
         if (TRON_ADDRESS.matcher(String.valueOf(to)).matches()
                 || joined.matches(".*\\b(tron|trx|trc10|trc20)\\b.*")) {
-            return "TRON, TRX, TRC10, and TRC20 are not supported by VelarumPay.";
+            return "TRON, TRX, TRC10, and TRC20 are not supported by Paytobe.";
         }
         if (joined.matches(".*(\\bnear\\b|near[-_ ]?protocol).*")) {
             return "NEAR is removed from the v1 supported transfer asset list.";

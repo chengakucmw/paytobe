@@ -57,7 +57,7 @@ export function tenantPatch(scope, resource, value) {
 export function createTenantJobPayload(scope, type, payload) {
   assertTenantScope(scope);
   return deepFreeze({
-    version: "velarum.tenant_job.v1",
+    version: "Paytobe.tenant_job.v1",
     merchant_id: scope.merchant_id,
     type: required(type, "type"),
     payload: structuredClone(payload || {})
@@ -66,7 +66,7 @@ export function createTenantJobPayload(scope, type, payload) {
 
 export function assertTenantJobPayload(scope, job) {
   assertTenantScope(scope);
-  if (!job || !Object.isFrozen(job) || job.version !== "velarum.tenant_job.v1") {
+  if (!job || !Object.isFrozen(job) || job.version !== "Paytobe.tenant_job.v1") {
     throw new TypeError("Immutable tenant job payload is required");
   }
   if (job.merchant_id !== scope.merchant_id) throw new TypeError("Tenant job merchant_id does not match TenantScope");

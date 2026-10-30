@@ -21,7 +21,7 @@ export function createPortalServer() {
   return http.createServer((request, response) => {
     const url = new URL(request.url || "/", `http://${request.headers.host || `localhost:${port}`}`);
     if (url.pathname === "/health") {
-      return sendJson(response, 200, { ok: true, service: "VelarumPay-merchant-portal" });
+      return sendJson(response, 200, { ok: true, service: "Paytobe-merchant-portal" });
     }
     if (request.method === "GET" && url.pathname === "/v1/merchant-sessions/current") {
       return sendJson(response, 401, {
@@ -79,7 +79,7 @@ function sendJson(response, status, payload) {
 function securityHeaders(headers) {
   return {
     ...headers,
-    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https://api.velarumai.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+    "content-security-policy": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self' https://api.Paytobe.com; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
     "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
     "referrer-policy": "no-referrer",
     "x-content-type-options": "nosniff",
@@ -90,6 +90,6 @@ function securityHeaders(headers) {
 const isDirectRun = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun && process.env.VP_PORTAL_NO_AUTO_LISTEN !== "1") {
   createPortalServer().listen(port, host, () => {
-    console.log(`VelarumPay merchant portal listening on http://${host}:${port}`);
+    console.log(`Paytobe merchant portal listening on http://${host}:${port}`);
   });
 }

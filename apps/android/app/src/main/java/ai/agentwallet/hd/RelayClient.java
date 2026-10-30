@@ -34,7 +34,7 @@ public final class RelayClient {
     private static final OkHttpClient WS_HTTP = WalletHttp.webSocket();
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final Object REST_SYNC_LOCK = new Object();
-    private static final String REST_SYNC_PREFS = "velarumpay_rest_sync_state";
+    private static final String REST_SYNC_PREFS = "Paytobe_rest_sync_state";
     private WebSocket socket;
 
     void connect(Context context, Listener listener) {

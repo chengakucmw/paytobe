@@ -2,18 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Webhook Verification · VelarumPay Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
+  <title>Webhook Verification · Paytobe Docs</title><link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar"><div class="inner">
-    <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+    <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
     <nav class="nav"><a href="/">Overview</a><a href="/quickstart.html">Quickstart</a><a href="/api.html">REST API</a><a href="/agent-auth.html">Agent Auth</a><a href="/webhooks.html">Webhooks</a></nav>
   </div></header>
   <main>
     <span class="pill">Webhook HMAC · SHA-256</span>
     <h1>Verify the exact raw request body before processing an event</h1>
-    <p class="lead">VelarumPay signs <code>timestamp + "." + rawBody</code>. The signature is carried in <code>x-velarumpay-signature</code> as <code>t=&lt;unix-seconds&gt;,v1=&lt;hex-hmac&gt;</code>.</p>
+    <p class="lead">Paytobe signs <code>timestamp + "." + rawBody</code>. The signature is carried in <code>x-Paytobe-signature</code> as <code>t=&lt;unix-seconds&gt;,v1=&lt;hex-hmac&gt;</code>.</p>
     <div class="note">Keep endpoint secrets in a server-side secret manager. Never expose them to browser code, mobile clients, logs, error responses, or documentation. The downloadable vector uses an intentionally public non-production test key.</div>
 
     <h2>Node.js verification</h2>
@@ -39,9 +39,9 @@ function verifyWebhook(publicOrSecretKey, rawBody, signatureHeader, nowSeconds) 
     <h2>Headers and replay handling</h2>
     <table>
       <tr><th>Header</th><th>Use</th></tr>
-      <tr><td><code>x-velarumpay-signature</code></td><td>Timestamped HMAC described above.</td></tr>
-      <tr><td><code>x-velarumpay-event-id</code></td><td>Stable event identity; deduplicate business processing on this value.</td></tr>
-      <tr><td><code>x-velarumpay-delivery-id</code></td><td>Unique attempt identity for delivery diagnostics.</td></tr>
+      <tr><td><code>x-Paytobe-signature</code></td><td>Timestamped HMAC described above.</td></tr>
+      <tr><td><code>x-Paytobe-event-id</code></td><td>Stable event identity; deduplicate business processing on this value.</td></tr>
+      <tr><td><code>x-Paytobe-delivery-id</code></td><td>Unique attempt identity for delivery diagnostics.</td></tr>
     </table>
     <p>Return a 2xx response only after durable acceptance. Retries and manual replay may produce new delivery IDs for the same event ID. Always reconcile final Payment Request state through the authenticated REST API.</p>
 
@@ -51,6 +51,6 @@ function verifyWebhook(publicOrSecretKey, rawBody, signatureHeader, nowSeconds) 
     <h2>Endpoint lifecycle</h2>
     <p>Use <code>createWebhookEndpoint</code>, <code>verifyWebhookEndpoint</code>, <code>rotateWebhookSecret</code>, and <code>revokeWebhookEndpoint</code> through the merchant session boundary. Rotation and revocation require step-up authentication; overlap is bounded and old secrets expire.</p>
   </main>
-  <footer class="footer">VelarumPay Developer Docs · Platform API v0.1</footer>
+  <footer class="footer">Paytobe Developer Docs · Platform API v0.1</footer>
 </body>
 </html>

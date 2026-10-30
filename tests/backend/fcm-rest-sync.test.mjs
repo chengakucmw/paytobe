@@ -38,7 +38,7 @@ test("FCM data message carries only opaque sync coordinates", () => {
   const data = payload.message.data;
 
   assert.deepEqual(data, {
-    type: "velarumpay.sync",
+    type: "Paytobe.sync",
     sync_required: "true",
     event_id: "cinv_opaque_456",
     request_id: "prq_opaque_123",
@@ -55,7 +55,7 @@ test("production config fails closed unless the complete FCM secret set is prese
     RUNTIME_ENV: "production",
     OPENCLAW_DEVICE_SECRET: "strong-openclaw-secret",
     CORS_ALLOWED_ORIGINS: "https://wallet.example.com",
-    RELAY_STORE_PATH: "/var/lib/velarumpay/relay.sqlite",
+    RELAY_STORE_PATH: "/var/lib/Paytobe/relay.sqlite",
     METRICS_TOKEN: "metrics-secret"
   }));
   assert.equal(missing.ok, false);
@@ -63,7 +63,7 @@ test("production config fails closed unless the complete FCM secret set is prese
 
   const malformedKey = validateRuntimeConfig(loadRuntimeConfig({
     FCM_ENABLED: "true",
-    FCM_PROJECT_ID: "velarumpay-prod",
+    FCM_PROJECT_ID: "Paytobe-prod",
     FCM_SERVICE_ACCOUNT_JSON: "{}",
     FCM_TOKEN_ENCRYPTION_KEY: "too-short"
   }));
@@ -72,7 +72,7 @@ test("production config fails closed unless the complete FCM secret set is prese
 });
 
 test("an UNREGISTERED response invalidates only the matching encrypted FCM token", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-fcm-invalid-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-fcm-invalid-"));
   const store = new Store(path.join(dir, "store.json"));
   t.after(() => {
     store.close();
@@ -81,12 +81,12 @@ test("an UNREGISTERED response invalidates only the matching encrypted FCM token
   store.registerDevice("device-fcm", "device-auth-token");
   const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const serviceAccount = {
-    client_email: "fcm-test@velarumpay.example",
+    client_email: "fcm-test@Paytobe.example",
     private_key: privateKey.export({ type: "pkcs8", format: "pem" })
   };
   const config = loadRuntimeConfig({
     FCM_ENABLED: "true",
-    FCM_PROJECT_ID: "velarumpay-test",
+    FCM_PROJECT_ID: "Paytobe-test",
     FCM_SERVICE_ACCOUNT_JSON: JSON.stringify(serviceAccount),
     FCM_TOKEN_ENCRYPTION_KEY: TOKEN_KEY
   });
@@ -123,7 +123,7 @@ test("an UNREGISTERED response invalidates only the matching encrypted FCM token
 });
 
 test("Connect Invitation push uses the same opaque wake-up channel", async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-fcm-connect-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-fcm-connect-"));
   const store = new Store(path.join(dir, "store.json"));
   t.after(() => {
     store.close();
@@ -133,9 +133,9 @@ test("Connect Invitation push uses the same opaque wake-up channel", async (t) =
   const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   const config = loadRuntimeConfig({
     FCM_ENABLED: "true",
-    FCM_PROJECT_ID: "velarumpay-test",
+    FCM_PROJECT_ID: "Paytobe-test",
     FCM_SERVICE_ACCOUNT_JSON: JSON.stringify({
-      client_email: "fcm-connect@velarumpay.example",
+      client_email: "fcm-connect@Paytobe.example",
       private_key: privateKey.export({ type: "pkcs8", format: "pem" })
     }),
     FCM_TOKEN_ENCRYPTION_KEY: TOKEN_KEY
@@ -165,13 +165,13 @@ test("Connect Invitation push uses the same opaque wake-up channel", async (t) =
   }
 
   assert.equal(delivered.message.data.event_id, "cinv_opaque_456");
-  assert.equal(delivered.message.data.type, "velarumpay.sync");
+  assert.equal(delivered.message.data.type, "Paytobe.sync");
   assert.equal(Object.hasOwn(delivered.message.data, "agent_name"), false);
   assert.equal(Object.hasOwn(delivered.message.data, "requested_scopes"), false);
 });
 
 test("device event stream is isolated, cursor-based, and signals retention reset", (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-device-events-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-device-events-"));
   const store = new Store(path.join(dir, "store.json"));
   t.after(() => {
     store.close();
@@ -216,7 +216,7 @@ test("device event stream is isolated, cursor-based, and signals retention reset
 test("HTTP push-token registration and device REST compensation use authenticated, isolated routes", {
   skip: process.env.VP_ALLOW_LISTEN_TESTS !== "1"
 }, async (t) => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-fcm-http-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-fcm-http-"));
   const relayStore = path.join(dir, "relay-store.json");
   const { privateKey } = crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
   process.env.VP_NO_AUTO_LISTEN = "1";
@@ -225,10 +225,10 @@ test("HTTP push-token registration and device REST compensation use authenticate
   process.env.RELAY_STORE_DRIVER = "json";
   process.env.RELAY_STORE_PATH = relayStore;
   process.env.FCM_ENABLED = "true";
-  process.env.FCM_PROJECT_ID = "velarumpay-http-test";
+  process.env.FCM_PROJECT_ID = "Paytobe-http-test";
   process.env.FCM_TOKEN_ENCRYPTION_KEY = TOKEN_KEY;
   process.env.FCM_SERVICE_ACCOUNT_JSON = JSON.stringify({
-    client_email: "fcm-http-test@velarumpay.example",
+    client_email: "fcm-http-test@Paytobe.example",
     private_key: privateKey.export({ type: "pkcs8", format: "pem" })
   });
   const module = await import(`../../services/platform-api/src/server.js?fcm-http=${Date.now()}`);

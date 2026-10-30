@@ -2,7 +2,7 @@ import {
   createTransactionContextSnapshot,
   normalizePaymentRequestV1,
   normalizeTransactionContextV1
-} from "@velarumpay/protocol";
+} from "@Paytobe/protocol";
 
 export {
   createTransactionContextSnapshot,
@@ -10,14 +10,14 @@ export {
   normalizeTransactionContextV1
 };
 
-export const DEFAULT_BASE_URL = "https://api.velarumai.com";
-export const DEFAULT_AGENT_TOKEN_AUDIENCE = "https://api.velarumai.com/v1/agent-auth/token";
+export const DEFAULT_BASE_URL = "https://api.Paytobe.com";
+export const DEFAULT_AGENT_TOKEN_AUDIENCE = "https://api.Paytobe.com/v1/agent-auth/token";
 export const validatePaymentRequest = normalizePaymentRequestV1;
 export const validateTransactionContext = normalizeTransactionContextV1;
 
 /**
- * @typedef {Object} VelarumPayClientOptions
- * @property {string=} baseUrl Platform API base URL. Defaults to https://api.velarumai.com.
+ * @typedef {Object} PaytobeClientOptions
+ * @property {string=} baseUrl Platform API base URL. Defaults to https://api.Paytobe.com.
  * @property {string=} connectionToken Connection-scoped token returned by pairing approval.
  * @property {typeof fetch=} fetch Fetch implementation for Node, browsers, or tests.
  * @property {Record<string, string>=} headers Extra headers sent with every request.
@@ -61,15 +61,15 @@ export const validateTransactionContext = normalizeTransactionContextV1;
  */
 
 /**
- * Minimal VelarumPay SDK client for pairing, Transaction Context, Payment Request,
+ * Minimal Paytobe SDK client for pairing, Transaction Context, Payment Request,
  * and status-event polling. It never handles wallet private keys or signing.
  */
-export class VelarumPayClient {
+export class PaytobeClient {
   #agentToken = null;
   #agentRefresh = null;
 
   /**
-   * @param {VelarumPayClientOptions=} options
+   * @param {PaytobeClientOptions=} options
    */
   constructor(options = {}) {
     this.baseUrl = normalizeBaseUrl(options.baseUrl || DEFAULT_BASE_URL);
@@ -87,7 +87,7 @@ export class VelarumPayClient {
 
   /**
    * @param {string} connectionToken
-   * @returns {VelarumPayClient}
+   * @returns {PaytobeClient}
    */
   setConnectionToken(connectionToken) {
     this.connectionToken = connectionToken || "";
@@ -96,10 +96,10 @@ export class VelarumPayClient {
 
   /**
    * @param {string} connectionToken
-   * @returns {VelarumPayClient}
+   * @returns {PaytobeClient}
    */
   withConnectionToken(connectionToken) {
-    return new VelarumPayClient({
+    return new PaytobeClient({
       baseUrl: this.baseUrl,
       connectionToken,
       fetch: this.fetchFn,
@@ -325,35 +325,35 @@ export class VelarumPayClient {
 }
 
 /**
- * @param {VelarumPayClientOptions=} options
- * @returns {VelarumPayClient}
+ * @param {PaytobeClientOptions=} options
+ * @returns {PaytobeClient}
  */
-export function createVelarumPayClient(options = {}) {
-  return new VelarumPayClient(options);
+export function createPaytobeClient(options = {}) {
+  return new PaytobeClient(options);
 }
 
 export function createPairingSession(payload, options = {}) {
-  return createVelarumPayClient(options).createPairingSession(payload, options);
+  return createPaytobeClient(options).createPairingSession(payload, options);
 }
 
 export function createTransactionContext(payload, options = {}) {
-  return createVelarumPayClient(options).createTransactionContext(payload, options);
+  return createPaytobeClient(options).createTransactionContext(payload, options);
 }
 
 export function createPaymentRequest(payload, options = {}) {
-  return createVelarumPayClient(options).createPaymentRequest(payload, options);
+  return createPaytobeClient(options).createPaymentRequest(payload, options);
 }
 
 export function getPaymentRequest(requestId, options = {}) {
-  return createVelarumPayClient(options).getPaymentRequest(requestId, options);
+  return createPaytobeClient(options).getPaymentRequest(requestId, options);
 }
 
 export function pollEvents(options = {}) {
-  return createVelarumPayClient(options).pollEvents(options);
+  return createPaytobeClient(options).pollEvents(options);
 }
 
 /**
- * Verify the standard VelarumPay webhook signature over the exact raw bytes.
+ * Verify the standard Paytobe webhook signature over the exact raw bytes.
  * The caller must verify before parsing JSON so whitespace and UTF-8 bytes
  * cannot be changed without detection.
  */

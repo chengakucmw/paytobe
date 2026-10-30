@@ -15,7 +15,7 @@ export type ValidationResult<T = Record<string, unknown>> = {
 };
 
 export type AuthContext = Readonly<{
-  version: "velarum.auth_context.v1";
+  version: "Paytobe.auth_context.v1";
   actor_type: "merchant_user" | "agent_client" | "wallet_device" | "platform_operator";
   actor_id: string;
   merchant_id?: string;
@@ -32,12 +32,12 @@ export type AuthContext = Readonly<{
   request_id: string;
 }>;
 
-export const PLATFORM_API_CONTRACT_VERSION: "velarum.platform-api.v1";
-export const CONTROL_PLANE_SCHEMA_VERSION: "velarum.control-plane.v1";
+export const PLATFORM_API_CONTRACT_VERSION: "Paytobe.platform-api.v1";
+export const CONTROL_PLANE_SCHEMA_VERSION: "Paytobe.control-plane.v1";
 export const CONTROL_PLANE_STATUSES: Readonly<Record<string, readonly string[]>>;
 export const AGENT_ALLOWED_SCOPES: readonly string[];
-export const AUTH_CONTEXT_VERSION: "velarum.auth_context.v1";
-export const IDEMPOTENCY_SCOPE_VERSION: "velarum.idempotency_scope.v1";
+export const AUTH_CONTEXT_VERSION: "Paytobe.auth_context.v1";
+export const IDEMPOTENCY_SCOPE_VERSION: "Paytobe.idempotency_scope.v1";
 export const AUTH_CONTEXT_ACTOR_TYPES: readonly string[];
 export const AUTH_METHODS: readonly string[];
 export const MERCHANT_ROLES: readonly string[];
@@ -59,8 +59,8 @@ export function validateRecipient(value: unknown): ValidationResult<Record<strin
 export function validateWebhookEndpoint(value: unknown): ValidationResult<Record<string, unknown>>;
 export function validateNonAuthoritativeMetadata(value: unknown): ValidationResult<Record<string, unknown>>;
 
-export const PAYMENT_REQUEST_PROTOCOL: "velarum.payment_request.v1";
-export const TRANSACTION_CONTEXT_PROTOCOL: "velarum.transaction_context.v1";
+export const PAYMENT_REQUEST_PROTOCOL: "Paytobe.payment_request.v1";
+export const TRANSACTION_CONTEXT_PROTOCOL: "Paytobe.transaction_context.v1";
 export const BASE_USDC_CONTRACT: string;
 export const PAYMENT_RAILS: readonly string[];
 export const CANONICAL_PAYMENT_RAILS: readonly string[];

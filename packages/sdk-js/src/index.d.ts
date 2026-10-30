@@ -2,9 +2,9 @@ import type {
   createTransactionContextSnapshot,
   normalizePaymentRequestV1,
   normalizeTransactionContextV1
-} from "@velarumpay/protocol";
+} from "@Paytobe/protocol";
 
-export type VelarumPayClientOptions = {
+export type PaytobeClientOptions = {
   baseUrl?: string;
   connectionToken?: string;
   fetch?: typeof fetch;
@@ -67,15 +67,15 @@ export const validatePaymentRequest: typeof normalizePaymentRequestV1;
 export const validateTransactionContext: typeof normalizeTransactionContextV1;
 export { createTransactionContextSnapshot, normalizePaymentRequestV1, normalizeTransactionContextV1 };
 
-export class VelarumPayClient {
-  constructor(options?: VelarumPayClientOptions);
+export class PaytobeClient {
+  constructor(options?: PaytobeClientOptions);
   baseUrl: string;
   connectionToken: string;
   headers: Record<string, string>;
   agentAuth: Readonly<AgentAuthOptions> | null;
   csrfToken: string | (() => string);
   setConnectionToken(connectionToken: string): this;
-  withConnectionToken(connectionToken: string): VelarumPayClient;
+  withConnectionToken(connectionToken: string): PaytobeClient;
   createPairingSession(payload: Record<string, unknown>, options?: RequestOptions): Promise<ApiResult>;
   createTransactionContext(payload: Record<string, unknown>, options?: RequestOptions): Promise<ApiResult>;
   createPaymentRequest(payload: Record<string, unknown>, options?: RequestOptions): Promise<ApiResult>;
@@ -111,12 +111,12 @@ export class VelarumPayClient {
   requestHeaders(body?: Record<string, unknown> | null, options?: RequestOptions): Record<string, string>;
 }
 
-export function createVelarumPayClient(options?: VelarumPayClientOptions): VelarumPayClient;
-export function createPairingSession(payload: Record<string, unknown>, options?: VelarumPayClientOptions & RequestOptions): Promise<ApiResult>;
-export function createTransactionContext(payload: Record<string, unknown>, options?: VelarumPayClientOptions & RequestOptions): Promise<ApiResult>;
-export function createPaymentRequest(payload: Record<string, unknown>, options?: VelarumPayClientOptions & RequestOptions): Promise<ApiResult>;
-export function getPaymentRequest(requestId: string, options?: VelarumPayClientOptions & RequestOptions): Promise<ApiResult>;
-export function pollEvents(options?: (VelarumPayClientOptions & RequestOptions & { since?: number }) | number): Promise<ApiResult>;
+export function createPaytobeClient(options?: PaytobeClientOptions): PaytobeClient;
+export function createPairingSession(payload: Record<string, unknown>, options?: PaytobeClientOptions & RequestOptions): Promise<ApiResult>;
+export function createTransactionContext(payload: Record<string, unknown>, options?: PaytobeClientOptions & RequestOptions): Promise<ApiResult>;
+export function createPaymentRequest(payload: Record<string, unknown>, options?: PaytobeClientOptions & RequestOptions): Promise<ApiResult>;
+export function getPaymentRequest(requestId: string, options?: PaytobeClientOptions & RequestOptions): Promise<ApiResult>;
+export function pollEvents(options?: (PaytobeClientOptions & RequestOptions & { since?: number }) | number): Promise<ApiResult>;
 export function verifyWebhookSignature(
   secret: string,
   rawBody: string | Uint8Array | ArrayBuffer,

@@ -10,8 +10,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import ai.agentwallet.hd.ui.theme.Spacing
-import ai.agentwallet.hd.ui.theme.VelarumRadii
-import ai.agentwallet.hd.ui.theme.VelarumTheme
+import ai.agentwallet.hd.ui.theme.PaytobeRadii
+import ai.agentwallet.hd.ui.theme.PaytobeTheme
 
 /** 主操作按钮：品牌绿、胶囊形（对照 web 的 primary）。 */
 @Composable
@@ -19,10 +19,10 @@ fun VpPrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = VelarumRadii.pill,
+        shape = PaytobeRadii.pill,
         colors = ButtonDefaults.buttonColors(
-            containerColor = VelarumTheme.colors.primary,
-            contentColor = VelarumTheme.colors.onPrimary,
+            containerColor = PaytobeTheme.colors.primary,
+            contentColor = PaytobeTheme.colors.onPrimary,
         ),
         modifier = modifier.heightIn(min = Spacing.controlLg),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
@@ -34,10 +34,10 @@ fun VpEmphasisButton(text: String, onClick: () -> Unit, modifier: Modifier = Mod
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = VelarumRadii.pill,
+        shape = PaytobeRadii.pill,
         colors = ButtonDefaults.buttonColors(
-            containerColor = VelarumTheme.colors.emphasis,
-            contentColor = VelarumTheme.colors.onEmphasis,
+            containerColor = PaytobeTheme.colors.emphasis,
+            contentColor = PaytobeTheme.colors.onEmphasis,
         ),
         modifier = modifier.heightIn(min = Spacing.controlLg),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
@@ -49,10 +49,10 @@ fun VpWhiteButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
     Button(
         onClick = onClick,
         enabled = enabled,
-        shape = VelarumRadii.pill,
+        shape = PaytobeRadii.pill,
         colors = ButtonDefaults.buttonColors(
             containerColor = Color.White,
-            contentColor = VelarumTheme.colors.textStrong,
+            contentColor = PaytobeTheme.colors.textStrong,
         ),
         modifier = modifier.heightIn(min = Spacing.controlMd),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
@@ -64,8 +64,8 @@ fun VpOutlineButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        shape = VelarumRadii.pill,
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = VelarumTheme.colors.textStrong),
+        shape = PaytobeRadii.pill,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = PaytobeTheme.colors.textStrong),
         modifier = modifier.heightIn(min = Spacing.controlLg),
     ) { Text(text, style = MaterialTheme.typography.labelLarge) }
 }

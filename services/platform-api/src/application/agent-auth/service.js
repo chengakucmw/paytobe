@@ -1,6 +1,6 @@
 import { createAuthContext } from "../../../../../packages/protocol/src/platform-api.js";
 
-export const AGENT_TOKEN_AUDIENCE = "https://api.velarumai.com/v1/agent-auth/token";
+export const AGENT_TOKEN_AUDIENCE = "https://api.Paytobe.com/v1/agent-auth/token";
 const MAX_ASSERTION_SECONDS = 300;
 const CLOCK_SKEW_SECONDS = 60;
 

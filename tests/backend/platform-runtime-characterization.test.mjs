@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 const codeRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturePath = path.join(codeRoot, "tests/fixtures/platform-runtime-characterization.json");
 const fixture = JSON.parse(fs.readFileSync(fixturePath, "utf8"));
-const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "velarumpay-runtime-characterization-"));
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-runtime-characterization-"));
 
 process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";

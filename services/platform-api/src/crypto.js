@@ -48,7 +48,7 @@ export function opaqueToken(prefix, bytes = 32) {
 }
 
 export function createConnectKey() {
-  return `velarumpay-connect:${opaqueToken("ck")}`;
+  return `Paytobe-connect:${opaqueToken("ck")}`;
 }
 
 // Canonical string that an OpenClaw HMAC signature is computed over. The
@@ -92,9 +92,9 @@ export function timingSafeTextEqual(left, right) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-export function createAes256GcmVault(encodedKey, purpose = "velarumpay.secret.v1") {
+export function createAes256GcmVault(encodedKey, purpose = "Paytobe.secret.v1") {
   const key = decodeAes256Key(encodedKey);
-  const context = String(purpose || "velarumpay.secret.v1");
+  const context = String(purpose || "Paytobe.secret.v1");
   return Object.freeze({
     encrypt(plaintext, binding = "") {
       const value = String(plaintext || "");

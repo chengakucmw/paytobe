@@ -10,7 +10,7 @@ process.env.VP_NO_AUTO_LISTEN = "1";
 process.env.RELAY_STORE_DRIVER = "sqlite";
 process.env.RELAY_STORE_PATH = path.join(storeDirectory, "relay-store.sqlite");
 
-const { VelarumPayClient } = await import("../../../packages/sdk-js/src/index.js");
+const { PaytobeClient } = await import("../../../packages/sdk-js/src/index.js");
 const { server: platformServer, store } = await import("../../../services/platform-api/src/server.js");
 const keyPair = crypto.generateKeyPairSync("ed25519");
 seedStandardAgentFood(store, keyPair.publicKey);
@@ -46,9 +46,9 @@ async function jsonRequest(base, pathname, options = {}) {
 
 test("AgentFood claims a Connect Key and pushes a wallet-bound Payment Request", async (t) => {
   const platformBase = await listen(platformServer);
-  process.env.VELARUMPAY_API_URL = platformBase;
+  process.env.Paytobe_API_URL = platformBase;
   const { createDemoServer } = await import(`../server.mjs?integration=${Date.now()}`);
-  const platformClient = new VelarumPayClient({
+  const platformClient = new PaytobeClient({
     baseUrl: platformBase,
     agentAuth: {
       agentId: "agentfood-testnet",

@@ -1,4 +1,4 @@
-const CHANNEL_NAME = "velarumpay-merchant-step-up-v1";
+const CHANNEL_NAME = "Paytobe-merchant-step-up-v1";
 const TOKEN_PATTERN = /^mstep_[A-Za-z0-9_-]{43}$/;
 
 export function createStepUpChannel({

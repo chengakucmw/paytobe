@@ -105,7 +105,7 @@ export function stablePaymentEventId(scope, event, request, hash = defaultHash) 
   assertTenantScope(scope);
   const data = event?.data || {};
   return `evt_${hash(stableJson({
-    version: "velarum.payment_event.v1",
+    version: "Paytobe.payment_event.v1",
     merchant_id: scope.merchant_id,
     type: event?.type || "",
     request_id: data.request_id || event?.request_id || event?.intent_id || request?.request_id || "",

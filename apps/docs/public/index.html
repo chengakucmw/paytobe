@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VelarumPay Developer Docs</title>
+  <title>Paytobe Developer Docs</title>
   <link rel="stylesheet" href="/styles.css?v=colorgood-20260802a" />
 </head>
 <body>
-  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://velarumai.com/preview">View boundaries</a></div>
+  <div class="preview-bar">Official Testnet · Public testnet access · Mainnet and commercial SLAs are not offered · <a href="https://paytobe.com/preview">View boundaries</a></div>
   <header class="topbar">
     <div class="inner">
-      <a class="brand" href="/"><span class="mark">V</span> VelarumPay <span style="color:var(--muted);font-weight:600">Docs</span></a>
+      <a class="brand" href="/"><span class="mark">P</span> Paytobe <span style="color:var(--muted);font-weight:600">Docs</span></a>
       <nav class="nav">
         <a href="/">Overview</a>
         <a href="/quickstart.html">Quickstart</a>
@@ -19,7 +19,7 @@
         <a href="/webhooks.html">Webhooks</a>
         <a href="/protocol.html">Protocol</a>
         <a href="/mcp.html">MCP for agents</a>
-        <a href="https://velarumai.com/business">Business</a>
+        <a href="https://paytobe.com/business">Business</a>
       </nav>
     </div>
   </header>
@@ -27,15 +27,15 @@
   <main>
     <span class="pill">Platform API v0.1</span>
     <h1>Let your AI agent request payments — the user always signs.</h1>
-    <p class="lead">VelarumPay is a non-custodial wallet and payment-request platform. Your agent asks for a payment; the person reviews and signs it in their own wallet. The server never holds private keys.</p>
+    <p class="lead">Paytobe is a non-custodial wallet and payment-request platform. Your agent asks for a payment; the person reviews and signs it in their own wallet. The server never holds private keys.</p>
 
     <div class="note">New here? The fastest path is the <a href="/quickstart.html">Quickstart</a>: pair once, then create payment requests with a connection token.</div>
-    <div class="note">Machine-readable contracts: <a href="/contracts/velarumpay-platform-api-v0.1.openapi.json">OpenAPI 3.1</a>, <a href="/contracts/velarum.payment_request.v1.schema.json">Payment Request JSON Schema</a>, and <a href="/contracts/velarum.transaction_context.v1.schema.json">Transaction Context JSON Schema</a>.</div>
+    <div class="note">Machine-readable contracts: <a href="/contracts/Paytobe-platform-api-v0.1.openapi.json">OpenAPI 3.1</a>, <a href="/contracts/Paytobe.payment_request.v1.schema.json">Payment Request JSON Schema</a>, and <a href="/contracts/Paytobe.transaction_context.v1.schema.json">Transaction Context JSON Schema</a>.</div>
 
     <h2>How it works in one picture</h2>
     <div class="card">
       <ol class="steps">
-        <li><strong>Pair.</strong> Your agent opens a pairing session and shows a short code or QR. The user scans it inside the VelarumPay wallet.</li>
+        <li><strong>Pair.</strong> Your agent opens a pairing session and shows a short code or QR. The user scans it inside the Paytobe wallet.</li>
         <li><strong>Approve.</strong> The user approves the requested scopes. The wallet hands back a <code>connection token</code> — that token <em>is</em> the authorization. There is no developer API key.</li>
         <li><strong>Request.</strong> Your agent uses the token to create payment requests. Each one is delivered to the wallet over WebSocket.</li>
         <li><strong>Sign.</strong> The user reviews the human-readable context and signs locally. Status flows back: <code>pending → signed → broadcasted → confirmed</code>.</li>
@@ -43,18 +43,18 @@
     </div>
 
     <h2>Why there is no API key</h2>
-    <p>Most payment APIs give developers a secret key that can move money. VelarumPay is different on purpose: authority comes from the <strong>user approving a pairing</strong> in their wallet, not from a key you hold. You get a scoped, revocable connection token instead. The user can pause or revoke it at any time.</p>
+    <p>Most payment APIs give developers a secret key that can move money. Paytobe is different on purpose: authority comes from the <strong>user approving a pairing</strong> in their wallet, not from a key you hold. You get a scoped, revocable connection token instead. The user can pause or revoke it at any time.</p>
 
     <h2>Pick your integration</h2>
     <div class="grid2">
       <div class="card">
         <h3>JavaScript SDK</h3>
-        <p>Use <code>@velarumpay/sdk-js</code> for pairing, transaction contexts, payment requests, and event polling.</p>
+        <p>Use <code>@paytobe/sdk-js</code> for pairing, transaction contexts, payment requests, and event polling.</p>
         <p><a href="/quickstart.html">Go to Quickstart →</a></p>
       </div>
       <div class="card">
         <h3>MCP server</h3>
-        <p>Plug VelarumPay into any MCP-capable AI agent (Claude and others) as a set of tools.</p>
+        <p>Plug Paytobe into any MCP-capable AI agent (Claude and others) as a set of tools.</p>
         <p><a href="/mcp.html">Set up MCP →</a></p>
       </div>
       <div class="card">
@@ -64,7 +64,7 @@
       </div>
       <div class="card">
         <h3>Protocol</h3>
-        <p>The open <code>velarum.payment_request.v1</code> and <code>velarum.transaction_context.v1</code> formats.</p>
+        <p>The open <code>Paytobe.payment_request.v1</code> and <code>Paytobe.transaction_context.v1</code> formats.</p>
         <p><a href="/protocol.html">Read the protocol →</a></p>
       </div>
     </div>
@@ -81,7 +81,7 @@
   </main>
 
   <footer class="footer">
-    VelarumPay Developer Docs · Platform API v0.1 · This site contains no sample balances, merchants, or transaction data.
+    Paytobe Developer Docs · Platform API v0.1 · This site contains no sample balances, merchants, or transaction data.
   </footer>
 </body>
 </html>

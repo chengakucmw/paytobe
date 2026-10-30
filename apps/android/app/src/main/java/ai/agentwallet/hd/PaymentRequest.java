@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.Set;
 
 final class PaymentRequest {
-    static final String PROTOCOL_PAYMENT_REQUEST = "velarum.payment_request.v1";
+    static final String PROTOCOL_PAYMENT_REQUEST = "Paytobe.payment_request.v1";
     static final String PROTOCOL_LEGACY_INTENT = "agentwallet.payment_intent.v1";
 
     static final String STATUS_PENDING = "pending";
@@ -113,12 +113,12 @@ final class PaymentRequest {
         transactionContextSnapshot = object(raw, "transaction_context_snapshot");
         context = object(raw, "context");
 
-        JSONObject velarum = object(raw, "velarum");
-        JSONObject legacyMerchant = firstObject(raw.optJSONObject("merchant"), object(velarum.optJSONObject("payload"), "merchant"));
-        JSONObject legacyRecipient = firstObject(raw.optJSONObject("recipient"), object(velarum.optJSONObject("payload"), "recipient"));
+        JSONObject Paytobe = object(raw, "Paytobe");
+        JSONObject legacyMerchant = firstObject(raw.optJSONObject("merchant"), object(Paytobe.optJSONObject("payload"), "merchant"));
+        JSONObject legacyRecipient = firstObject(raw.optJSONObject("recipient"), object(Paytobe.optJSONObject("payload"), "recipient"));
 
         legacyIntentId = firstNonEmpty(raw.optString("intent_id", ""), raw.optString("id", ""));
-        requestId = firstNonEmpty(raw.optString("request_id", ""), velarum.optString("request_id", ""), legacyIntentId);
+        requestId = firstNonEmpty(raw.optString("request_id", ""), Paytobe.optString("request_id", ""), legacyIntentId);
         id = firstNonEmpty(requestId, legacyIntentId, raw.optString("id", ""));
         connectionId = raw.optString("connection_id", "");
         transactionId = raw.optString("transaction_id", "");

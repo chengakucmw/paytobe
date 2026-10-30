@@ -14,7 +14,7 @@ import { Store } from "../../services/platform-api/src/store.js";
 // the delta-write path keeps the tables exactly in sync — including DELETEs.
 
 function freshSqlite() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-norm-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-norm-"));
   return { dir, file: path.join(dir, "relay-store.sqlite") };
 }
 

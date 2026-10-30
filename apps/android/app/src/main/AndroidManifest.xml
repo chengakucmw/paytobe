@@ -10,7 +10,7 @@
         android:required="false" />
 
     <application
-        android:name=".VelarumPayApplication"
+        android:name=".PaytobeApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="${appLabel}"
@@ -24,7 +24,7 @@
             android:stopWithTask="false"
             android:foregroundServiceType="dataSync" />
         <service
-            android:name=".VelarumFirebaseMessagingService"
+            android:name=".PaytobeFirebaseMessagingService"
             android:directBootAware="false"
             android:exported="false"
             android:stopWithTask="false">
@@ -41,7 +41,7 @@
             android:name=".MainComposeActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:theme="@style/Theme.Velarum.Compose"
+            android:theme="@style/Theme.Paytobe.Compose"
             android:windowSoftInputMode="adjustResize"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout">
             <intent-filter>
@@ -70,7 +70,7 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="velarumpay" android:host="pair" />
+                <data android:scheme="paytobe" android:host="pair" />
             </intent-filter>
         </activity>
 

@@ -3,8 +3,8 @@ import {
   SUPPORTED_TRANSFER_RAILS
 } from "./transfer-assets.js";
 
-export const PAYMENT_REQUEST_PROTOCOL = "velarum.payment_request.v1";
-export const TRANSACTION_CONTEXT_PROTOCOL = "velarum.transaction_context.v1";
+export const PAYMENT_REQUEST_PROTOCOL = "Paytobe.payment_request.v1";
+export const TRANSACTION_CONTEXT_PROTOCOL = "Paytobe.transaction_context.v1";
 
 export const BASE_USDC_CONTRACT = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
@@ -72,7 +72,7 @@ export const RISK_SEVERITIES = Object.freeze([
 //   - services/platform-api/src/risk/limits.js  (dailyLimitFor fallback)
 //   - apps/android/app/src/main/java/ai/agentwallet/hd/RiskPolicy.java
 //       (DAILY_*_LIMIT and UNVERIFIED_*_CAP literals)
-//   - apps/ios/VelarumPay/RiskPolicy.swift
+//   - apps/ios/Paytobe/RiskPolicy.swift
 //       (LocalRiskPolicy.dailyXLMLimit and .unverifiedXLMCap literals)
 // Amounts are exact decimal STRINGS (never float), consistent with decimal.js
 // and Android's BigDecimal. Consistency is enforced by

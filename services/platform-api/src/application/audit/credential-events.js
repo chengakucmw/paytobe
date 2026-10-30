@@ -21,7 +21,7 @@ export function credentialAuditEvent({ audit_event_id, scope, action, credential
 
 export function credentialReminderEvent(eventId, credential, occurredAt) {
   return Object.freeze({
-    version: "velarum.credential_event.v1",
+    version: "Paytobe.credential_event.v1",
     event_id: eventId,
     type: "agent_credential.expiring",
     merchant_id: credential.merchant_id,

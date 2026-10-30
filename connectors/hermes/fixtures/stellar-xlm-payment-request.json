@@ -4,7 +4,7 @@
   "network_note": "Uses Stellar testnet and does not require mainnet funds.",
   "target_app_device_id": "wallet_dev_hermes",
   "transaction_context": {
-    "protocol": "velarum.transaction_context.v1",
+    "protocol": "Paytobe.transaction_context.v1",
     "transaction_id": "txn_hermes_stellar_books_1001",
     "connection_id": "conn_hermes_demo",
     "created_at": "2026-06-17T10:00:00.000Z",
@@ -81,7 +81,7 @@
     "risk_findings": []
   },
   "payment_request": {
-    "protocol": "velarum.payment_request.v1",
+    "protocol": "Paytobe.payment_request.v1",
     "request_id": "prq_hermes_stellar_books_1001",
     "connection_id": "conn_hermes_demo",
     "transaction_id": "txn_hermes_stellar_books_1001",

@@ -11,7 +11,7 @@ import { createConnectKey, id, opaqueToken } from "../../services/platform-api/s
 import { Store } from "../../services/platform-api/src/store.js";
 
 test("wallet approval uses live verified identity and fails closed after lifecycle changes", async (t) => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-connect-review-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-connect-review-"));
   const store = new Store(path.join(directory, "review.sqlite"));
   seedIdentity(store);
   const audits = [];

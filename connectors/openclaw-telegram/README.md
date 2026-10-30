@@ -1,12 +1,12 @@
 # OpenClaw Telegram Connector
 
 > **Last modified**
-> - **Taipei Time:** 2026-07-21 21:50:07 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-07-21 13:50:07 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
 Local OpenClaw-side bridge for Telegram payment commands.
 
-The connector now builds a standard `velarum.payment_request.v1` payload and keeps the legacy `agentwallet.payment_intent.v1` relay wrapper for migration. It never handles private keys, mnemonic phrases, wallet signing, or automatic payment approval.
+The connector now builds a standard `Paytobe.payment_request.v1` payload and keeps the legacy `agentwallet.payment_intent.v1` relay wrapper for migration. It never handles private keys, mnemonic phrases, wallet signing, or automatic payment approval.
 
 ## Supported Commands
 
@@ -23,16 +23,16 @@ The parser may still accept the migration alias `evm_erc20` for Base USDC input.
 
 1. Telegram message arrives.
 2. Connector parses hard payment fields: amount, recipient, network, and asset.
-3. Connector builds a standard `velarum.payment_request.v1` payload.
+3. Connector builds a standard `Paytobe.payment_request.v1` payload.
 4. AgentFood or Telegram-specific details stay in `metadata`, for example `metadata.food_order`.
-5. Connector builds a legacy relay wrapper that includes the standard payload at `payment_request` and `velarum.payload.payment_request`.
+5. Connector builds a legacy relay wrapper that includes the standard payload at `payment_request` and `Paytobe.payload.payment_request`.
 6. Connector submits the legacy wrapper to `/v1/payment-intents`, or callers can submit `payment_request` directly to `/v1/payment-requests`.
 7. The wallet reviews and signs locally only after user approval.
 
 ## Run
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/connectors/openclaw-telegram
+cd connectors/openclaw-telegram
 cp .env.example .env
 TELEGRAM_BOT_TOKEN=... \
 TELEGRAM_ALLOWED_CHAT_IDS=123456 \
@@ -100,7 +100,7 @@ Output shape:
 
 ```json
 {
-  "protocol": "velarum.payment_request.v1",
+  "protocol": "Paytobe.payment_request.v1",
   "request_id": "prq_agentfood_1842",
   "connection_id": "conn_agentfood_demo",
   "transaction_id": "txn_agentfood_1842",
@@ -208,13 +208,13 @@ node src/index.js --dry-run "send 24 USDC on Base to 0x9b1c2f4e3a8d5c6b7e9f0a1b2
 The legacy wrapper keeps `payment.rail = "base_usdc"` for Base USDC and includes the standard payload at:
 
 - `payment_request`
-- `velarum.payment_request`
-- `velarum.payload.payment_request`
+- `Paytobe.payment_request`
+- `Paytobe.payload.payment_request`
 
 ## Checks
 
 ```bash
-cd /Users/yang/code/VelarumPay/code/connectors/openclaw-telegram
+cd connectors/openclaw-telegram
 npm install
 npm run check
 ```

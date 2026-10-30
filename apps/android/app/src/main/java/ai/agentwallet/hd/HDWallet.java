@@ -28,7 +28,7 @@ final class HDWallet {
 
     /**
      * When true (default), Stellar key derivation is delegated to the shared
-     * cross-platform Rust core (crates/velarum-wallet-core) via WalletCoreBridge,
+     * cross-platform Rust core (crates/Paytobe-wallet-core) via WalletCoreBridge,
      * instead of the bitcoinj/bouncycastle path below. Both produce identical
      * results — pinned by the golden vector (GB3J…QBYX) and the conformance tests
      * — so this preserves behaviour. Set to false to revert to the native path.

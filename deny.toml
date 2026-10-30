@@ -1,4 +1,4 @@
-# VelarumPay Rule 0: fail closed on licenses outside the project's permissive
+# Paytobe Rule 0: fail closed on licenses outside the project's permissive
 # code-dependency allowlist. Do not add exceptions here without explicit owner
 # approval and a corresponding legal-record update.
 [licenses]

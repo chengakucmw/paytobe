@@ -77,7 +77,7 @@ test("Android wallet unverified-recipient caps mirror RISK_LIMITS.unverified_rec
 });
 
 test("iOS wallet daily-limit cap mirrors RISK_LIMITS.daily_limit_default", () => {
-  const policy = read("apps/ios/VelarumPay/RiskPolicy.swift");
+  const policy = read("apps/ios/Paytobe/RiskPolicy.swift");
   assert.equal(
     swiftDecimal(policy, "dailyXLMLimit"),
     RISK_LIMITS.daily_limit_default,
@@ -86,7 +86,7 @@ test("iOS wallet daily-limit cap mirrors RISK_LIMITS.daily_limit_default", () =>
 });
 
 test("iOS wallet unverified-recipient cap mirrors RISK_LIMITS.unverified_recipient_cap", () => {
-  const policy = read("apps/ios/VelarumPay/RiskPolicy.swift");
+  const policy = read("apps/ios/Paytobe/RiskPolicy.swift");
   assert.equal(
     swiftDecimal(policy, "unverifiedXLMCap"),
     RISK_LIMITS.unverified_recipient_cap,

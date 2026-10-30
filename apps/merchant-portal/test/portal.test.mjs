@@ -245,7 +245,7 @@ test("static server applies a protected shell CSP and does not expose API author
   const origin = `http://127.0.0.1:${server.address().port}`;
   const response = await fetch(`${origin}/members?authenticated=true`);
   assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-security-policy"), /connect-src 'self' https:\/\/api\.velarumai\.com/);
+  assert.match(response.headers.get("content-security-policy"), /connect-src 'self' https:\/\/api\.Paytobe\.com/);
   assert.match(await response.text(), /id="app"/);
   const post = await fetch(origin, { method: "POST" });
   assert.equal(post.status, 405);

@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.paytobe.dev/Paytobe.transaction_context.v1.schema.json",
+  "title": "Paytobe Transaction Context v1",
+  "description": "Explanatory context and provenance for a transaction. It cannot override Payment Request facts.",
+  "type": "object",
+  "required": [
+    "protocol",
+    "transaction_id",
+    "connection_id",
+    "type",
+    "title",
+    "summary"
+  ],
+  "properties": {
+    "protocol": {
+      "const": "Paytobe.transaction_context.v1"
+    },
+    "transaction_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "connection_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "purchase",
+        "online_purchase",
+        "food_order",
+        "api_paid_call",
+        "subscription",
+        "virtual_goods",
+        "service_booking",
+        "travel_booking",
+        "transfer_request",
+        "invoice_payment",
+        "donation",
+        "developer_test",
+        "generic",
+        "generic_task"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "default": "proposed",
+      "enum": [
+        "draft",
+        "proposed",
+        "awaiting_payment",
+        "ready_for_payment",
+        "payment_pending",
+        "paid",
+        "failed",
+        "cancelled",
+        "fulfilled",
+        "disputed"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "user_intent": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "agent_activity": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "costs": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "media": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "truth_fields": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string",
+            "enum": [
+              "payment_request_fact",
+              "wallet_derived",
+              "user_provided",
+              "user_agent_inferred",
+              "merchant_web_observed",
+              "merchant_ai_claim",
+              "merchant_api_response",
+              "merchant_signed_quote",
+              "platform_verified",
+              "external_verified",
+              "unknown"
+            ]
+          },
+          "verification_status": {
+            "type": "string",
+            "enum": [
+              "signature_verified",
+              "domain_verified",
+              "address_verified",
+              "api_authenticated",
+              "observed_only",
+              "ai_claim_only",
+              "inferred_only",
+              "conflicted",
+              "missing",
+              "unverified"
+            ]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "missing_context": {
+      "type": "array",
+      "items": {
+        "type": ["string", "object"]
+      }
+    },
+    "risk_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["blocker", "warning", "review_required", "info"]
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,8 +1,8 @@
-# VelarumPay Connect Platform Edge Testnet
+# Paytobe Connect Platform Edge Testnet
 
 > **Last modified**
-> - **Taipei Time:** 2026-08-04 21:07:25 Asia/Taipei (UTC+08:00)
-> - **UTC:** 2026-08-04 13:07:25 UTC
+> - **Taipei Time:** 2026-10-29 13:41:42 Asia/Taipei (UTC+08:00)
+> - **UTC:** 2026-10-29 05:41:42 UTC
 
 Public testnet edge deployment for the wallet-owned Connect Key flow. It is an independent Platform API, not an AgentFood server.
 

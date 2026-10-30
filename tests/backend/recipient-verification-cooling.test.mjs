@@ -227,7 +227,7 @@ test("activation route requires both a managing role and fresh step-up", async (
 });
 
 function sqliteRuntime(t) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-recipient-verification-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-recipient-verification-"));
   const store = new Store(path.join(directory, "recipient.sqlite"));
   const repository = new SqliteRecipientRepository(store.db);
   t.after(() => {

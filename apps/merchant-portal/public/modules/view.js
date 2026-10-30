@@ -19,7 +19,7 @@ export function routeFromPath(pathname) {
 export function renderPortal(state, route = "overview", onboarding = null, security = {}) {
   if (onboarding?.status) return renderOnboarding(onboarding);
   if (state.status === AUTH_STATUS.CHECKING) return publicFrame("Checking your session…", "Please wait.");
-  if (state.status === AUTH_STATUS.SIGNING_IN) return publicFrame("Signing in…", "Validating the one-time grant with VelarumPay.");
+  if (state.status === AUTH_STATUS.SIGNING_IN) return publicFrame("Signing in…", "Validating the one-time grant with Paytobe.");
   if (state.status !== AUTH_STATUS.AUTHENTICATED || !state.session) return renderSignIn(state);
   return renderAuthenticated(state, routeFromPath(`/${route}`), security);
 }
@@ -64,7 +64,7 @@ function renderSignIn(state) {
 
 function renderOnboarding(onboarding) {
   if (onboarding.status === "verifying") {
-    return publicFrame("Verifying your email…", "This one-time link is being checked with VelarumPay.");
+    return publicFrame("Verifying your email…", "This one-time link is being checked with Paytobe.");
   }
   if (onboarding.status === "registration_sent") {
     return onboardingFrame("Check your inbox", "If the address can be used, a one-time link is on its way.", "");
@@ -79,10 +79,10 @@ function renderOnboarding(onboarding) {
     </form>`);
   }
   if (onboarding.status === "creating") {
-    return publicFrame("Creating your workspace…", "VelarumPay is applying the verified owner identity.");
+    return publicFrame("Creating your workspace…", "Paytobe is applying the verified owner identity.");
   }
   if (onboarding.status === "signing_in") {
-    return publicFrame("Signing in securely…", "VelarumPay is exchanging the one-time email proof for a protected session.");
+    return publicFrame("Signing in securely…", "Paytobe is exchanging the one-time email proof for a protected session.");
   }
   if (onboarding.status === "merchant_choice") {
     const choices = (onboarding.merchants || []).map((merchant, index) => `<label class="merchant-choice">
@@ -172,7 +172,7 @@ function securityVerification(security = {}, csrfAvailable = false, session = {}
 }
 
 function brand() {
-  return '<div class="brand" aria-label="VelarumPay"><span class="brand-mark" aria-hidden="true">V</span><span>VelarumPay</span></div>';
+  return '<div class="brand" aria-label="Paytobe"><span class="brand-mark" aria-hidden="true">V</span><span>Paytobe</span></div>';
 }
 
 function formatTimestamp(value) {

@@ -4,8 +4,8 @@ ENV NODE_ENV=production \
     RUNTIME_ENV=production \
     PORT=8787 \
     RELAY_STORE_DRIVER=sqlite \
-    RELAY_STORE_PATH=/var/lib/velarumpay/relay-store.sqlite \
-    RELAY_STORE_LEGACY_JSON=/var/lib/velarumpay/relay-store.json
+    RELAY_STORE_PATH=/var/lib/Paytobe/relay-store.sqlite \
+    RELAY_STORE_LEGACY_JSON=/var/lib/Paytobe/relay-store.json
 
 WORKDIR /app
 
@@ -17,8 +17,8 @@ COPY services/platform-api/src ./services/platform-api/src
 COPY services/platform-api/scripts ./services/platform-api/scripts
 COPY services/platform-api/.env.example ./services/platform-api/.env.example
 
-RUN mkdir -p /var/lib/velarumpay /var/backups/velarumpay \
-  && chown -R node:node /app /var/lib/velarumpay /var/backups/velarumpay
+RUN mkdir -p /var/lib/Paytobe /var/backups/Paytobe \
+  && chown -R node:node /app /var/lib/Paytobe /var/backups/Paytobe
 
 USER node
 WORKDIR /app/services/platform-api

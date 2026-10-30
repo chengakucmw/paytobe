@@ -15,7 +15,7 @@ import androidx.core.content.ContextCompat;
 
 final class PaymentNotifications {
     static final String PAYMENT_CHANNEL_ID = "agentwallet_payment_requests";
-    static final String CONNECT_CHANNEL_ID = "velarumpay_agent_connections";
+    static final String CONNECT_CHANNEL_ID = "Paytobe_agent_connections";
     static final String RELAY_CHANNEL_ID = "agentwallet_relay_status";
     static final int RELAY_FOREGROUND_ID = 1001;
 
@@ -93,7 +93,7 @@ final class PaymentNotifications {
 
         String detail = intent.title() + " to " + shortAddress(intent.to);
         Notification notification = new Notification.Builder(context, PAYMENT_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_velarum)
+                .setSmallIcon(R.drawable.ic_stat_paytobe)
                 .setContentTitle("New payment request")
                 .setContentText(detail)
                 .setStyle(new Notification.BigTextStyle().bigText(
@@ -135,11 +135,11 @@ final class PaymentNotifications {
                 ? "An Agent"
                 : invitation.agentName.trim();
         Notification notification = new Notification.Builder(context, CONNECT_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_velarum)
+                .setSmallIcon(R.drawable.ic_stat_paytobe)
                 .setContentTitle("Agent connection request")
                 .setContentText(agentName + " is waiting for your review")
                 .setStyle(new Notification.BigTextStyle().bigText(
-                        agentName + " requested limited wallet access. Open VelarumPay to review the verified identity and scopes. No signing authority is granted."
+                        agentName + " requested limited wallet access. Open Paytobe to review the verified identity and scopes. No signing authority is granted."
                 ))
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
@@ -161,7 +161,7 @@ final class PaymentNotifications {
         );
 
         return new Notification.Builder(context, RELAY_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_velarum)
+                .setSmallIcon(R.drawable.ic_stat_paytobe)
                 .setContentTitle("AgentWallet relay connected")
                 .setContentText("Listening for OpenClaw payment requests.")
                 .setContentIntent(pendingIntent)

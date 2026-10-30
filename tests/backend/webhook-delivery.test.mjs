@@ -43,8 +43,8 @@ test("retry worker follows immediate/1m/5m/30m/2h/12h, creates unique attempts, 
   assert.equal(new Set(attempts.map((item) => item.delivery_id)).size, 6);
   assert.deepEqual(attempts.map((item) => item.attempt), [1, 2, 3, 4, 5, 6]);
   assert.deepEqual(attempts.map((item) => item.event_id), Array(6).fill("event_a"));
-  assert.equal(runtime.transportCalls.every((call) => call.headers["x-velarumpay-event-id"] === "event_a"), true);
-  assert.equal(runtime.transportCalls.every((call) => call.headers["x-velarumpay-signature"].startsWith("t=")), true);
+  assert.equal(runtime.transportCalls.every((call) => call.headers["x-Paytobe-event-id"] === "event_a"), true);
+  assert.equal(runtime.transportCalls.every((call) => call.headers["x-Paytobe-signature"].startsWith("t=")), true);
   assert.equal(runtime.transportCalls.every((call) => new TextDecoder().decode(call.raw_body) === runtime.rawBody), true);
   assert.equal(runtime.service.list(tenant).items.some((item) => Object.hasOwn(item, "secret_ciphertext")), false);
   assert.equal(runtime.observability.prometheusText().includes(secret), false);
@@ -89,7 +89,7 @@ test("database lease prevents concurrent claims and authorized replay keeps Even
 });
 
 function setup(t, outcomes) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-webhook-delivery-"));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-webhook-delivery-"));
   const store = new Store(path.join(directory, "platform.sqlite"));
   t.after(() => {
     store.close();
@@ -98,7 +98,7 @@ function setup(t, outcomes) {
   new SqliteWebhookEndpointRepository(store.db);
   seedMerchant(store.db, "merchant_a");
   seedMerchant(store.db, "merchant_b");
-  const vault = createAes256GcmVault(Buffer.alloc(32, 11).toString("base64url"), "velarumpay.webhook_secret.v1");
+  const vault = createAes256GcmVault(Buffer.alloc(32, 11).toString("base64url"), "Paytobe.webhook_secret.v1");
   const endpointId = "endpoint_a";
   const secretId = "secret_a";
   const ciphertext = JSON.stringify(vault.encrypt(secret, `merchant_a:${endpointId}:${secretId}`));
@@ -111,7 +111,7 @@ function setup(t, outcomes) {
   store.db.prepare(`INSERT INTO webhook_endpoint_secrets
     (secret_id, merchant_id, webhook_endpoint_id, ciphertext, status, created_at)
     VALUES (?, 'merchant_a', ?, ?, 'active', ?)`).run(secretId, endpointId, ciphertext, new Date(start).toISOString());
-  const rawBody = JSON.stringify({ version: "velarum.webhook_event.v1", event_id: "event_a", merchant_id: "merchant_a",
+  const rawBody = JSON.stringify({ version: "Paytobe.webhook_event.v1", event_id: "event_a", merchant_id: "merchant_a",
     type: "payment_request.status_updated", occurred_at: new Date(start).toISOString(), data: { request_id: "request_a", status: "signed" } });
   store.db.prepare(`INSERT INTO webhook_events
     (event_id, merchant_id, type, aggregate_id, payload_json, occurred_at, created_at)

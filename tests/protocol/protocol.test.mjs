@@ -25,10 +25,10 @@ import {
 } from "../../packages/protocol/src/fixtures.js";
 import {
   normalizePaymentRequestV1 as normalizeApiPaymentRequestV1
-} from "../../services/platform-api/src/velarum.js";
+} from "../../services/platform-api/src/Paytobe.js";
 import {
   normalizeTransactionContextV1 as normalizeApiTransactionContextV1
-} from "../../services/platform-api/src/velarum.js";
+} from "../../services/platform-api/src/Paytobe.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
 test("protocol enums cover v0.1 shared contracts", () => {
@@ -319,7 +319,7 @@ test("Transaction Context negative fixtures return structured errors", () => {
 
   const wrongProtocol = normalizeTransactionContextV1({
     ...transactionContextFixtures.valid,
-    protocol: "velarum.transaction_context.v0"
+    protocol: "Paytobe.transaction_context.v0"
   }, { now: protocolFixtureClock.now });
   assert.equal(wrongProtocol.ok, false);
   assert.equal(wrongProtocol.error.code, "invalid_protocol");
@@ -395,7 +395,7 @@ test("Platform API Transaction Context wrapper returns structured results", () =
 });
 
 test("Platform API Store persists and reads Transaction Context by transaction_id", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-store-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-store-"));
   try {
     const store = new Store(path.join(dir, "store.json"));
     const normalized = normalizeApiTransactionContextV1(transactionContextFixtures.missing_context, {
@@ -416,7 +416,7 @@ test("Platform API Store persists and reads Transaction Context by transaction_i
 });
 
 test("Platform API Store persists relay state in SQLite across instances", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-sqlite-store-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-sqlite-store-"));
   try {
     const sqlitePath = path.join(dir, "relay-store.sqlite");
     const first = new Store(sqlitePath);
@@ -460,7 +460,7 @@ test("Platform API Store persists relay state in SQLite across instances", () =>
 });
 
 test("Platform API Store imports legacy JSON state into SQLite once", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "velarumpay-sqlite-migration-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "Paytobe-sqlite-migration-"));
   try {
     const legacyJson = path.join(dir, "relay-store.json");
     const sqlitePath = path.join(dir, "relay-store.sqlite");

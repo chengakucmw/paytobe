@@ -22,8 +22,8 @@ test("Hermes fixtures output standard Transaction Context and Payment Request", 
     });
 
     assert.equal(prepared.ok, true, JSON.stringify(prepared.error));
-    assert.equal(prepared.transaction_context.protocol, "velarum.transaction_context.v1");
-    assert.equal(prepared.payment_request.protocol, "velarum.payment_request.v1");
+    assert.equal(prepared.transaction_context.protocol, "Paytobe.transaction_context.v1");
+    assert.equal(prepared.payment_request.protocol, "Paytobe.payment_request.v1");
     assert.equal(prepared.transaction_id, prepared.transaction_context.transaction_id);
     assert.equal(prepared.transaction_id, prepared.payment_request.transaction_id);
     assert.equal(prepared.payment_request.policy.requires_user_approval, true);
@@ -59,7 +59,7 @@ test("Hermes intent can be adapted into standard v1 payloads", () => {
       }
     ],
     payee: {
-      name: "VelarumPay Hermes Developer Test",
+      name: "Paytobe Hermes Developer Test",
       verified: false
     },
     payment: {
@@ -94,7 +94,7 @@ test("Hermes adapter runs pairing, context, request, and status polling loop", a
           ok: true,
           pairing_session: {
             pairing_session_id: "pair_hermes",
-            pairing_uri: "velarumpay://pair?session=pair_hermes&code=482913",
+            pairing_uri: "Paytobe://pair?session=pair_hermes&code=482913",
             pairing_code: "482913",
             status: "pending"
           }

@@ -100,7 +100,7 @@ export function createDomainVerificationModel({ api, session, copyText = async (
       domain,
       displayStatus: domain.status,
       challenge: String(result.challenge || ""),
-      dnsName: domain.method === "dns_txt" ? String(result.dns_name || `_velarumpay.${domain.domain}`) : "",
+      dnsName: domain.method === "dns_txt" ? String(result.dns_name || `_Paytobe.${domain.domain}`) : "",
       challengeExpiresAt: timeField(result, "challenge_expires_at", "expires_at"),
       reverifyAt: timeField(result, "reverify_at", "next_reverification_at"),
       message,

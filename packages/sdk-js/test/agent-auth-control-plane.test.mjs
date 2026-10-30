@@ -4,7 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { createVelarumPayClient, DEFAULT_AGENT_TOKEN_AUDIENCE } from "../src/index.js";
+import { createPaytobeClient, DEFAULT_AGENT_TOKEN_AUDIENCE } from "../src/index.js";
 
 const tokenA = `vat_${"A".repeat(43)}`;
 const tokenB = `vat_${"B".repeat(43)}`;
@@ -19,7 +19,7 @@ test("local signer creates a canonical assertion and Agent token authenticates C
     response(201, { ok: true, claim_token: claimToken, connect_invitation: { connect_invitation_id: "cinv_one" } })
   ], (input) => { signerInput = input; return new Uint8Array([1, 2, 3]); });
 
-  const result = await client.claimConnectInvitation(`velarumpay-connect:ck_${"D".repeat(43)}`, ["payment.requests.create"], {
+  const result = await client.claimConnectInvitation(`Paytobe-connect:ck_${"D".repeat(43)}`, ["payment.requests.create"], {
     requestId: "request_connect_one"
   });
   assert.equal(result.ok, true);
@@ -56,8 +56,8 @@ test("short-token refresh is coalesced and a 401 retry is bounded to one", async
   };
   const client = clientWithAgentAuth(calls, [], undefined, fetch);
   await Promise.all([
-    client.claimConnectInvitation(`velarumpay-connect:ck_${"E".repeat(43)}`, ["payment.requests.create"]),
-    client.claimConnectInvitation(`velarumpay-connect:ck_${"F".repeat(43)}`, ["payment.requests.create"])
+    client.claimConnectInvitation(`Paytobe-connect:ck_${"E".repeat(43)}`, ["payment.requests.create"]),
+    client.claimConnectInvitation(`Paytobe-connect:ck_${"F".repeat(43)}`, ["payment.requests.create"])
   ]);
   assert.equal(exchanges, 1);
   assert.equal(claims, 2);
@@ -72,7 +72,7 @@ test("short-token refresh is coalesced and a 401 retry is bounded to one", async
     protectedCalls += 1;
     return response(401, { ok: false, error: { code: "unauthenticated", message: "revoked" } });
   });
-  const failure = await bounded.claimConnectInvitation(`velarumpay-connect:ck_${"G".repeat(43)}`, ["payment.requests.create"]);
+  const failure = await bounded.claimConnectInvitation(`Paytobe-connect:ck_${"G".repeat(43)}`, ["payment.requests.create"]);
   assert.equal(failure.ok, false);
   assert.equal(tokenCalls, 2);
   assert.equal(protectedCalls, 2);
@@ -86,7 +86,7 @@ test("403, clock-skew, and duplicate-JTI failures do not retry", async () => {
     protectedCalls += 1;
     return response(403, { ok: false, error: { code: "scope_denied", message: "denied" } });
   });
-  assert.equal((await forbidden.claimConnectInvitation(`velarumpay-connect:ck_${"H".repeat(43)}`, ["payment.requests.create"])).status, 403);
+  assert.equal((await forbidden.claimConnectInvitation(`Paytobe-connect:ck_${"H".repeat(43)}`, ["payment.requests.create"])).status, 403);
   assert.equal(exchanges, 1);
   assert.equal(protectedCalls, 1);
 
@@ -104,7 +104,7 @@ test("403, clock-skew, and duplicate-JTI failures do not retry", async () => {
 
 test("merchant control plane, Payment Request, and Webhook clients share request ID and idempotency semantics", async () => {
   const calls = [];
-  const client = createVelarumPayClient({
+  const client = createPaytobeClient({
     baseUrl: "https://platform.test",
     connectionToken: "connection-token-test",
     csrfToken: () => "csrf-in-memory",
@@ -158,7 +158,7 @@ test("failure objects redact assertions, tokens, Secrets, and private material",
 });
 
 function clientWithAgentAuth(calls, responses, signer = () => "AQID", fetchOverride) {
-  return createVelarumPayClient({
+  return createPaytobeClient({
     baseUrl: "https://platform.test",
     requestIdFactory: () => "request_generated",
     fetch: fetchOverride || sequenceFetch(calls, responses),

@@ -15,7 +15,7 @@ import { createTenantScope } from "../../services/platform-api/src/ports/tenant-
 import { createConnectKey, id, opaqueToken, tokenHash } from "../../services/platform-api/src/crypto.js";
 import { Store } from "../../services/platform-api/src/store.js";
 
-const directory = fs.mkdtempSync(path.join(os.tmpdir(), "velarum-domain-verification-"));
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), "Paytobe-domain-verification-"));
 const store = new Store(path.join(directory, "platform.sqlite"));
 const at = "2026-08-02T00:00:00.000Z";
 for (const merchantId of ["merchant_a", "merchant_b"]) {
@@ -88,7 +88,7 @@ test("first verified domain atomically activates an email-verified merchant exac
   const pendingScope = scope("merchant_pending");
   const resolver = new FakeResolver(["93.184.216.34"]);
   const domains = service(resolver);
-  const created = domains.create(pendingScope, { domain: "pilot.velarumai.com", method: "dns_txt" });
+  const created = domains.create(pendingScope, { domain: "pilot.Paytobe.com", method: "dns_txt" });
   resolver.txt = [created.challenge];
 
   const verified = await domains.verify(pendingScope, created.merchant_domain.domain_id);
@@ -110,7 +110,7 @@ test("first verified domain atomically activates an email-verified merchant exac
 test("failed proof or invalid merchant verification state cannot partially activate", async () => {
   const noProofScope = scope("merchant_pending_no_proof");
   const noProofDomains = service(new FakeResolver(["8.8.8.8"]));
-  const noProof = noProofDomains.create(noProofScope, { domain: "no-proof.velarumai.com", method: "dns_txt" });
+  const noProof = noProofDomains.create(noProofScope, { domain: "no-proof.Paytobe.com", method: "dns_txt" });
   const rejected = await noProofDomains.verify(noProofScope, noProof.merchant_domain.domain_id);
   assert.equal(rejected.ok, false);
   assert.equal(store.db.prepare("SELECT status FROM merchants WHERE merchant_id = ?").get("merchant_pending_no_proof").status, "pending_verification");
@@ -119,7 +119,7 @@ test("failed proof or invalid merchant verification state cannot partially activ
   const invalidStateScope = scope("merchant_pending_bad_state");
   const resolver = new FakeResolver(["8.8.4.4"]);
   const invalidStateDomains = service(resolver);
-  const invalidState = invalidStateDomains.create(invalidStateScope, { domain: "bad-state.velarumai.com", method: "dns_txt" });
+  const invalidState = invalidStateDomains.create(invalidStateScope, { domain: "bad-state.Paytobe.com", method: "dns_txt" });
   resolver.txt = [invalidState.challenge];
   const conflict = await invalidStateDomains.verify(invalidStateScope, invalidState.merchant_domain.domain_id);
   assert.equal(conflict.ok, false);
@@ -132,7 +132,7 @@ test("HTTPS well-known verification requires an exact challenge and persists met
   let challenge = "";
   const fetcher = {
     async fetch(url, options) {
-      assert.equal(url, "https://pay.bravo.com/.well-known/velarumpay-domain-verification");
+      assert.equal(url, "https://pay.bravo.com/.well-known/Paytobe-domain-verification");
       assert.equal(options.redirect, "manual");
       return new Response(JSON.stringify({ challenge }), { status: 200, headers: { "content-type": "application/json" } });
     }
