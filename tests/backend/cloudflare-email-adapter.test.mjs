@@ -7,10 +7,10 @@ import { loadRuntimeConfig, validateRuntimeConfig } from "../../services/platfor
 const CONFIG = Object.freeze({
   account_id: "a".repeat(32),
   api_token: "cloudflare-email-token-with-sufficient-entropy",
-  from: "security@Paytobe.com",
+  from: "security@paytobe.com",
   from_name: "Paytobe",
-  reply_to: "support@Paytobe.com",
-  portal_base_url: "https://portal.Paytobe.com",
+  reply_to: "support@paytobe.com",
+  portal_base_url: "https://portal.paytobe.com",
   timeout_ms: 1_000
 });
 
@@ -37,9 +37,9 @@ test("Cloudflare verification email uses the REST endpoint and a one-time Portal
   assert.equal(calls[0].url, `https://api.cloudflare.com/client/v4/accounts/${"a".repeat(32)}/email/sending/send`);
   assert.equal(calls[0].options.headers.authorization, "Bearer cloudflare-email-token-with-sufficient-entropy");
   assert.equal(calls[0].body.to, "owner@example.com");
-  assert.match(calls[0].body.text, /https:\/\/portal\.Paytobe\.com\/verify-email\?token=mverify_/);
+  assert.match(calls[0].body.text, /https:\/\/portal\.paytobe\.com\/verify-email\?token=mverify_/);
   assert.match(calls[0].body.html, /Verify email/);
-  assert.equal(calls[0].body.reply_to, "support@Paytobe.com");
+  assert.equal(calls[0].body.reply_to, "support@paytobe.com");
   assert.equal(calls[0].body.headers, undefined);
 });
 

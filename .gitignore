@@ -64,6 +64,7 @@ transaction-history-store*.json
 # Regenerate with crates/Paytobe-wallet-core/scripts/build-apple.sh (iOS) and
 # build-android-host.sh (Android JVM tests).
 crates/Paytobe-wallet-core/target/
-apps/ios/Generated/
+apps/ios/Generated/*
+!apps/ios/Generated/Paytobe_wallet_core.swift
 apps/android/app/uniffi-generated/
 apps/android/app/src/main/jniLibs/

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
+  "devDependencies": {
+    "express": "^4.19.2"
+  },
   "workspaces": [
     "packages/protocol",
     "packages/sdk-js",

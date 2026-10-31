@@ -420,7 +420,7 @@ final class RelayClient {
             return PairingLookup(idOrCode: clean, code: clean, inputSource: "Short code")
         }
         guard let components = URLComponents(string: clean),
-              components.scheme?.lowercased() == "Paytobe" else {
+              components.scheme?.lowercased() == "paytobe" else {
             throw AppError.invalidResponse("Enter a 6-digit short code or Paytobe://pair URI.")
         }
         guard components.host?.lowercased() == "pair" || components.path == "/pair" else {

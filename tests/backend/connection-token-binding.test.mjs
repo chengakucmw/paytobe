@@ -118,7 +118,7 @@ function seedControlPlane(store, at) {
     VALUES ('agent_a', 'merchant_a', 'Agent A', 'node', 'testnet', '["payment.requests.create"]', 0, 'active', 1, ?, ?)`).run(at, at);
   store.db.prepare(`INSERT INTO agent_credentials
     (credential_id, merchant_id, agent_id, kid, alg, public_key, status, not_before, expires_at, revocation_version, version, created_at, updated_at)
-    VALUES ('credential_a', 'merchant_a', 'agent_a', 'kid_a', 'Ed25519', 'test-public-key', 'active', ?, '2027-01-01T00:00:00.000Z', 0, 1, ?, ?)`).run(at, at, at);
+    VALUES ('credential_a', 'merchant_a', 'agent_a', 'kid_a', 'Ed25519', 'test-public-key', 'active', ?, '2030-01-01T00:00:00.000Z', 0, 1, ?, ?)`).run(at, at, at);
 }
 
 function connectionInput() {
@@ -134,7 +134,7 @@ function connectionInput() {
     scopes: ["payment.requests.create"],
     approved_by_device_id: "device_a",
     pairing_session_id: "pair_a",
-    expires_at: "2026-09-01T00:00:00.000Z"
+    expires_at: "2030-01-01T00:00:00.000Z"
   };
 }
 
